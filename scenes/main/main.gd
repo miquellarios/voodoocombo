@@ -44,6 +44,14 @@ var score_crowns: Array[TextureRect] = []
 var score_values: Array[int] = []
 var score_change_times: Array[int] = []
 var bots_dash_global_left := 0.0
+var end_wait := 0.0
+var results_elapsed := 0.0
+var results_ranking: Array[Dictionary] = []
+var results_awards: Dictionary = {}
+var results_xp := 0
+var character_preview: TextureRect
+var character_preview_id := "mago"
+var character_idle := 0.0
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
@@ -64,6 +72,18 @@ func _ready() -> void:
 	_build_menu()
 
 func _process(delta: float) -> void:
+	if state == "match_end":
+		end_wait = maxf(0.0, end_wait - delta)
+		if end_wait == 0.0: _show_results()
+		return
+	if state == "results":
+		results_elapsed += delta
+		if results_elapsed >= 10.0: _build_menu()
+		return
+	if state == "menu":
+		character_idle += delta
+		if is_instance_valid(character_preview): _update_character_preview()
+		return
 	if state == "playing" and Input.is_action_just_pressed("dash"):
 		_start_dash(0)
 	if state == "playing" and Input.is_action_just_pressed("use_spell"):
@@ -141,7 +161,8 @@ func _begin_match(classic: bool = false) -> void:
 	opened_chests.clear()
 	floating.clear()
 	var names := [Profile.nick, "Mordisquitos", "Conde Costura", "Dama del Pantano"]
-	var characters := ["mago", "trol", "gnomo", "nigro"]
+	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
+	var characters := [Profile.character, "trol", "gnomo", "nigro"]
 	var sprite_colors := ["coral", "azul", "lima", "hueso"]
 	for i in range(4):
 		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
@@ -663,7 +684,9 @@ func _update_hud() -> void:
 		if not active: continue
 		var player: Dictionary = players[slot]
 		score_name_labels[slot].text = String(player.name)
-		score_tag_labels[slot].text = "%s%d · %s · %s" % [I18n.t("player"), slot + 1, I18n.t("you") if slot == 0 else String(player.shape), player.shape]
+		score_name_labels[slot].add_theme_color_override("font_color", player.color)
+		score_tag_labels[slot].text = "%s%d · %s%s" % [I18n.t("player"), slot + 1, (I18n.t("you") + " · ") if slot == 0 else "", player.shape]
+		score_tag_labels[slot].add_theme_color_override("font_color", player.color)
 		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
 		var portrait_texture: Texture2D = load(portrait_path)
 		if portrait_texture != null: score_portraits[slot].texture = portrait_texture
@@ -688,38 +711,90 @@ func _update_hud() -> void:
 
 func _build_menu() -> void:
 	_clear_hud()
+	_end_match_cleanup()
 	state = "menu"
 	var root := _new_overlay()
-	_label(root, "VOODOO COMBO", Vector2(0, 95), 64, Color("ffd23f"), true)
-	_label(root, I18n.t("how"), Vector2(0, 185), 20, Color("b8a9d1"), false)
-	_button(root, I18n.t("play") + " · " + I18n.t("voodoo"), Vector2(0, 240), func(): _begin_match(false))
-	_button(root, I18n.t("classic"), Vector2(0, 295), func(): _begin_match(true))
-	_button(root, I18n.t("settings"), Vector2(0, 350), _build_settings)
-	_button(root, "PERSONALIZAR", Vector2(0, 405), _build_customize)
-	_button(root, "HISTORIAL", Vector2(0, 460), _build_history)
-	_label(root, "WASD / Flechas · Espacio / A dash · E / B hechizo · Esc pausa", Vector2(0, 535), 18, Color("ffffff"), false)
-	_label(root, "Nivel %d   ·   %d XP   ·   %d partidas" % [Profile.level() + 1, Profile.xp, Profile.games], Vector2(0, 580), 18, Color("b8a9d1"), false)
+	var background := TextureRect.new()
+	background.texture = load("res://assets/ui/menu_fondo.png")
+	background.size = Vector2(1280, 720)
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(background)
+	root.move_child(background, 0)
+	var logo := TextureRect.new()
+	logo.name = "MenuLogo"
+	logo.texture = load("res://assets/ui/logo.png")
+	logo.position = Vector2(360, 14)
+	logo.size = Vector2(560, 253)
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(logo)
+	if not Settings.reduce_motion:
+		logo.position.y = -230
+		var logo_tween := create_tween()
+		logo_tween.tween_property(logo, "position:y", 14.0, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		logo_tween.set_loops()
+	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
+	var actions: Array[Callable] = [func(): _begin_match(false), func(): _begin_match(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
+	for index in range(labels.size()):
+		var button := _button(root, labels[index], Vector2(0, 302 + index * 59), actions[index])
+		if not Settings.reduce_motion:
+			button.modulate.a = 0.0
+			var tween := create_tween()
+			tween.tween_interval(index * 0.05)
+			tween.tween_property(button, "modulate:a", 1.0, 0.2)
+	_label(root, "Nivel %d · %d XP" % [Profile.level() + 1, Profile.xp], Vector2(-222, 666), 16, Color("b8a9d1"), false)
+	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
 
-func _build_customize() -> void:
+func _build_characters() -> void:
 	_clear_hud()
 	var root := _new_overlay()
-	_label(root, "PERSONALIZAR", Vector2(0, 115), 42, GameConfig.GOLD, true)
-	var hats := ["none", "witch", "crown"]
-	_button(root, "Sombrero: %s" % Profile.cosmetics.hat, Vector2(0, 210), func():
-		Profile.cosmetics.hat = hats[(hats.find(Profile.cosmetics.hat) + 1) % hats.size()]
-		Profile.save()
-		_build_customize())
-	var eyes := ["button", "star", "sleepy"]
-	_button(root, "Ojos: %s" % Profile.cosmetics.eyes, Vector2(0, 275), func():
-		Profile.cosmetics.eyes = eyes[(eyes.find(Profile.cosmetics.eyes) + 1) % eyes.size()]
-		Profile.save()
-		_build_customize())
-	var trails := ["none", "gold", "frost"]
-	_button(root, "Estela: %s" % Profile.cosmetics.trail, Vector2(0, 340), func():
-		Profile.cosmetics.trail = trails[(trails.find(Profile.cosmetics.trail) + 1) % trails.size()]
-		Profile.save()
-		_build_customize())
-	_button(root, I18n.t("menu"), Vector2(0, 425), _build_menu)
+	_label(root, I18n.t("characters"), Vector2(0, 65), 42, GameConfig.GOLD, true)
+	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
+	character_preview_id = Profile.character
+	character_preview = TextureRect.new()
+	character_preview.name = "CharacterPreview"
+	character_preview.position = Vector2(490, 145)
+	character_preview.size = Vector2(300, 300)
+	character_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	character_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	root.add_child(character_preview)
+	_update_character_preview()
+	var display: Dictionary = character_metadata.get("characters", {}).get(character_preview_id, {})
+	_label(root, String(display.get("name", character_preview_id.to_upper())), Vector2(0, 420), 34, Color("fff6c2"), true)
+	_label(root, String(display.get("role", "")), Vector2(0, 465), 20, Color("b8a9d1"), false)
+	var previous_button := _button(root, "◀", Vector2(-210, 265), func(): _cycle_character(-1))
+	previous_button.position = Vector2(350, 265)
+	previous_button.size = Vector2(64, 54)
+	var next_button := _button(root, "▶", Vector2(210, 265), func(): _cycle_character(1))
+	next_button.position = Vector2(866, 265)
+	next_button.size = Vector2(64, 54)
+	_button(root, I18n.t("menu"), Vector2(0, 565), _build_menu)
+	character_idle = 0.0
+
+func _cycle_character(direction: int) -> void:
+	var keys := ["mago", "trol", "gnomo", "nigro"]
+	var index := keys.find(character_preview_id)
+	character_preview_id = keys[posmod(index + direction, keys.size())]
+	Profile.character = character_preview_id
+	Profile.save()
+	_build_characters()
+
+func _update_character_preview() -> void:
+	if not is_instance_valid(character_preview): return
+	var sheet: Texture2D = load("res://assets/characters/%s_coral.png" % character_preview_id)
+	if sheet == null: return
+	var idle: Dictionary = character_metadata.get("animations", {}).get("idle", {"frames": 6, "fps": 6})
+	var width := int(character_metadata.get("frame_w", 224))
+	var height := int(character_metadata.get("frame_h", 256))
+	var frame := int(character_idle * float(idle.get("fps", 6))) % int(idle.get("frames", 6))
+	var atlas := AtlasTexture.new()
+	atlas.atlas = sheet
+	atlas.region = Rect2(frame * width, int(idle.get("row", 0)) * height, width, height)
+	character_preview.texture = atlas
 
 func _build_history() -> void:
 	_clear_hud()
@@ -818,9 +893,10 @@ func _build_hud() -> void:
 	var timer := Label.new()
 	timer.name = "Timer"
 	timer.position = Vector2(574, 10)
-	timer.size = Vector2(132, 48)
+	timer.position = Vector2(574, 2)
+	timer.size = Vector2(132, 58)
 	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	timer.add_theme_font_size_override("font_size", 32)
+	timer.add_theme_font_size_override("font_size", roundi(44 * Settings.ui_scale))
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
 	var slot_texture := TextureRect.new()
@@ -856,43 +932,104 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 	label.size = label_size
 	label.horizontal_alignment = alignment
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_font_size_override("font_size", roundi(font_size * Settings.ui_scale))
 	root.add_child(label)
 	return label
 
 func _finish_match() -> void:
-	if state == "results": return
-	state = "results"
-	var ranked := MatchRanking.rank(players)
+	if state in ["match_end", "results"]: return
+	results_ranking = MatchRanking.rank(players)
 	var place := 1
-	for i in range(ranked.size()):
-		if ranked[i].name == Profile.nick: place = i + 1
-	var gained := Profile.award_match(place, players[0].max_combo)
+	for i in range(results_ranking.size()):
+		if results_ranking[i].name == Profile.nick: place = i + 1
+	results_xp = Profile.award_match(place, players[0].max_combo)
+	results_awards = MatchRanking.awards(players)
 	var directory := "user://matches"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
 	var public_players: Array[Dictionary] = []
-	for player in ranked:
+	for player in results_ranking:
 		public_players.append({"name": player.name, "score": player.score, "shape": player.shape})
-	var record := {"date": Time.get_datetime_string_from_system(), "mode": mode, "winner": ranked[0].name, "ranking": public_players, "awards": MatchRanking.awards(players)}
+	var record := {"date": Time.get_datetime_string_from_system(), "mode": mode, "winner": results_ranking[0].name, "ranking": public_players, "awards": results_awards}
 	var file := FileAccess.open("%s/%s.json" % [directory, Time.get_datetime_string_from_system().replace(":", "-")], FileAccess.WRITE)
 	if file: file.store_string(JSON.stringify(record, "\t"))
 	HttpEndpoint.add_result(record)
 	_clear_hud()
+	_end_match_cleanup()
+	state = "match_end"
+	end_wait = 1.0
 	var root := _new_overlay()
-	_label(root, "%s  %s" % [I18n.t("winner"), ranked[0].name], Vector2(0, 105), 46, GameConfig.GOLD, true)
-	for i in range(ranked.size()):
-		_label(root, "%d  %s %s   %d" % [i + 1, ranked[i].shape, ranked[i].name, ranked[i].score], Vector2(0, 190 + i * 43), 24, ranked[i].color, false)
-	_label(root, "+%d XP   ·   Nivel %d" % [gained, Profile.level() + 1], Vector2(0, 380), 22, Color.WHITE, false)
-	_button(root, I18n.t("again"), Vector2(0, 445), func(): _begin_match(mode == "classic"))
-	_button(root, I18n.t("menu"), Vector2(0, 510), _build_menu)
+	_label(root, I18n.t("time_up"), Vector2(0, 285), 64, GameConfig.GOLD, true)
+
+func _show_results() -> void:
+	_clear_hud()
+	state = "results"
+	results_elapsed = 0.0
+	var root := _new_overlay()
+	root.add_child(_screen_backdrop())
+	_label(root, "%s  %s" % [I18n.t("winner"), String(results_ranking[0].get("name", ""))], Vector2(0, 36), 42, GameConfig.GOLD, true)
+	for index in range(results_ranking.size()):
+		var player: Dictionary = results_ranking[index]
+		var pedestal := ColorRect.new()
+		var pedestal_height := [58, 44, 34, 28][index]
+		pedestal.position = Vector2(408 + index * 150, 315 - pedestal_height)
+		pedestal.size = Vector2(94, pedestal_height)
+		pedestal.color = player.color.darkened(0.35)
+		pedestal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(pedestal)
+		var portrait := TextureRect.new()
+		portrait.position = Vector2(420 + index * 150, 130)
+		portrait.size = Vector2(70, 70)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.texture = load("res://assets/ui/retrato_%s_%s.png" % [player.get("character", "mago"), player.get("sprite_color", "coral")])
+		root.add_child(portrait)
+		_label(root, "%d · %s" % [index + 1, player.name], Vector2(-185 + index * 150, 204), 19, player.color, false)
+		_label(root, str(player.score), Vector2(-185 + index * 150, 232), 26, Color.WHITE, true)
+	var award_lines := PackedStringArray()
+	for award_name in results_awards:
+		award_lines.append("%s: %s" % [award_name, results_awards[award_name]])
+	_label(root, "  ·  ".join(award_lines), Vector2(0, 328), 16, Color("b8a9d1"), false)
+	_label(root, "+%d XP   ·   Nivel %d" % [results_xp, Profile.level() + 1], Vector2(0, 386), 22, Color.WHITE, false)
+	_button(root, I18n.t("main_menu"), Vector2(0, 455), _build_menu)
+	_button(root, I18n.t("again"), Vector2(0, 519), func(): _begin_match(mode == "classic"))
+
+func _end_match_cleanup() -> void:
+	players.clear()
+	coins.clear()
+	chests.clear()
+	opened_chests.clear()
+	hazard_runtime.clear()
+	obstacle_rects.clear()
+	floating.clear()
+	arena.clear()
+	arena_background = null
+	roll_time = 0.0
+	roll_player = -1
+	roll_result = ""
+	elapsed = 0.0
+	remaining = 90.0
+	countdown = 0.0
+	end_wait = 0.0
+	bots_dash_global_left = 0.0
+	score_name_labels.clear()
+	score_tag_labels.clear()
+	score_number_labels.clear()
+	score_portraits.clear()
+	score_crowns.clear()
+	score_values.clear()
+	score_change_times.clear()
+	queue_redraw()
+
+func _screen_backdrop() -> ColorRect:
+	var backdrop := ColorRect.new()
+	backdrop.color = GameConfig.BACKGROUND
+	backdrop.size = Vector2(1280, 720)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return backdrop
 
 func _draw() -> void:
-	if state == "menu":
+	if state in ["menu", "results", "match_end"]:
 		draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
-		for i in range(18):
-			var x := float((i * 83 + 27) % 1280)
-			var y := float((i * 131 + 65) % 720)
-			draw_circle(Vector2(x, y), 3.0 + float(i % 4), Color(0.42, 0.28, 0.52, 0.28))
 		return
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
 	draw_set_transform(OFFSET)
@@ -1110,8 +1247,8 @@ func _new_overlay() -> Control:
 	add_child(hud)
 	hud_root = Control.new()
 	hud_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hud_root.scale = Vector2.ONE * Settings.ui_scale
-	hud_root.position = Vector2((1280.0 - 1280.0 * Settings.ui_scale) * 0.5, (720.0 - 720.0 * Settings.ui_scale) * 0.5)
+	hud_root.scale = Vector2.ONE
+	hud_root.position = Vector2.ZERO
 	hud_root.theme = ThemeBuilder.build()
 	hud.add_child(hud_root)
 	return hud_root
@@ -1125,7 +1262,7 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 	label.position = Vector2(240, 0) + offset
 	label.size = Vector2(800, 52)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", roundi(size * Settings.ui_scale))
 	label.add_theme_color_override("font_color", tint)
 	label.add_theme_color_override("font_shadow_color", Color("160e22"))
 	label.add_theme_constant_override("shadow_offset_x", 2)
@@ -1133,18 +1270,20 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 	root.add_child(label)
 	return label
 
-func _button(root: Control, text: String, offset: Vector2, action: Callable) -> void:
+func _button(root: Control, text: String, offset: Vector2, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.position = Vector2(450, 0) + offset
-	button.size = Vector2(380, 54)
-	button.add_theme_font_size_override("font_size", 22)
+	button.position = Vector2(470, 0) + offset
+	button.size = Vector2(340, 54)
+	button.add_theme_font_size_override("font_size", roundi(26 * Settings.ui_scale))
 	button.focus_mode = Control.FOCUS_ALL
-	button.pressed.connect(action)
+	button.pressed.connect(func(): Sfx.play_tone(300.0, 0.07); action.call())
+	button.focus_entered.connect(func(): Sfx.play_tone(470.0, 0.045))
 	root.add_child(button)
 	if not root.has_meta("focus_set"):
 		button.grab_focus()
 		root.set_meta("focus_set", true)
+	return button
 
 func _random_position() -> Vector2:
 	for _attempt in range(100):

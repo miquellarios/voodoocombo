@@ -1,6 +1,7 @@
 extends Node
 
 var nick := "Viajero Vudú"
+var character := "mago"
 var xp := 0
 var games := 0
 var wins := 0
@@ -10,6 +11,7 @@ func _ready() -> void:
 	var config := ConfigFile.new()
 	if config.load("user://profile.cfg") == OK:
 		nick = str(config.get_value("profile", "nick", nick))
+		character = str(config.get_value("profile", "character", character))
 		xp = int(config.get_value("profile", "xp", 0))
 		games = int(config.get_value("profile", "games", 0))
 		wins = int(config.get_value("profile", "wins", 0))
@@ -23,6 +25,7 @@ func award_match(place: int, combo: int) -> int:
 		wins += 1
 	var config := ConfigFile.new()
 	config.set_value("profile", "nick", nick)
+	config.set_value("profile", "character", character)
 	config.set_value("profile", "xp", xp)
 	config.set_value("profile", "games", games)
 	config.set_value("profile", "wins", wins)
@@ -36,6 +39,7 @@ func level() -> int:
 func save() -> void:
 	var config := ConfigFile.new()
 	config.set_value("profile", "nick", nick)
+	config.set_value("profile", "character", character)
 	config.set_value("profile", "xp", xp)
 	config.set_value("profile", "games", games)
 	config.set_value("profile", "wins", wins)
