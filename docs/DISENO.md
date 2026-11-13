@@ -1,5 +1,7 @@
 # VoodooCombo — Diseño simple y adictivo
 
+> **Actualización:** la parte visual ha cambiado a fantasía oscura. Ahora hay personajes elegibles (Brasa, Colmillo, Tuerca, Cripta) y 4 arenas con trampas. La referencia vigente es `AGENTS.md` §4.1, §4.8 y §7. Las mecánicas de este documento siguen igual.
+
 > Versión definitiva: se entiende en 5 segundos y te deja con ganas de "una más".
 > Sustituye a las propuestas de ajedrez y de cartas por turnos.
 

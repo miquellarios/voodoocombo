@@ -11,6 +11,9 @@
        │
        ▼
 5 Turnos tipo ajedrez ─► 6 Ajedrez modular ✗ ─► 7 Simple y con dopamina ✓ ─► 8 Revisión contra el enunciado
+       │
+       ▼
+9 Tráiler ─► 10 Estilo visual (5 versiones, v3 ✓) ─► 11 Sprites para Godot ─► 12 Arenas con trampas
 ```
 
 ---
@@ -85,6 +88,38 @@
   - **Modo Clásico** (literal del enunciado: 15 de 50 doblones), 50 doblones iniciales, salidas aleatorias y "¡Eres el Jugador N!".
   - Una página web en el endpoint e historial de partidas.
   - Plan de documentación, de presentación y de demo.
+- **Decidimos:** [completad].
+
+### 9 · Tráiler conceptual
+- **Pedimos:** un tráiler del juego.
+- **Propuso:**
+  - Primero un teaser animado en el navegador para verlo en el móvil.
+  - Después un tráiler de 42 s en MP4, generado por código (Python + Cairo para la imagen y sonido sintetizado), con la etiqueta "Tráiler conceptual".
+- **Decidimos:** [completad].
+
+### 10 · Dirección visual: 5 versiones de personajes ⭐
+| Versión | Qué propuso la IA | Qué dijimos |
+|---|---|---|
+| v1 | Muñecos simples y brillantes, letras Lilita One | Demasiado simple: "algo más oscuro" |
+| v2 | Muñecos de arpillera oscuros con costuras, dos opciones de logo | "Como trolls, gnomos, magos… referencias de WoW" |
+| **v3** | Muñecos vudú de fantasía: mago, trol, gnomo, nigromante (diseños y nombres propios, sin copiar a Blizzard) | **Elegido** ✓ |
+| v4 | Personajes humanoides | Al compañero no le gustó ✗ |
+| v5 | Chibi que mezcla los dos | Descartado: nos quedamos con v3 |
+- **Aprendizaje:** la IA itera muy rápido sobre lo visual. La decisión de estilo fue del equipo.
+
+### 11 · Sprites para Godot ⭐
+- **Pregunta del compañero:** ¿puede la IA usar las imágenes para crear los modelos en Godot, o hacerlos ella misma?
+- **Propuso:** en vez de pedirle a Codex que copie las imágenes (saldría peor), generar los sprites con el mismo código que el tráiler.
+  - 4 personajes × 4 colores.
+  - 5 animaciones cada uno.
+  - Metadatos en JSON y una guía con el código de carga en Godot.
+- **Decidimos:** [completad].
+
+### 12 · Arenas con trampas
+- **Pedimos:** más arenas para no jugar siempre en la misma, con trampas y cosas por el mapa.
+- **Propuso:** 4 arenas (Ciénaga, Cripta, Taller, Biblioteca), cada una con su decoración y 2-3 trampas que siempre avisan antes de hacer daño.
+  - Las trampas periódicas se calculan con el reloj de la partida, así que no hace falta sincronizarlas por red.
+  - Exportó fondos, sprites y un `arenas.json` con el mapa.
 - **Decidimos:** [completad].
 
 ---

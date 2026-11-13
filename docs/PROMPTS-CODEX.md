@@ -56,6 +56,17 @@ pero la lógica de partida tiene que estar ya en un nodo "servidor" local, para 
 En docs/BITACORA.md: qué probar y qué valores de game_config.gd creéis que habrá que ajustar. Commit.
 ```
 
+## Fase 2b — Personajes y arenas (assets)
+
+```
+Fase 2b: integra los assets que ya están en el repo.
+- Personajes: autoload CharSprites tal como está en assets/characters/SPRITES.md. El jugador usa un AnimatedSprite2D
+  (idle, walk, dash, hurt, win) con flip_h según la dirección. La forma ● ▲ ■ ◆ se dibuja debajo con _draw().
+- Arenas: sigue el prompt de assets/arenas/ARENAS.md (arena_data, arena_gen, colisiones, trampas en net/hazards.gd).
+- Añade la niebla y el parpadeo de las velas por encima de la arena.
+Tests, docs/BITACORA.md y commit.
+```
+
 ## Fase 3 — Multijugador en red
 
 ```
@@ -90,11 +101,10 @@ Cada acción tiene que responder en menos de 100 ms. En docs/BITACORA.md: lista 
 
 ```
 Fase 5: identidad visual según la sección 7 de AGENTS.md.
-- ui/theme_builder.gd: Theme en código con la paleta, botones gordos que rebotan al pasar por encima y
-  se aplastan al pulsar, y fuentes Lilita One / Baloo 2.
-- Muñeco definitivo: silueta de judía, ojos de botón, boca cosida, costura en X, contorno de 4 px,
-  bote al andar, estiramiento y aplastamiento en el dash.
-- Los 4 biomas con su suelo, sus obstáculos y decorado de bajo contraste.
+- ui/theme_builder.gd: Theme en código con la paleta oscura de AGENTS.md §7, botones que rebotan al pasar por encima
+  y se aplastan al pulsar, y fuentes New Rocker (títulos) / Lilita One (números) / Baloo 2 (texto).
+- Personajes: ya son sprites. Añade bote al andar y estiramiento en el dash con la escala del nodo (no los redibujes).
+- Arenas: ya son assets. Añade la viñeta, la niebla y las luces de las velas por encima.
 - Doblones que giran y brillan; cofres que flotan y brillan.
 - Menú principal: logo VOODOO COMBO con letras que se mueven, botón JUGAR enorme (foco inicial) y tu
   muñeco bailando.
