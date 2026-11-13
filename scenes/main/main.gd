@@ -28,6 +28,7 @@ var arena_background: Texture2D
 var character_metadata: Dictionary = {}
 var character_sheets: Dictionary = {}
 var hazard_sheets: Dictionary = {}
+var bots_dash_global_left := 0.0
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
@@ -54,6 +55,7 @@ func _process(delta: float) -> void:
 	if state != "playing":
 		_animate_floating(delta)
 		return
+	bots_dash_global_left = maxf(0.0, bots_dash_global_left - delta)
 	elapsed += delta
 	remaining = maxf(0.0, remaining - delta)
 	if not frenzy_notified and mode == "voodoo" and remaining <= 15.0:
@@ -74,9 +76,9 @@ func _process(delta: float) -> void:
 	_update_player(0, delta)
 	for i in range(1, players.size()):
 		_update_bot(i, delta)
+	_update_dash_hits()
 	_separate_players()
 	_update_pickups()
-	_update_dash_hits()
 	_update_roll(delta)
 	_update_hud()
 	_animate_floating(delta)
@@ -117,7 +119,7 @@ func _begin_match(classic: bool = false) -> void:
 		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
 		if not character_sheets.has(sheet_key):
 			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
-		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO})
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1})
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0})
 	elapsed = 0.0
@@ -136,6 +138,13 @@ func _update_player(index: int, delta: float) -> void:
 	player.stun = maxf(0.0, player.stun - delta)
 	player.invuln = maxf(0.0, player.invuln - delta)
 	player.dash_cd = maxf(0.0, player.dash_cd - delta)
+	player.dash_lock = maxf(0.0, player.dash_lock - delta)
+	if player.recoil_left > 0.0:
+		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
+		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		player.recoil_left = maxf(0.0, player.recoil_left - delta)
+		player.vel = Vector2.ZERO
+		return
 	var had_timed_item: bool = float(player.item_time) > 0.0
 	player.item_time = maxf(0.0, player.item_time - delta)
 	if had_timed_item and player.item_time == 0.0:
@@ -167,6 +176,14 @@ func _update_bot(index: int, delta: float) -> void:
 	player.stun = maxf(0.0, player.stun - delta)
 	player.dash_cd = maxf(0.0, player.dash_cd - delta)
 	player.invuln = maxf(0.0, player.invuln - delta)
+	player.dash_lock = maxf(0.0, player.dash_lock - delta)
+	player.bot_recent_hit = maxf(0.0, player.bot_recent_hit - delta)
+	if player.recoil_left > 0.0:
+		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
+		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		player.recoil_left = maxf(0.0, player.recoil_left - delta)
+		player.vel = Vector2.ZERO
+		return
 	var had_timed_item: bool = float(player.item_time) > 0.0
 	player.item_time = maxf(0.0, player.item_time - delta)
 	if had_timed_item and player.item_time == 0.0: player.item = ""
@@ -179,17 +196,19 @@ func _update_bot(index: int, delta: float) -> void:
 		for chest in chests:
 			chest_positions.append(chest)
 	var direction := BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
-	var should_dash := false
-	if player.dash_cd <= 0.0 and player.item != "sheep":
-		for j in range(players.size()):
-			if j != index and player.pos.distance_to(players[j].pos) < 120.0 and rng.randf() < 0.3:
-				direction = (players[j].pos - player.pos).normalized()
-				should_dash = true
-				break
-	if should_dash and direction != Vector2.ZERO:
-		player.dash_dir = direction
-		player.dash_left = GameConfig.DASH_DURATION
-		player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
+	player.bot_action_left = float(player.bot_action_left) - delta
+	if player.bot_action_left <= 0.0:
+		player.bot_action_left = rng.randf_range(GameConfig.BOT_DECISION_MIN_SECONDS, GameConfig.BOT_DECISION_MAX_SECONDS)
+		player.bot_dash_target = BotBrain.choose_dash_target(player, players, index, obstacle_rects, rng) if bots_dash_global_left <= 0.0 else -1
+	if bots_dash_global_left <= 0.0 and player.dash_cd <= 0.0 and int(player.bot_dash_target) >= 0 and player.dash_lock <= 0.0:
+		var target_index := int(player.bot_dash_target)
+		if target_index < players.size():
+			direction = (players[target_index].pos - player.pos).normalized()
+			player.dash_dir = direction
+			player.dash_left = GameConfig.DASH_DURATION
+			player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
+			bots_dash_global_left = GameConfig.BOT_TEAM_DASH_INTERVAL
+		player.bot_dash_target = -1
 	var speed_scale := 0.6 if player.item == "sheep" else (1.6 if player.item == "boots" else 1.0)
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
@@ -210,7 +229,7 @@ func _update_bot(index: int, delta: float) -> void:
 
 func _start_dash(index: int) -> void:
 	var player := players[index]
-	if player.dash_cd > 0.0 or player.stun > 0.0 or player.item == "sheep": return
+	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or player.item == "sheep": return
 	player.dash_left = GameConfig.DASH_DURATION
 	player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
 	if player.vel.length() > 0.1: player.dash_dir = player.vel.normalized()
@@ -257,10 +276,21 @@ func _update_dash_hits() -> void:
 	for i in range(players.size()):
 		if players[i].dash_left <= 0.0: continue
 		for j in range(players.size()):
-			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > 38.0: continue
+			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > GameConfig.PLAYER_RADIUS * 2.0: continue
 			if players[j].dash_left > 0.0:
+				var away := (players[i].pos - players[j].pos).normalized()
+				if away == Vector2.ZERO:
+					away = Vector2.RIGHT
+				players[i].recoil_dir = away
+				players[j].recoil_dir = -away
+				players[i].recoil_left = GameConfig.DASH_CLASH_RECOIL_SECONDS
+				players[j].recoil_left = GameConfig.DASH_CLASH_RECOIL_SECONDS
+				players[i].dash_lock = GameConfig.DASH_CLASH_LOCK_SECONDS
+				players[j].dash_lock = GameConfig.DASH_CLASH_LOCK_SECONDS
 				players[i].dash_left = 0.0
 				players[j].dash_left = 0.0
+				Fx.hit()
+				Sfx.play_tone(210.0, 0.12)
 				break
 			var victim: Dictionary = players[j]
 			if victim.item == "cloak":
@@ -276,6 +306,10 @@ func _update_dash_hits() -> void:
 			victim.hits += 1
 			players[i].dashes += 1
 			players[i].stolen += dropped
+			if players[i].is_bot:
+				players[i].bot_recent_hit = GameConfig.BOT_RECENT_HIT_LOCK_SECONDS
+				players[i].bot_ignored_peer = j
+				players[i].bot_repath_left = 0.0
 			for d in range(dropped):
 				var angle := TAU * float(d) / maxf(1.0, dropped)
 				coins.append({"pos": victim.pos + Vector2.RIGHT.rotated(angle) * rng.randf_range(45.0, 110.0), "owner": j, "lock": 0.6})

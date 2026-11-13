@@ -8,6 +8,7 @@ func _initialize() -> void:
 	_test_arena()
 	_test_arena_physics()
 	_test_bot_pathfinding()
+	_test_bot_dash_rate()
 	_test_items()
 	_test_ranking()
 	if failures == 0:
@@ -79,6 +80,36 @@ func _test_bot_pathfinding() -> void:
 		var direction: Vector2 = (path[path_index] - position).normalized()
 		position = ArenaPhysics.move_circle(position, direction * GameConfig.PLAYER_SPEED / 60.0, GameConfig.PLAYER_RADIUS, obstacle_rects)
 	_check(position.distance_to(goal) < 28.0, "bot reaches target behind obstacle within five seconds")
+
+func _test_bot_dash_rate() -> void:
+	var players: Array[Dictionary] = [
+		{"pos": Vector2(300.0, 300.0), "is_bot": true, "dash_cd": 0.0, "dash_lock": 0.0, "bot_recent_hit": 0.0, "item": "", "stun": 0.0, "invuln": 0.0},
+		{"pos": Vector2(330.0, 300.0), "is_bot": true, "dash_cd": 0.0, "dash_lock": 0.0, "bot_recent_hit": 0.0, "item": "", "stun": 0.0, "invuln": 0.0}
+	]
+	var decision_left := [0.0, 0.0]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 33
+	var dash_count := 0
+	var team_dash_left := 0.0
+	for _frame in range(600):
+		team_dash_left = maxf(0.0, team_dash_left - 1.0 / 60.0)
+		for i in range(players.size()):
+			players[i].dash_cd = maxf(0.0, players[i].dash_cd - 1.0 / 60.0)
+			players[i].bot_recent_hit = maxf(0.0, players[i].bot_recent_hit - 1.0 / 60.0)
+			decision_left[i] -= 1.0 / 60.0
+			if decision_left[i] <= 0.0 and team_dash_left <= 0.0:
+				decision_left[i] = rng.randf_range(GameConfig.BOT_DECISION_MIN_SECONDS, GameConfig.BOT_DECISION_MAX_SECONDS)
+				var target := BotBrain.choose_dash_target(players[i], players, i, [], rng)
+				if target >= 0:
+					dash_count += 1
+					players[i].dash_cd = GameConfig.DASH_COOLDOWN
+					players[i].bot_recent_hit = GameConfig.BOT_RECENT_HIT_LOCK_SECONDS
+					team_dash_left = GameConfig.BOT_TEAM_DASH_INTERVAL
+		var separated := ArenaPhysics.separate_pair(players[0].pos, players[1].pos, GameConfig.PLAYER_RADIUS, [])
+		players[0].pos = separated[0]
+		players[1].pos = separated[1]
+	_check(dash_count <= 4, "nearby bots do not spam more than four dashes in ten seconds")
+	_check(players[0].pos.distance_to(players[1].pos) >= GameConfig.PLAYER_RADIUS * 2.0, "nearby bots remain separated")
 
 func _test_items() -> void:
 	var rng := RandomNumberGenerator.new()

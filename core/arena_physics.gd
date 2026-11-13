@@ -34,6 +34,16 @@ static func separate_pair(first: Vector2, second: Vector2, radius: float, obstac
 		moved_first = move_circle(moved_first, -direction * (minimum_distance - moved_first.distance_to(moved_second)), radius, obstacles, arena_size)
 	return [moved_first, moved_second]
 
+static func segment_clear(from: Vector2, to: Vector2, obstacles: Array) -> bool:
+	var distance := from.distance_to(to)
+	var steps := maxi(1, ceili(distance / 8.0))
+	for step in range(1, steps):
+		var point := from.lerp(to, float(step) / float(steps))
+		for obstacle in obstacles:
+			if obstacle.has_point(point):
+				return false
+	return true
+
 static func _overlaps_rect(center: Vector2, radius: float, rect: Rect2) -> bool:
 	var closest := Vector2(clampf(center.x, rect.position.x, rect.end.x), clampf(center.y, rect.position.y, rect.end.y))
 	return closest.distance_squared_to(center) < radius * radius

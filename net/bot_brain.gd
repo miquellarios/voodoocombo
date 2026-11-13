@@ -19,6 +19,23 @@ static func choose_direction(position: Vector2, coins: Array[Vector2], opponents
 				break
 	return {"direction": direction, "dash": dash}
 
+static func choose_dash_target(player: Dictionary, players: Array[Dictionary], player_index: int, obstacles: Array[Rect2], rng: RandomNumberGenerator) -> int:
+	if float(player.get("dash_cd", 0.0)) > 0.0 or float(player.get("dash_lock", 0.0)) > 0.0 or float(player.get("bot_recent_hit", 0.0)) > 0.0 or String(player.get("item", "")) == "sheep":
+		return -1
+	for target_index in range(players.size()):
+		if target_index == player_index:
+			continue
+		var target: Dictionary = players[target_index]
+		if float(target.get("invuln", 0.0)) > 0.0 or float(target.get("stun", 0.0)) > 0.0:
+			continue
+		if player.pos.distance_to(target.pos) >= GameConfig.BOT_DASH_RANGE:
+			continue
+		if not ArenaPhysics.segment_clear(player.pos, target.pos, obstacles):
+			continue
+		if rng.randf() < GameConfig.BOT_DASH_CHANCE:
+			return target_index
+	return -1
+
 static func find_path(position: Vector2, goal: Vector2, arena: Dictionary, elapsed: float = 0.0) -> Array[Vector2]:
 	var grid := _build_grid(arena, elapsed)
 	var from_cell := _world_to_cell(position)

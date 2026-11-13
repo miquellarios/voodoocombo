@@ -28,6 +28,12 @@ Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el prof
 - Problemas encontrados y cómo se resolvieron: El primer test tomó un camino que rozaba una esquina y el círculo no podía seguirlo; al incluir la huella de colisión en la cuadrícula, el bot llega al objetivo en menos de cinco segundos.
 - Qué tienen que probar los humanos: Dejar bots en esquinas y alrededor de muros durante dos minutos y revisar que no se atasquen, que elijan cofres sin hechizo y que eviten pinchos, barriles y rayos.
 
+### Fase 9c — Dash de bots y choques (13/11/2026)
+- Qué se ha hecho: Los bots evalúan ataques cada 0,4–0,6 s, solo contra rivales visibles, cercanos, vulnerables y con dash disponible. Tras un golpe se bloquean 2,5 s; hay una pausa compartida entre bots para evitar cadenas. Dos dashes que chocan rebotan 70 px y bloquean el dash 0,3 s. El dash también se corta al chocar con un muro.
+- Decisiones: Se prioriza el control de spam con una espera común de 2,5 s entre dashes de bots, manteniendo además el porcentaje de acierto del 30 % en cada decisión.
+- Problemas encontrados y cómo se resolvieron: El test inicial superó el límite de cuatro dashes en diez segundos; una pausa compartida entre bots eliminó esa ráfaga y el test pasó.
+- Qué tienen que probar los humanos: Dejar dos bots cerca durante diez segundos sin monedas próximas, observar choques entre dashes y confirmar que ninguno se queda haciendo dash repetidamente ni queda dentro del otro.
+
 Formato de cada entrada:
 
 ```
