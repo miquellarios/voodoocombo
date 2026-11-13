@@ -122,3 +122,9 @@ Formato de cada entrada:
 - Decisiones: Se conservaron los datos y los nombres de archivos originales del paquete. El generador acepta los arrays que trae `arenas.json` y el formato de texto documentado en `ARENAS.md`; la selección de salidas y sus asignaciones usa la semilla.
 - Problemas encontrados y cómo se resolvieron: Godot no podía escribir su configuración en las rutas de usuario del entorno; al redirigir `APPDATA`, `LOCALAPPDATA` y las carpetas temporales a `.godot-appdata/` y `.godot-tmp/`, se generó un PCK válido. La suite core pasó y el PCK actualizado arranca en modo headless.
 - Qué tienen que probar los humanos: Abrir `build/VoodooCombo-0.1.exe` y confirmar las cuatro arenas, el encaje de los fondos, escala/animación de los personajes, colisiones y ubicación de doblones. Las imágenes de las trampas están integradas; sus efectos de juego aún no están conectados.
+
+### Fase 9f — HUD ilustrado (13/11/2026)
+- Qué se ha hecho: Sustituido el marcador de texto por cuatro fichas con panel 9-slice, retrato, nombre, forma, puntuación animada y corona del líder; el reloj ahora muestra minutos y segundos, y la ranura inferior usa los gráficos de hechizos del kit. El HUD se dibuja en una capa superior y conserva el escalado de interfaz.
+- Decisiones: Se muestran las cuatro fichas para mantener ubicaciones estables aunque haya menos jugadores; las fichas vacías se ocultan. La ficha local indica «TÚ» según el idioma.
+- Problemas encontrados y cómo se resolvieron: Ninguno durante la compilación de scripts y las pruebas headless.
+- Qué tienen que probar los humanos: Revisar el HUD en ventana 1280×720 y con escala 100/125/150 %, comprobar corona y puntos durante una partida y verificar los iconos de hechizos.

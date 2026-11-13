@@ -1,0 +1,72 @@
+{
+  "ui": {
+    "boton": {
+      "file": "boton.png",
+      "size": [
+        120,
+        84
+      ],
+      "margin": 24,
+      "godot": "StyleBoxTexture: texture_margin_* = 24, axis_stretch_horizontal/vertical = TILE_FIT, content_margin_* = 20"
+    },
+    "boton_hover": {
+      "file": "boton_hover.png",
+      "size": [
+        120,
+        84
+      ],
+      "margin": 24,
+      "godot": "StyleBoxTexture: texture_margin_* = 24, axis_stretch_horizontal/vertical = TILE_FIT, content_margin_* = 20"
+    },
+    "boton_pulsado": {
+      "file": "boton_pulsado.png",
+      "size": [
+        120,
+        84
+      ],
+      "margin": 24,
+      "godot": "StyleBoxTexture: texture_margin_* = 24, axis_stretch_horizontal/vertical = TILE_FIT, content_margin_* = 20"
+    },
+    "panel": {
+      "file": "panel.png",
+      "size": [
+        120,
+        84
+      ],
+      "margin": 24,
+      "godot": "StyleBoxTexture: texture_margin_* = 24, axis_stretch_horizontal/vertical = TILE_FIT, content_margin_* = 20"
+    },
+    "ranura": {
+      "file": "ranura.png",
+      "size": [
+        160,
+        160
+      ],
+      "note": "Ranura del hechizo (HUD, abajo a la izquierda). El icono va centrado."
+    },
+    "logo": {
+      "file": "logo.png",
+      "size": [
+        986,
+        446
+      ],
+      "note": "Logo con transparencia. En el menú: ancho ~560 px (scale ≈ 0.57)."
+    },
+    "retratos": {
+      "file": "retrato_<personaje>_<color>.png",
+      "size": [
+        112,
+        112
+      ],
+      "note": "Cabeza en un círculo con borde del color del jugador, para las fichas del marcador. Dibujar a 56×56."
+    },
+    "menu_fondo": {
+      "file": "menu_fondo.png",
+      "size": [
+        1920,
+        1080
+      ],
+      "note": "Fondo del menú principal. TextureRect a pantalla completa (stretch KEEP_ASPECT_COVERED). Deja libre la columna central (x 470-810 en 1280×720) para el logo y los botones."
+    }
+  }
+}

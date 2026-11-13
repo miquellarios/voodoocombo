@@ -36,6 +36,13 @@ var character_sheets: Dictionary = {}
 var hazard_sheets: Dictionary = {}
 var item_metadata: Dictionary = {}
 var spell_atlases: Array[AtlasTexture] = []
+var score_name_labels: Array[Label] = []
+var score_tag_labels: Array[Label] = []
+var score_number_labels: Array[Label] = []
+var score_portraits: Array[TextureRect] = []
+var score_crowns: Array[TextureRect] = []
+var score_values: Array[int] = []
+var score_change_times: Array[int] = []
 var bots_dash_global_left := 0.0
 
 func _ready() -> void:
@@ -644,22 +651,40 @@ func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
 	var time_label := hud_root.get_node_or_null("Timer") as Label
 	if time_label:
-		time_label.text = str(ceil(remaining)) if state == "playing" else ("3 · 2 · 1" if state == "countdown" else "")
-	var score_label := hud_root.get_node_or_null("Scores") as Label
-	if score_label:
-		var lines := PackedStringArray()
-		for index in _score_order():
-			var p: Dictionary = players[index]
-			lines.append("%s %s  %d%s" % [p.shape, p.name, p.score, "  👑" if index == _leader_index() else ""])
-		score_label.text = "     ".join(lines)
-	var spell_label := hud_root.get_node_or_null("Spell") as Label
-	if spell_label and not players.is_empty():
-		spell_label.text = "E  %s" % (players[0].item.to_upper() if players[0].item != "" else "—")
+		var seconds := maxi(0, ceili(remaining))
+		time_label.text = ("3 · 2 · 1" if state == "countdown" else "%d:%02d" % [seconds / 60, seconds % 60])
+		time_label.add_theme_color_override("font_color", GameConfig.GOLD if remaining <= 15.0 and mode == "voodoo" else Color.WHITE)
+	var leader := _leader_index() if not players.is_empty() else -1
+	for slot in range(score_name_labels.size()):
+		var active := slot < players.size()
+		for control in [score_name_labels[slot], score_tag_labels[slot], score_number_labels[slot], score_portraits[slot]]:
+			control.visible = active
+		score_crowns[slot].visible = active and slot == leader
+		if not active: continue
+		var player: Dictionary = players[slot]
+		score_name_labels[slot].text = String(player.name)
+		score_tag_labels[slot].text = "%s%d · %s · %s" % [I18n.t("player"), slot + 1, I18n.t("you") if slot == 0 else String(player.shape), player.shape]
+		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
+		var portrait_texture: Texture2D = load(portrait_path)
+		if portrait_texture != null: score_portraits[slot].texture = portrait_texture
+		var value := int(player.score)
+		if score_values[slot] != value:
+			score_values[slot] = value
+			score_change_times[slot] = Time.get_ticks_msec()
+		var age := Time.get_ticks_msec() - score_change_times[slot]
+		var pop := 1.0 + (0.24 * (1.0 - float(age) / 170.0) if age < 170 else 0.0)
+		score_number_labels[slot].scale = Vector2.ONE * pop
+		score_number_labels[slot].pivot_offset = score_number_labels[slot].size * 0.5
+		score_number_labels[slot].text = str(value)
+		score_number_labels[slot].add_theme_color_override("font_color", GameConfig.GOLD if age < 170 else Color.WHITE)
 	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
+	var spell_name := hud_root.get_node_or_null("SpellName") as Label
 	if spell_icon and not players.is_empty():
 		var spell_index := ITEMS.find(String(players[0].item))
 		spell_icon.visible = spell_index >= 0
 		spell_icon.texture = spell_atlases[spell_index] if spell_index >= 0 else null
+	if spell_name and not players.is_empty():
+		spell_name.text = String(players[0].item).to_upper() if not String(players[0].item).is_empty() else I18n.t("spell")
 
 func _build_menu() -> void:
 	_clear_hud()
@@ -746,35 +771,77 @@ func _build_hud() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	if state == "menu": return
-	var score := Label.new()
-	score.name = "Scores"
-	score.position = Vector2(24, 10)
-	score.size = Vector2(1232, 44)
-	score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	score.add_theme_font_size_override("font_size", 19)
-	root.add_child(score)
+	score_name_labels.clear()
+	score_tag_labels.clear()
+	score_number_labels.clear()
+	score_portraits.clear()
+	score_crowns.clear()
+	score_values.clear()
+	score_change_times.clear()
+	var card_x := [8.0, 294.0, 706.0, 992.0]
+	for slot in range(4):
+		var card := NinePatchRect.new()
+		card.texture = load("res://assets/ui/panel.png")
+		card.patch_margin_left = 24
+		card.patch_margin_top = 24
+		card.patch_margin_right = 24
+		card.patch_margin_bottom = 24
+		card.position = Vector2(card_x[slot], 8)
+		card.size = Vector2(280, 54)
+		root.add_child(card)
+		var portrait := TextureRect.new()
+		portrait.position = Vector2(card_x[slot] + 6, 13)
+		portrait.size = Vector2(44, 44)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.texture = load("res://assets/ui/retrato_mago_coral.png")
+		root.add_child(portrait)
+		var crown := TextureRect.new()
+		crown.position = Vector2(card_x[slot] + 11, 3)
+		crown.size = Vector2(34, 20)
+		crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		crown.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		crown.texture = load("res://assets/characters/crown.png")
+		crown.visible = false
+		root.add_child(crown)
+		var name_label := _hud_label(root, Vector2(card_x[slot] + 58, 9), Vector2(154, 25), 18, HORIZONTAL_ALIGNMENT_LEFT)
+		var tag_label := _hud_label(root, Vector2(card_x[slot] + 58, 31), Vector2(158, 22), 13, HORIZONTAL_ALIGNMENT_LEFT)
+		tag_label.add_theme_color_override("font_color", Color("b8a9d1"))
+		var number := _hud_label(root, Vector2(card_x[slot] + 216, 6), Vector2(58, 48), 32, HORIZONTAL_ALIGNMENT_RIGHT)
+		score_name_labels.append(name_label)
+		score_tag_labels.append(tag_label)
+		score_number_labels.append(number)
+		score_portraits.append(portrait)
+		score_crowns.append(crown)
+		score_values.append(-1)
+		score_change_times.append(0)
 	var timer := Label.new()
 	timer.name = "Timer"
-	timer.position = Vector2(535, 48)
-	timer.size = Vector2(210, 56)
+	timer.position = Vector2(574, 10)
+	timer.size = Vector2(132, 48)
 	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	timer.add_theme_font_size_override("font_size", 38)
+	timer.add_theme_font_size_override("font_size", 32)
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
-	var spell := Label.new()
-	spell.name = "Spell"
-	spell.position = Vector2(88, 650)
-	spell.size = Vector2(240, 42)
-	spell.add_theme_font_size_override("font_size", 21)
-	root.add_child(spell)
+	var slot_texture := TextureRect.new()
+	slot_texture.texture = load("res://assets/ui/ranura.png")
+	slot_texture.position = Vector2(12, 626)
+	slot_texture.size = Vector2(80, 80)
+	slot_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	root.add_child(slot_texture)
 	var spell_icon := TextureRect.new()
 	spell_icon.name = "SpellIcon"
-	spell_icon.position = Vector2(24, 630)
-	spell_icon.size = Vector2(56, 56)
+	spell_icon.position = Vector2(28, 642)
+	spell_icon.size = Vector2(48, 48)
 	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	spell_icon.visible = false
 	root.add_child(spell_icon)
+	var spell_key := _hud_label(root, Vector2(65, 675), Vector2(34, 26), 18, HORIZONTAL_ALIGNMENT_CENTER)
+	spell_key.text = "E"
+	var spell_name := _hud_label(root, Vector2(99, 651), Vector2(170, 30), 17, HORIZONTAL_ALIGNMENT_LEFT)
+	spell_name.name = "SpellName"
 	var pause := Button.new()
 	pause.text = "Ⅱ"
 	pause.position = Vector2(1200, 648)
@@ -782,6 +849,16 @@ func _build_hud() -> void:
 	pause.pressed.connect(func(): state = "paused"; _build_pause())
 	root.add_child(pause)
 	_update_hud()
+
+func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size: int, alignment: HorizontalAlignment) -> Label:
+	var label := Label.new()
+	label.position = position
+	label.size = label_size
+	label.horizontal_alignment = alignment
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", font_size)
+	root.add_child(label)
+	return label
 
 func _finish_match() -> void:
 	if state == "results": return
@@ -1029,6 +1106,7 @@ func _draw_ray_beams(center: Vector2, angle: float) -> void:
 
 func _new_overlay() -> Control:
 	hud = CanvasLayer.new()
+	hud.layer = 10
 	add_child(hud)
 	hud_root = Control.new()
 	hud_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
