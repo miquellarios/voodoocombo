@@ -34,6 +34,12 @@ Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el prof
 - Problemas encontrados y cómo se resolvieron: El test inicial superó el límite de cuatro dashes en diez segundos; una pausa compartida entre bots eliminó esa ráfaga y el test pasó.
 - Qué tienen que probar los humanos: Dejar dos bots cerca durante diez segundos sin monedas próximas, observar choques entre dashes y confirmar que ninguno se queda haciendo dash repetidamente ni queda dentro del otro.
 
+### Fase 9d — Trampas y golpes comunes (13/11/2026)
+- Qué se ha hecho: Conectados los efectos del lodo, raíces, pinchos, fantasma, cintas, vapor, barriles, portales y rayo. Los golpes usan un cálculo común con doblones en abanico, combo perdido, aturdimiento, invulnerabilidad y bloqueo por Capa Élfica. Actualizadas las reglas en `AGENTS.md` y `assets/arenas/ARENAS.md`.
+- Decisiones: Las trampas periódicas consultan `elapsed`; raíces y barriles usan estado de partida. Los efectos corren en la simulación local actual porque aún no hay una simulación de partida autoritativa integrada.
+- Problemas encontrados y cómo se resolvieron: Godot detectó inferencias ambiguas en dos vectores; se declararon como `Vector2`. Los tests de reglas y el arranque headless de la escena pasaron.
+- Qué tienen que probar los humanos: Probar cada trampa de las cuatro arenas, observar sus avisos/daños/caídas de doblones y repetir con Capa Élfica e invulnerabilidad activas.
+
 Formato de cada entrada:
 
 ```

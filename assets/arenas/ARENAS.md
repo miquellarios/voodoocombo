@@ -59,12 +59,12 @@ La información de cada sprite está en `arenas.json → sprites.<nombre>`. Todo
 | Trampa | Dónde | Regla | Sprites |
 |---|---|---|---|
 | **Lodo** | Elipses `center` y `radius` | Mientras estás dentro: velocidad x0,6 | Ya está en el fondo |
-| **Raíces** | Punto libre al azar cada 6 s (servidor) | Aviso de 0,7 s y después atrapan 1 s a quien esté a ≤36 px: no se mueve, pero puede usar el hechizo | `raices_aviso` (6), `raices_activas` (6) |
+| **Raíces** | Punto libre al azar cada 6 s (servidor) | Aviso de 0,7 s y después atrapan 1 s a quien esté a ≤36 px: no se mueve, puede usar el hechizo y suelta 2 doblones | `raices_aviso` (6), `raices_activas` (6) |
 | **Pinchos** | Casillas `tiles` | Ciclo `down` 2 s → `warn` 0,6 s → `up` 1 s, con `phase` de desfase. Pisarlos arriba cuenta como un golpe | `pinchos`: frame 0 abajo, 1 aviso, 2 arriba |
 | **Fantasma** | Recorre `path` en bucle a 120 px/s | Si toca a alguien (radio 22): aturdido 0,6 s y suelta 3 doblones. Después ignora a ese jugador 2 s | `fantasma` (8, bucle). `flip_h` según la dirección |
 | **Cinta** | Casillas `tiles` y dirección `dir` | Empuja a jugadores y doblones a 140 px/s | `cinta` (4 frames por casilla, `flip_h` si dir = -1) y `cinta_rodillo` en los extremos |
-| **Vapor** | `center` | Cada 4 s: aviso 0,6 s y chorro 0,5 s. Quien esté a ≤70 px sale empujado a 220 px/s y queda aturdido 0,3 s | `vapor_rejilla` (fija), `vapor_aviso` (4), `vapor_chorro` (5) |
-| **Barril** | `center` | Si lo golpeas con un dash, explota a los 0,8 s. Todos a ≤110 px salen empujados y sueltan el 20 % de sus doblones. Reaparece a los 15 s | `barril`, `barril_mecha` (4), `barril_explosion` (6, sin bucle) |
+| **Vapor** | `center` | Cada 4 s: aviso 0,6 s y chorro 0,5 s. Quien esté a ≤70 px sale empujado 90 px, queda aturdido 0,3 s y suelta 2 doblones | `vapor_rejilla` (fija), `vapor_aviso` (4), `vapor_chorro` (5) |
+| **Barril** | `center` | Si lo golpeas con un dash, explota a los 0,8 s. Todos a ≤110 px salen empujados 90 px y sueltan el 20 % de sus doblones (mínimo 2). Reaparece a los 15 s | `barril`, `barril_mecha` (4), `barril_explosion` (6, sin bucle) |
 | **Portal** | Parejas `a` y `b` del mismo color | Al entrar (radio 22) apareces en el otro portal. 1 s de espera por jugador. Los doblones no lo cruzan | `portal_cian` y `portal_magenta` (8, bucle) |
 | **Rayo** | Orbe en `center` | Dos brazos opuestos de 280 px. Una vuelta cada 8 s. Tocarlo (10 px de grosor) cuenta como un golpe | `rayo_orbe` (4) y `rayo_haz`. El haz empieza en x=6: offset y rotación |
 

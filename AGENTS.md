@@ -149,6 +149,22 @@ res://
   - Si tienen un rival a menos de 120 px y el dash listo, hacen dash el 30 % de las veces.
   - Usan el hechizo cuando les sirve.
 
+### 4.8 Trampas de arena
+
+| Trampa | Efecto al activarse |
+|---|---|
+| Lodo | Velocidad ×0,6 dentro de la elipse. |
+| Raíces | Aviso 0,7 s; atrapan 1 s a ≤36 px y sueltan 2 doblones. |
+| Pinchos | 2 s abajo, 0,6 s de aviso y 1 s arriba; arriba aplica el golpe normal. |
+| Fantasma | Recorre su ruta a 120 px/s; al tocar aturde 0,6 s y suelta 3 doblones. Ignora al jugador afectado 2 s. |
+| Cinta | Empuja jugadores y doblones a 140 px/s. |
+| Vapor | Periodo de 4 s: aviso 0,6 s y chorro 0,5 s; a ≤70 px empuja 90 px, aturde 0,3 s y suelta 2 doblones. |
+| Barril | Un dash inicia una mecha de 0,8 s; explota a ≤110 px, empuja 90 px y suelta el 20 % (mínimo 2). Reaparece a los 15 s. |
+| Portal | Teletransporta a la pareja y añade 30 px en la dirección de movimiento; espera de 1 s por jugador. |
+| Rayo | Dos brazos de 280 px giran cada 8 s; tocar a ≤32 px aplica el golpe normal. |
+
+Los golpes comunes sueltan el 25 % de los doblones (mínimo 3, máximo 12; con corona 35 %), aturden 0,4 s, reinician el combo y dan 1,5 s de invulnerabilidad. La Capa Élfica los bloquea.
+
 ## 5. Red (tiempo real)
 
 - **Transporte:** `ENetMultiplayerPeer`, puerto 7777.

@@ -13,6 +13,7 @@ var seed_value := 0
 var arena: Dictionary = {}
 var previous_arena_id := ""
 var obstacle_rects: Array[Rect2] = []
+var hazard_runtime: Array[Dictionary] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
 var chests: Array[Vector2] = []
@@ -76,6 +77,7 @@ func _process(delta: float) -> void:
 	_update_player(0, delta)
 	for i in range(1, players.size()):
 		_update_bot(i, delta)
+	_update_arena_hazards(delta)
 	_update_dash_hits()
 	_separate_players()
 	_update_pickups()
@@ -107,6 +109,7 @@ func _begin_match(classic: bool = false) -> void:
 	arena = ArenaGen.generate(seed_value, previous_arena_id)
 	previous_arena_id = String(arena.get("map_id", ""))
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
+	_initialize_hazard_runtime()
 	arena_background = load("res://assets/arenas/" + String(arena.background)) if not String(arena.background).is_empty() else null
 	players.clear()
 	coins.clear()
@@ -119,7 +122,7 @@ func _begin_match(classic: bool = false) -> void:
 		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
 		if not character_sheets.has(sheet_key):
 			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
-		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1})
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1})
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0})
 	elapsed = 0.0
@@ -139,6 +142,10 @@ func _update_player(index: int, delta: float) -> void:
 	player.invuln = maxf(0.0, player.invuln - delta)
 	player.dash_cd = maxf(0.0, player.dash_cd - delta)
 	player.dash_lock = maxf(0.0, player.dash_lock - delta)
+	player.rooted_left = maxf(0.0, player.rooted_left - delta)
+	if player.rooted_left > 0.0:
+		player.vel = Vector2.ZERO
+		return
 	if player.recoil_left > 0.0:
 		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
 		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
@@ -153,7 +160,7 @@ func _update_player(index: int, delta: float) -> void:
 		return
 	if direction != Vector2.ZERO:
 		player.dash_dir = direction
-	var speed := GameConfig.PLAYER_SPEED * (1.6 if player.item == "boots" else 1.0)
+	var speed := GameConfig.PLAYER_SPEED * (1.6 if player.item == "boots" else 1.0) * _terrain_speed(player.pos)
 	if player.item == "sheep": speed *= 0.6
 	var motion: Vector2
 	if player.dash_left > 0.0:
@@ -178,6 +185,10 @@ func _update_bot(index: int, delta: float) -> void:
 	player.invuln = maxf(0.0, player.invuln - delta)
 	player.dash_lock = maxf(0.0, player.dash_lock - delta)
 	player.bot_recent_hit = maxf(0.0, player.bot_recent_hit - delta)
+	player.rooted_left = maxf(0.0, player.rooted_left - delta)
+	if player.rooted_left > 0.0:
+		player.vel = Vector2.ZERO
+		return
 	if player.recoil_left > 0.0:
 		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
 		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
@@ -209,7 +220,7 @@ func _update_bot(index: int, delta: float) -> void:
 			player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
 			bots_dash_global_left = GameConfig.BOT_TEAM_DASH_INTERVAL
 		player.bot_dash_target = -1
-	var speed_scale := 0.6 if player.item == "sheep" else (1.6 if player.item == "boots" else 1.0)
+	var speed_scale := (0.6 if player.item == "sheep" else (1.6 if player.item == "boots" else 1.0)) * _terrain_speed(player.pos)
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
@@ -278,7 +289,7 @@ func _update_dash_hits() -> void:
 		for j in range(players.size()):
 			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > GameConfig.PLAYER_RADIUS * 2.0: continue
 			if players[j].dash_left > 0.0:
-				var away := (players[i].pos - players[j].pos).normalized()
+				var away: Vector2 = (players[i].pos - players[j].pos).normalized()
 				if away == Vector2.ZERO:
 					away = Vector2.RIGHT
 				players[i].recoil_dir = away
@@ -292,32 +303,236 @@ func _update_dash_hits() -> void:
 				Fx.hit()
 				Sfx.play_tone(210.0, 0.12)
 				break
-			var victim: Dictionary = players[j]
-			if victim.item == "cloak":
-				victim.item = ""
+			var fraction := GameConfig.RING_HIT_DROP_FRACTION if players[j].item == "ring" else (GameConfig.CROWN_HIT_DROP_FRACTION if j == _leader_index() else GameConfig.HIT_DROP_FRACTION)
+			var result := _apply_hit(j, i, fraction, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
+			if not result.applied:
 				players[i].dash_left = 0.0
 				break
-			var dropped := Scoring.dropped_coins(victim.coins, j == _leader_index(), victim.item == "ring")
-			victim.coins -= dropped
-			victim.score = victim.coins
-			victim.stun = 0.4
-			victim.invuln = 1.5
-			victim.combo = 0
-			victim.hits += 1
+			var dropped := int(result.dropped)
 			players[i].dashes += 1
-			players[i].stolen += dropped
 			if players[i].is_bot:
 				players[i].bot_recent_hit = GameConfig.BOT_RECENT_HIT_LOCK_SECONDS
 				players[i].bot_ignored_peer = j
 				players[i].bot_repath_left = 0.0
-			for d in range(dropped):
-				var angle := TAU * float(d) / maxf(1.0, dropped)
-				coins.append({"pos": victim.pos + Vector2.RIGHT.rotated(angle) * rng.randf_range(45.0, 110.0), "owner": j, "lock": 0.6})
 			players[i].dash_left = 0.0
-			Fx.hit()
-			Fx.pop("-%d" % dropped, victim.pos + OFFSET, Color("ff7474"))
-			Sfx.play_tone(140.0, 0.16)
 			break
+
+func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum: int, maximum: int, stun_seconds: float, text_key: String = "trap_zap") -> Dictionary:
+	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
+	if result.blocked:
+		Fx.pop(I18n.t("trap_blocked"), players[victim_index].pos + OFFSET, Color("7fe7ff"))
+		Sfx.play_tone(720.0, 0.08)
+		return result
+	if not result.applied:
+		return result
+	players[victim_index] = result.victim
+	var dropped := int(result.dropped)
+	_drop_coins(victim_index, dropped)
+	if attacker_index >= 0:
+		players[attacker_index].stolen += dropped
+	Fx.hit()
+	var text := I18n.t(text_key)
+	if dropped > 0:
+		text += " -%d" % dropped
+	Fx.pop(text, players[victim_index].pos + OFFSET, Color("ff7474"))
+	Sfx.play_tone(140.0, 0.16)
+	return result
+
+func _drop_coins(victim_index: int, count: int) -> void:
+	if count <= 0:
+		return
+	for coin_index in range(count):
+		var base_angle := rng.randf_range(0.0, TAU)
+		var distance := rng.randf_range(GameConfig.DROPPED_COIN_MIN_DISTANCE, GameConfig.DROPPED_COIN_MAX_DISTANCE)
+		var position: Vector2 = players[victim_index].pos + Vector2.RIGHT.rotated(base_angle) * distance
+		for _attempt in range(8):
+			if _coin_position_is_clear(position):
+				break
+			base_angle += PI / 4.0
+			position = players[victim_index].pos + Vector2.RIGHT.rotated(base_angle) * distance
+		if not _coin_position_is_clear(position):
+			position = _random_position()
+		coins.append({"pos": position, "owner": victim_index, "lock": GameConfig.DROPPED_COIN_LOCK_SECONDS, "phase": rng.randf_range(0.0, TAU)})
+
+func _initialize_hazard_runtime() -> void:
+	hazard_runtime.clear()
+	for hazard in arena.get("hazards", []):
+		hazard_runtime.append({"roots_state": "idle", "roots_timer": GameConfig.ROOTS_PERIOD, "roots_position": Vector2.ZERO, "player_cooldowns": [0.0, 0.0, 0.0, 0.0], "last_steam_cycle": -1, "barrel_state": "idle", "barrel_timer": 0.0})
+
+func _update_arena_hazards(delta: float) -> void:
+	if players.is_empty():
+		return
+	var hazards: Array = arena.get("hazards", [])
+	for hazard_index in range(hazards.size()):
+		var hazard: Dictionary = hazards[hazard_index]
+		var runtime: Dictionary = hazard_runtime[hazard_index]
+		var kind := String(hazard.get("type", ""))
+		match kind:
+			"lodo":
+				pass
+			"raices":
+				_update_roots(runtime, delta)
+			"pinchos":
+				_update_spikes(hazard)
+			"fantasma":
+				_update_ghost(hazard, runtime, delta)
+			"cinta":
+				_update_conveyor(hazard, delta)
+			"vapor":
+				_update_steam(hazard, runtime, delta)
+			"barril":
+				_update_barrel(hazard, runtime, delta)
+			"portal":
+				_update_portal(hazard, runtime, delta)
+			"rayo":
+				_update_ray(hazard)
+
+func _update_roots(runtime: Dictionary, delta: float) -> void:
+	runtime.roots_timer = float(runtime.roots_timer) - delta
+	var roots_state := String(runtime.roots_state)
+	if roots_state == "idle" and runtime.roots_timer <= 0.0:
+		runtime.roots_position = _random_position()
+		runtime.roots_state = "warn"
+		runtime.roots_timer = GameConfig.ROOTS_WARN_SECONDS
+	elif roots_state == "warn" and runtime.roots_timer <= 0.0:
+		runtime.roots_state = "active"
+		runtime.roots_timer = GameConfig.ROOTS_ACTIVE_SECONDS
+	elif roots_state == "active" and runtime.roots_timer <= 0.0:
+		runtime.roots_state = "idle"
+		runtime.roots_timer = GameConfig.ROOTS_PERIOD
+	if String(runtime.roots_state) != "active":
+		return
+	for player_index in range(players.size()):
+		if players[player_index].rooted_left > 0.0 or players[player_index].pos.distance_to(runtime.roots_position) > GameConfig.ROOTS_RADIUS:
+			continue
+		var result := _apply_hit(player_index, -1, 0.0, GameConfig.ROOTS_DROP_COUNT, GameConfig.ROOTS_DROP_COUNT, 0.0, "trap_root")
+		if result.applied:
+			players[player_index].rooted_left = GameConfig.ROOTED_SECONDS
+
+func _update_spikes(hazard: Dictionary) -> void:
+	var current_state := HazardRules.spike_state(elapsed, float(hazard.get("phase", 0.0)), float(hazard.get("down", GameConfig.SPIKE_DOWN_SECONDS)), float(hazard.get("warn", GameConfig.SPIKE_WARN_SECONDS)), float(hazard.get("up", GameConfig.SPIKE_UP_SECONDS)))
+	if current_state != "up":
+		return
+	for player_index in range(players.size()):
+		for tile in hazard.get("tiles", []):
+			var rect := _tile_rect(tile).grow(GameConfig.PLAYER_RADIUS)
+			if rect.has_point(players[player_index].pos):
+				_apply_hit(player_index, -1, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
+				break
+
+func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
+	var ghost_pos := _ghost_position(hazard)
+	var cooldowns: Array = runtime.player_cooldowns
+	for index in range(players.size()):
+		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
+		if cooldowns[index] <= 0.0 and players[index].pos.distance_to(ghost_pos) <= GameConfig.PLAYER_RADIUS + GameConfig.GHOST_RADIUS:
+			_apply_hit(index, -1, 0.0, GameConfig.GHOST_DROP_COUNT, GameConfig.GHOST_DROP_COUNT, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
+			cooldowns[index] = GameConfig.GHOST_IGNORE_SECONDS
+	runtime.player_cooldowns = cooldowns
+
+func _update_conveyor(hazard: Dictionary, delta: float) -> void:
+	var direction := _json_point(hazard.get("dir", [1.0, 0.0])).normalized()
+	var motion := direction * GameConfig.CONVEYOR_SPEED * delta
+	for tile in hazard.get("tiles", []):
+		var rect := _tile_rect(tile)
+		for player_index in range(players.size()):
+			if rect.has_point(players[player_index].pos):
+				players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		for coin in coins:
+			if rect.has_point(coin.pos):
+				coin.pos += motion
+
+func _update_steam(hazard: Dictionary, runtime: Dictionary, _delta: float) -> void:
+	var state_now := HazardRules.steam_state(elapsed, GameConfig.STEAM_PERIOD, GameConfig.STEAM_WARN_SECONDS, GameConfig.STEAM_BLAST_SECONDS)
+	if state_now != "blast":
+		return
+	var cycle := floori(elapsed / GameConfig.STEAM_PERIOD)
+	if int(runtime.last_steam_cycle) == cycle:
+		return
+	runtime.last_steam_cycle = cycle
+	var center := _json_point(hazard.get("center", []))
+	for player_index in range(players.size()):
+		var offset: Vector2 = players[player_index].pos - center
+		if offset.length() > GameConfig.STEAM_RADIUS:
+			continue
+		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
+		var result := _apply_hit(player_index, -1, 0.0, GameConfig.STEAM_DROP_COUNT, GameConfig.STEAM_DROP_COUNT, GameConfig.STEAM_STUN_SECONDS, "trap_steam")
+		if result.applied:
+			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.STEAM_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
+
+func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
+	var center := _json_point(hazard.get("center", []))
+	var state_now := String(runtime.barrel_state)
+	if state_now == "idle":
+		for player_index in range(players.size()):
+			if players[player_index].dash_left > 0.0 and players[player_index].pos.distance_to(center) <= GameConfig.BARREL_CONTACT_RADIUS:
+				runtime.barrel_state = "fusing"
+				runtime.barrel_timer = GameConfig.BARREL_FUSE_SECONDS
+				Fx.pop(I18n.t("trap_barrel"), center + OFFSET, GameConfig.GOLD)
+				Sfx.play_tone(330.0, 0.12)
+				break
+	elif state_now == "fusing":
+		runtime.barrel_timer = float(runtime.barrel_timer) - delta
+		if runtime.barrel_timer <= 0.0:
+			runtime.barrel_state = "exploding"
+			runtime.barrel_timer = GameConfig.BARREL_EXPLOSION_SECONDS
+			_explode_barrel(center)
+	elif state_now == "exploding":
+		runtime.barrel_timer = float(runtime.barrel_timer) - delta
+		if runtime.barrel_timer <= 0.0:
+			runtime.barrel_state = "hidden"
+			runtime.barrel_timer = GameConfig.BARREL_RESPAWN_SECONDS
+	elif state_now == "hidden":
+		runtime.barrel_timer = float(runtime.barrel_timer) - delta
+		if runtime.barrel_timer <= 0.0:
+			runtime.barrel_state = "idle"
+
+func _explode_barrel(center: Vector2) -> void:
+	for player_index in range(players.size()):
+		var offset: Vector2 = players[player_index].pos - center
+		if offset.length() > GameConfig.BARREL_RADIUS:
+			continue
+		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
+		var result := _apply_hit(player_index, -1, GameConfig.BARREL_DROP_FRACTION, GameConfig.BARREL_DROP_MIN, GameConfig.BARREL_DROP_MAX, 0.0, "trap_barrel")
+		if result.applied:
+			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.BARREL_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
+
+func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
+	var cooldowns: Array = runtime.player_cooldowns
+	for index in range(players.size()):
+		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
+		if cooldowns[index] > 0.0:
+			continue
+		var a := _json_point(hazard.get("a", []))
+		var b := _json_point(hazard.get("b", []))
+		var source := a
+		var destination := b
+		if players[index].pos.distance_to(a) > GameConfig.PORTAL_RADIUS:
+			if players[index].pos.distance_to(b) > GameConfig.PORTAL_RADIUS:
+				continue
+			source = b
+			destination = a
+		var direction: Vector2 = players[index].vel.normalized()
+		if direction == Vector2.ZERO:
+			direction = (destination - source).normalized()
+		players[index].pos = ArenaPhysics.move_circle(destination + direction * GameConfig.PORTAL_EXIT_DISTANCE, Vector2.ZERO, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		cooldowns[index] = GameConfig.PORTAL_COOLDOWN_SECONDS
+		Fx.pop(I18n.t("trap_portal"), players[index].pos + OFFSET, Color("7fe7ff"))
+		Sfx.play_tone(760.0, 0.1)
+	runtime.player_cooldowns = cooldowns
+
+func _update_ray(hazard: Dictionary) -> void:
+	var center := _json_point(hazard.get("center", []))
+	var direction := Vector2.RIGHT.rotated(elapsed * TAU / GameConfig.RAY_PERIOD)
+	var ends := [center + direction * GameConfig.RAY_LENGTH, center - direction * GameConfig.RAY_LENGTH]
+	for player_index in range(players.size()):
+		var hit := false
+		for endpoint in ends:
+			if HazardRules.ray_hits(players[player_index].pos, center, endpoint, GameConfig.RAY_HIT_RADIUS):
+				hit = true
+				break
+		if hit:
+			_apply_hit(player_index, -1, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_ray")
 
 func _start_roll(index: int) -> void:
 	roll_player = index
@@ -612,11 +827,13 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO)
 
 func _draw_arena_hazards() -> void:
-	for hazard in arena.get("hazards", []):
+	for hazard_index in range(arena.get("hazards", []).size()):
+		var hazard: Dictionary = arena.hazards[hazard_index]
+		var runtime: Dictionary = hazard_runtime[hazard_index]
 		var kind := String(hazard.get("type", ""))
 		if kind == "pinchos":
-			var cycle := fposmod(elapsed + float(hazard.get("phase", 0.0)), 3.6)
-			var frame := 0 if cycle < 2.0 else (1 if cycle < 2.6 else 2)
+			var spike_state := HazardRules.spike_state(elapsed, float(hazard.get("phase", 0.0)), GameConfig.SPIKE_DOWN_SECONDS, GameConfig.SPIKE_WARN_SECONDS, GameConfig.SPIKE_UP_SECONDS)
+			var frame := 0 if spike_state == "down" else (1 if spike_state == "warn" else 2)
 			for tile in hazard.get("tiles", []):
 				var parts: Variant = tile if tile is Array else String(tile).split(" ", false)
 				if parts.size() >= 4:
@@ -632,26 +849,29 @@ func _draw_arena_hazards() -> void:
 			_draw_hazard_sprite(portal_sprite, _json_point(hazard.get("b", [])), floori(elapsed * 8.0))
 		elif kind == "vapor":
 			var center := _json_point(hazard.get("center", []))
-			var cycle := fposmod(elapsed, 4.0)
+			var steam_state := HazardRules.steam_state(elapsed, GameConfig.STEAM_PERIOD, GameConfig.STEAM_WARN_SECONDS, GameConfig.STEAM_BLAST_SECONDS)
 			_draw_hazard_sprite("vapor_rejilla", center)
-			if cycle > 3.4:
+			if steam_state == "warn":
 				_draw_hazard_sprite("vapor_aviso", center, floori(elapsed * 8.0))
-			elif cycle < 0.5:
+			elif steam_state == "blast":
 				_draw_hazard_sprite("vapor_chorro", center, floori(elapsed * 10.0))
 		elif kind == "barril":
-			_draw_hazard_sprite("barril", _json_point(hazard.get("center", [])))
+			if runtime.get("barrel_state", "idle") == "idle":
+				_draw_hazard_sprite("barril", _json_point(hazard.get("center", [])))
+			elif runtime.barrel_state == "fusing":
+				_draw_hazard_sprite("barril_mecha", _json_point(hazard.get("center", [])), floori((GameConfig.BARREL_FUSE_SECONDS - float(runtime.barrel_timer)) * 5.0))
+			elif runtime.barrel_state == "exploding":
+				_draw_hazard_sprite("barril_explosion", _json_point(hazard.get("center", [])), floori((GameConfig.BARREL_EXPLOSION_SECONDS - float(runtime.barrel_timer)) * 12.0))
 		elif kind == "rayo":
-			_draw_hazard_sprite("rayo_orbe", _json_point(hazard.get("center", [])), floori(elapsed * 5.0))
+			var center := _json_point(hazard.get("center", []))
+			_draw_ray_beams(center, elapsed * TAU / GameConfig.RAY_PERIOD)
+			_draw_hazard_sprite("rayo_orbe", center, floori(elapsed * 5.0))
+		elif kind == "raices" and String(runtime.get("roots_state", "idle")) != "idle":
+			var sprite_id := "raices_aviso" if runtime.roots_state == "warn" else "raices_activas"
+			_draw_hazard_sprite(sprite_id, runtime.roots_position, floori(elapsed * 8.0))
 		elif kind == "fantasma":
-			var path: Array = hazard.get("path", [])
-			if not path.is_empty():
-				var points: Array[Vector2] = []
-				for point in path:
-					var parts: Variant = point if point is Array else String(point).split(" ", false)
-					if parts.size() >= 2:
-						points.append(Vector2(float(parts[0]), float(parts[1])))
-				if not points.is_empty():
-					_draw_hazard_sprite("fantasma", points[posmod(floori(elapsed * 0.5), points.size())], floori(elapsed * 8.0))
+			var position := _ghost_position(hazard)
+			_draw_hazard_sprite("fantasma", position, floori(elapsed * 8.0))
 
 func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 0) -> void:
 	var info: Dictionary = arena.get("sprites", {}).get(sprite_id, {})
@@ -674,6 +894,77 @@ func _json_point(value: Variant) -> Vector2:
 	if value is Array and value.size() >= 2:
 		return Vector2(float(value[0]), float(value[1]))
 	return Vector2.ZERO
+
+func _tile_rect(tile: Variant) -> Rect2:
+	var values: Variant = tile if tile is Array else String(tile).split(" ", false)
+	if values.size() < 4:
+		return Rect2()
+	return Rect2(Vector2(float(values[0]), float(values[1])), Vector2(float(values[2]), float(values[3])))
+
+func _terrain_speed(position: Vector2) -> float:
+	var speed_multiplier := 1.0
+	for hazard in arena.get("hazards", []):
+		if String(hazard.get("type", "")) != "lodo":
+			continue
+		var center := _json_point(hazard.get("center", []))
+		var radius: Variant = hazard.get("radius", [0.0, 0.0])
+		if radius is Array and radius.size() >= 2:
+			var normalized := (position - center) / Vector2(float(radius[0]), float(radius[1]))
+			if normalized.length_squared() <= 1.0:
+				speed_multiplier = minf(speed_multiplier, float(hazard.get("speed_mult", 0.6)))
+	return speed_multiplier
+
+func _ghost_position(hazard: Dictionary) -> Vector2:
+	var raw_path: Array = hazard.get("path", [])
+	var path: Array[Vector2] = []
+	for point in raw_path:
+		path.append(_json_point(point) if point is Array else _string_point(point))
+	if path.is_empty():
+		return Vector2.ZERO
+	if path.size() == 1:
+		return path[0]
+	var total_length := 0.0
+	for index in range(path.size()):
+		total_length += path[index].distance_to(path[(index + 1) % path.size()])
+	var distance := fposmod(elapsed * float(hazard.get("speed", GameConfig.GHOST_SPEED)), total_length)
+	for index in range(path.size()):
+		var next := path[(index + 1) % path.size()]
+		var segment_length := path[index].distance_to(next)
+		if distance <= segment_length:
+			return path[index].lerp(next, distance / maxf(segment_length, 0.001))
+		distance -= segment_length
+	return path[0]
+
+func _string_point(value: Variant) -> Vector2:
+	var parts: PackedStringArray = String(value).split(" ", false)
+	if parts.size() >= 2:
+		return Vector2(float(parts[0]), float(parts[1]))
+	return Vector2.ZERO
+
+func _coin_position_is_clear(position: Vector2) -> bool:
+	if position.x < 16.0 or position.x > GameConfig.ARENA_SIZE.x - 16.0 or position.y < 16.0 or position.y > GameConfig.ARENA_SIZE.y - 16.0:
+		return false
+	for obstacle in obstacle_rects:
+		var closest := Vector2(clampf(position.x, obstacle.position.x, obstacle.end.x), clampf(position.y, obstacle.position.y, obstacle.end.y))
+		if closest.distance_to(position) < 16.0:
+			return false
+	return true
+
+func _draw_ray_beams(center: Vector2, angle: float) -> void:
+	var info: Dictionary = arena.get("sprites", {}).get("rayo_haz", {})
+	if info.is_empty():
+		return
+	if not hazard_sheets.has("rayo_haz"):
+		hazard_sheets["rayo_haz"] = load("res://assets/arenas/" + String(info.file))
+	var texture: Texture2D = hazard_sheets["rayo_haz"]
+	if texture == null:
+		return
+	var width := int(info.get("frame_w", 584))
+	var height := int(info.get("frame_h", 60))
+	for arm in range(2):
+		draw_set_transform(center, angle + float(arm) * PI, Vector2.ONE * float(info.get("scale", 0.5)))
+		draw_texture_rect_region(texture, Rect2(6.0, -float(height) * 0.5, width, height), Rect2(0.0, 0.0, width, height))
+	draw_set_transform(OFFSET)
 
 func _new_overlay() -> Control:
 	hud = CanvasLayer.new()

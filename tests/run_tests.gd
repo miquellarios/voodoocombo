@@ -9,6 +9,7 @@ func _initialize() -> void:
 	_test_arena_physics()
 	_test_bot_pathfinding()
 	_test_bot_dash_rate()
+	_test_hazard_rules()
 	_test_items()
 	_test_ranking()
 	if failures == 0:
@@ -110,6 +111,26 @@ func _test_bot_dash_rate() -> void:
 		players[1].pos = separated[1]
 	_check(dash_count <= 4, "nearby bots do not spam more than four dashes in ten seconds")
 	_check(players[0].pos.distance_to(players[1].pos) >= GameConfig.PLAYER_RADIUS * 2.0, "nearby bots remain separated")
+
+func _test_hazard_rules() -> void:
+	_check(HazardRules.spike_state(0.0, 0.0, 2.0, 0.6, 1.0) == "down", "spikes stay down initially")
+	_check(HazardRules.spike_state(2.3, 0.0, 2.0, 0.6, 1.0) == "warn", "spikes warn before rising")
+	_check(HazardRules.spike_state(3.0, 0.0, 2.0, 0.6, 1.0) == "up", "spikes rise after warning")
+	_check(HazardRules.steam_state(0.0, 4.0, 0.6, 0.5) == "warn", "steam starts with warning")
+	_check(HazardRules.steam_state(0.7, 4.0, 0.6, 0.5) == "blast", "steam blast follows warning")
+	_check(HazardRules.steam_state(1.2, 4.0, 0.6, 0.5) == "idle", "steam blast ends")
+	_check(HazardRules.point_segment_distance(Vector2(5.0, 2.0), Vector2.ZERO, Vector2(10.0, 0.0)) == 2.0, "ray point-to-segment distance")
+	_check(HazardRules.ray_hits(Vector2(5.0, 2.0), Vector2.ZERO, Vector2(10.0, 0.0), 2.0), "ray segment detects contact")
+	_check(not HazardRules.ray_hits(Vector2(5.0, 3.0), Vector2.ZERO, Vector2(10.0, 0.0), 2.0), "ray segment rejects distant points")
+	_check(HazardRules.drop_amount(40, 0.25, 3, 12) == 10, "hit drop percentage")
+	_check(HazardRules.drop_amount(100, 0.4, 3, 12) == 12, "hit drop upper limit")
+	_check(HazardRules.drop_amount(2, 0.25, 3, 12) == 2, "hit drop cannot exceed coins held")
+	var shielded := HazardRules.resolve_hit({"coins": 10, "score": 10, "item": "cloak", "item_time": 8.0, "invuln": 0.0, "combo": 5, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
+	_check(shielded.blocked and shielded.victim.coins == 10 and shielded.victim.item == "", "cloak blocks and consumes a hit")
+	var invulnerable := HazardRules.resolve_hit({"coins": 10, "item": "", "invuln": 1.0, "combo": 5, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
+	_check(not invulnerable.applied and invulnerable.victim.coins == 10, "invulnerability blocks hits")
+	var struck := HazardRules.resolve_hit({"coins": 40, "score": 40, "item": "", "invuln": 0.0, "combo": 7, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
+	_check(struck.applied and struck.dropped == 10 and struck.victim.score == 30 and struck.victim.combo == 0 and struck.victim.stun == 0.4, "shared hit applies damage state")
 
 func _test_items() -> void:
 	var rng := RandomNumberGenerator.new()
