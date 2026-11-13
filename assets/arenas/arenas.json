@@ -1,0 +1,1164 @@
+{
+  "tile": 40,
+  "grid": [
+    30,
+    15
+  ],
+  "arena_px": [
+    1200,
+    600
+  ],
+  "export_scale": 2,
+  "arenas": {
+    "cienaga": {
+      "name": "Ciénaga Embrujada",
+      "accent": "#7BE042",
+      "background": {
+        "file": "cienaga/fondo.png",
+        "offset": [
+          -40,
+          -40
+        ],
+        "scale": 0.5,
+        "note": "Sprite2D con centered=false en la posición (-40,-40) y escala 0.5: la esquina (0,0) de la arena coincide con el mundo"
+      },
+      "obstacles": [
+        {
+          "kind": "stone",
+          "rect": [
+            240,
+            120,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "stone",
+          "rect": [
+            240,
+            440,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "stone",
+          "rect": [
+            920,
+            120,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "stone",
+          "rect": [
+            920,
+            440,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "log",
+          "rect": [
+            440,
+            240,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "log",
+          "rect": [
+            440,
+            320,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "log",
+          "rect": [
+            680,
+            240,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "log",
+          "rect": [
+            680,
+            320,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "tree",
+          "rect": [
+            160,
+            280,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "tree",
+          "rect": [
+            1000,
+            280,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "bigstone",
+          "rect": [
+            560,
+            280,
+            80,
+            40
+          ]
+        }
+      ],
+      "hazards": [
+        {
+          "type": "lodo",
+          "center": [
+            380.0,
+            168.0
+          ],
+          "radius": [
+            72.0,
+            44.0
+          ],
+          "speed_mult": 0.6,
+          "sprite": null
+        },
+        {
+          "type": "lodo",
+          "center": [
+            820.0,
+            168.0
+          ],
+          "radius": [
+            72.0,
+            44.0
+          ],
+          "speed_mult": 0.6,
+          "sprite": null
+        },
+        {
+          "type": "lodo",
+          "center": [
+            380.0,
+            432.0
+          ],
+          "radius": [
+            72.0,
+            44.0
+          ],
+          "speed_mult": 0.6,
+          "sprite": null
+        },
+        {
+          "type": "lodo",
+          "center": [
+            820.0,
+            432.0
+          ],
+          "radius": [
+            72.0,
+            44.0
+          ],
+          "speed_mult": 0.6,
+          "sprite": null
+        },
+        {
+          "type": "raices",
+          "every": 6.0,
+          "warn": 0.7,
+          "active": 1.0,
+          "radius": 36.0,
+          "random_position": true,
+          "sprite_warn": "raices_aviso",
+          "sprite_active": "raices_activas"
+        }
+      ],
+      "spawn_sets": [
+        [
+          [
+            100.0,
+            100.0
+          ],
+          [
+            1100.0,
+            100.0
+          ],
+          [
+            100.0,
+            500.0
+          ],
+          [
+            1100.0,
+            500.0
+          ]
+        ],
+        [
+          [
+            100.0,
+            300.0
+          ],
+          [
+            1100.0,
+            300.0
+          ],
+          [
+            600.0,
+            60.0
+          ],
+          [
+            600.0,
+            540.0
+          ]
+        ]
+      ],
+      "rules": {
+        "lodo": "Zona lenta: velocidad x0,6 mientras estás dentro. Los doblones también caen aquí.",
+        "raices": "Cada 6 s aparecen en un punto al azar: aviso verde 0,7 s y luego atrapan 1 s (no te mueves, sí puedes usar hechizo)."
+      }
+    },
+    "cripta": {
+      "name": "Cripta de Huesos",
+      "accent": "#B06BFF",
+      "background": {
+        "file": "cripta/fondo.png",
+        "offset": [
+          -40,
+          -40
+        ],
+        "scale": 0.5,
+        "note": "Sprite2D con centered=false en la posición (-40,-40) y escala 0.5: la esquina (0,0) de la arena coincide con el mundo"
+      },
+      "obstacles": [
+        {
+          "kind": "sarc",
+          "rect": [
+            200,
+            160,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "sarc",
+          "rect": [
+            200,
+            400,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "sarc",
+          "rect": [
+            920,
+            160,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "sarc",
+          "rect": [
+            920,
+            400,
+            80,
+            40
+          ]
+        },
+        {
+          "kind": "column",
+          "rect": [
+            400,
+            80,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "column",
+          "rect": [
+            400,
+            480,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "column",
+          "rect": [
+            760,
+            80,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "column",
+          "rect": [
+            760,
+            480,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "altar",
+          "rect": [
+            560,
+            280,
+            80,
+            40
+          ]
+        }
+      ],
+      "hazards": [
+        {
+          "type": "pinchos",
+          "tiles": [
+            [
+              320,
+              280,
+              40,
+              40
+            ],
+            [
+              360,
+              280,
+              40,
+              40
+            ],
+            [
+              400,
+              280,
+              40,
+              40
+            ],
+            [
+              760,
+              280,
+              40,
+              40
+            ],
+            [
+              800,
+              280,
+              40,
+              40
+            ],
+            [
+              840,
+              280,
+              40,
+              40
+            ]
+          ],
+          "phase": 0.0,
+          "down": 2.0,
+          "warn": 0.6,
+          "up": 1.0,
+          "sprite": "pinchos",
+          "frames": {
+            "down": 0,
+            "warn": 1,
+            "up": 2
+          }
+        },
+        {
+          "type": "pinchos",
+          "tiles": [
+            [
+              560,
+              120,
+              40,
+              40
+            ],
+            [
+              600,
+              120,
+              40,
+              40
+            ],
+            [
+              560,
+              440,
+              40,
+              40
+            ],
+            [
+              600,
+              440,
+              40,
+              40
+            ]
+          ],
+          "phase": 1.8,
+          "down": 2.0,
+          "warn": 0.6,
+          "up": 1.0,
+          "sprite": "pinchos",
+          "frames": {
+            "down": 0,
+            "warn": 1,
+            "up": 2
+          }
+        },
+        {
+          "type": "fantasma",
+          "path": [
+            [
+              360,
+              180.0
+            ],
+            [
+              840,
+              180.0
+            ],
+            [
+              840,
+              420.0
+            ],
+            [
+              360,
+              420.0
+            ]
+          ],
+          "speed": 120,
+          "radius": 22,
+          "stun": 0.6,
+          "drop": 3,
+          "sprite": "fantasma"
+        }
+      ],
+      "spawn_sets": [
+        [
+          [
+            100.0,
+            100.0
+          ],
+          [
+            1100.0,
+            100.0
+          ],
+          [
+            100.0,
+            500.0
+          ],
+          [
+            1100.0,
+            500.0
+          ]
+        ],
+        [
+          [
+            100.0,
+            300.0
+          ],
+          [
+            1100.0,
+            300.0
+          ],
+          [
+            600.0,
+            60.0
+          ],
+          [
+            600.0,
+            540.0
+          ]
+        ]
+      ],
+      "rules": {
+        "pinchos": "Ciclo de 3,6 s: 2 s escondidos, 0,6 s de aviso en rojo y 1 s arriba. Si te pinchan, cuenta como un golpe (sueltas doblones).",
+        "fantasma": "Da vueltas alrededor del altar a 120 px/s. Si te toca: aturdido 0,6 s y sueltas 3 doblones."
+      }
+    },
+    "taller": {
+      "name": "Taller Gnómico",
+      "accent": "#FFB347",
+      "background": {
+        "file": "taller/fondo.png",
+        "offset": [
+          -40,
+          -40
+        ],
+        "scale": 0.5,
+        "note": "Sprite2D con centered=false en la posición (-40,-40) y escala 0.5: la esquina (0,0) de la arena coincide con el mundo"
+      },
+      "obstacles": [
+        {
+          "kind": "crate",
+          "rect": [
+            240,
+            80,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "crate",
+          "rect": [
+            240,
+            480,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "crate",
+          "rect": [
+            920,
+            80,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "crate",
+          "rect": [
+            920,
+            480,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "anvil",
+          "rect": [
+            400,
+            200,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "anvil",
+          "rect": [
+            400,
+            360,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "anvil",
+          "rect": [
+            760,
+            200,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "anvil",
+          "rect": [
+            760,
+            360,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "boiler",
+          "rect": [
+            560,
+            240,
+            80,
+            120
+          ]
+        }
+      ],
+      "hazards": [
+        {
+          "type": "cinta",
+          "tiles": [
+            [
+              360,
+              120,
+              40,
+              40
+            ],
+            [
+              400,
+              120,
+              40,
+              40
+            ],
+            [
+              440,
+              120,
+              40,
+              40
+            ],
+            [
+              480,
+              120,
+              40,
+              40
+            ],
+            [
+              520,
+              120,
+              40,
+              40
+            ],
+            [
+              560,
+              120,
+              40,
+              40
+            ],
+            [
+              600,
+              120,
+              40,
+              40
+            ],
+            [
+              640,
+              120,
+              40,
+              40
+            ],
+            [
+              680,
+              120,
+              40,
+              40
+            ],
+            [
+              720,
+              120,
+              40,
+              40
+            ],
+            [
+              760,
+              120,
+              40,
+              40
+            ],
+            [
+              800,
+              120,
+              40,
+              40
+            ]
+          ],
+          "dir": [
+            1,
+            0
+          ],
+          "speed": 140,
+          "sprite": "cinta",
+          "sprite_roller": "cinta_rodillo"
+        },
+        {
+          "type": "cinta",
+          "tiles": [
+            [
+              360,
+              440,
+              40,
+              40
+            ],
+            [
+              400,
+              440,
+              40,
+              40
+            ],
+            [
+              440,
+              440,
+              40,
+              40
+            ],
+            [
+              480,
+              440,
+              40,
+              40
+            ],
+            [
+              520,
+              440,
+              40,
+              40
+            ],
+            [
+              560,
+              440,
+              40,
+              40
+            ],
+            [
+              600,
+              440,
+              40,
+              40
+            ],
+            [
+              640,
+              440,
+              40,
+              40
+            ],
+            [
+              680,
+              440,
+              40,
+              40
+            ],
+            [
+              720,
+              440,
+              40,
+              40
+            ],
+            [
+              760,
+              440,
+              40,
+              40
+            ],
+            [
+              800,
+              440,
+              40,
+              40
+            ]
+          ],
+          "dir": [
+            -1,
+            0
+          ],
+          "speed": 140,
+          "sprite": "cinta",
+          "sprite_roller": "cinta_rodillo"
+        },
+        {
+          "type": "vapor",
+          "center": [
+            180.0,
+            220.0
+          ],
+          "every": 4.0,
+          "warn": 0.6,
+          "blast": 0.5,
+          "radius": 70,
+          "knockback": 220,
+          "stun": 0.3,
+          "sprite_grate": "vapor_rejilla",
+          "sprite_warn": "vapor_aviso",
+          "sprite_blast": "vapor_chorro"
+        },
+        {
+          "type": "vapor",
+          "center": [
+            1020.0,
+            220.0
+          ],
+          "every": 4.0,
+          "warn": 0.6,
+          "blast": 0.5,
+          "radius": 70,
+          "knockback": 220,
+          "stun": 0.3,
+          "sprite_grate": "vapor_rejilla",
+          "sprite_warn": "vapor_aviso",
+          "sprite_blast": "vapor_chorro"
+        },
+        {
+          "type": "vapor",
+          "center": [
+            180.0,
+            380.0
+          ],
+          "every": 4.0,
+          "warn": 0.6,
+          "blast": 0.5,
+          "radius": 70,
+          "knockback": 220,
+          "stun": 0.3,
+          "sprite_grate": "vapor_rejilla",
+          "sprite_warn": "vapor_aviso",
+          "sprite_blast": "vapor_chorro"
+        },
+        {
+          "type": "vapor",
+          "center": [
+            1020.0,
+            380.0
+          ],
+          "every": 4.0,
+          "warn": 0.6,
+          "blast": 0.5,
+          "radius": 70,
+          "knockback": 220,
+          "stun": 0.3,
+          "sprite_grate": "vapor_rejilla",
+          "sprite_warn": "vapor_aviso",
+          "sprite_blast": "vapor_chorro"
+        },
+        {
+          "type": "barril",
+          "center": [
+            300.0,
+            300.0
+          ],
+          "fuse": 0.8,
+          "radius": 110,
+          "respawn": 15,
+          "drop_pct": 0.2,
+          "sprite_idle": "barril",
+          "sprite_fuse": "barril_mecha",
+          "sprite_boom": "barril_explosion"
+        },
+        {
+          "type": "barril",
+          "center": [
+            900.0,
+            300.0
+          ],
+          "fuse": 0.8,
+          "radius": 110,
+          "respawn": 15,
+          "drop_pct": 0.2,
+          "sprite_idle": "barril",
+          "sprite_fuse": "barril_mecha",
+          "sprite_boom": "barril_explosion"
+        }
+      ],
+      "spawn_sets": [
+        [
+          [
+            100.0,
+            100.0
+          ],
+          [
+            1100.0,
+            100.0
+          ],
+          [
+            100.0,
+            500.0
+          ],
+          [
+            1100.0,
+            500.0
+          ]
+        ],
+        [
+          [
+            100.0,
+            300.0
+          ],
+          [
+            1100.0,
+            300.0
+          ],
+          [
+            600.0,
+            60.0
+          ],
+          [
+            600.0,
+            540.0
+          ]
+        ]
+      ],
+      "rules": {
+        "cinta": "Empuja a 140 px/s a jugadores y doblones en su dirección.",
+        "vapor": "Cada 4 s: aviso 0,6 s (humo) y chorro 0,5 s que empuja lejos y aturde 0,3 s.",
+        "barril": "Si le das con el dash, explota a los 0,8 s: empuja y hace soltar el 20 % de los doblones a todos en 110 px. Reaparece a los 15 s."
+      }
+    },
+    "biblioteca": {
+      "name": "Biblioteca Arcana",
+      "accent": "#7FE7FF",
+      "background": {
+        "file": "biblioteca/fondo.png",
+        "offset": [
+          -40,
+          -40
+        ],
+        "scale": 0.5,
+        "note": "Sprite2D con centered=false en la posición (-40,-40) y escala 0.5: la esquina (0,0) de la arena coincide con el mundo"
+      },
+      "obstacles": [
+        {
+          "kind": "shelf",
+          "rect": [
+            160,
+            120,
+            120,
+            40
+          ]
+        },
+        {
+          "kind": "shelf",
+          "rect": [
+            160,
+            440,
+            120,
+            40
+          ]
+        },
+        {
+          "kind": "shelf",
+          "rect": [
+            920,
+            120,
+            120,
+            40
+          ]
+        },
+        {
+          "kind": "shelf",
+          "rect": [
+            920,
+            440,
+            120,
+            40
+          ]
+        },
+        {
+          "kind": "books",
+          "rect": [
+            360,
+            240,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "books",
+          "rect": [
+            360,
+            320,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "books",
+          "rect": [
+            800,
+            240,
+            40,
+            40
+          ]
+        },
+        {
+          "kind": "books",
+          "rect": [
+            800,
+            320,
+            40,
+            40
+          ]
+        }
+      ],
+      "hazards": [
+        {
+          "type": "portal",
+          "a": [
+            300.0,
+            60.0
+          ],
+          "b": [
+            900.0,
+            540.0
+          ],
+          "color": "#7FE7FF",
+          "radius": 22,
+          "cooldown": 1.0,
+          "sprite": "portal_cian"
+        },
+        {
+          "type": "portal",
+          "a": [
+            900.0,
+            60.0
+          ],
+          "b": [
+            300.0,
+            540.0
+          ],
+          "color": "#FF4FD8",
+          "radius": 22,
+          "cooldown": 1.0,
+          "sprite": "portal_magenta"
+        },
+        {
+          "type": "rayo",
+          "center": [
+            600.0,
+            300.0
+          ],
+          "length": 280,
+          "period": 8.0,
+          "arms": 2,
+          "hit_width": 10,
+          "sprite_orb": "rayo_orbe",
+          "sprite_beam": "rayo_haz"
+        }
+      ],
+      "spawn_sets": [
+        [
+          [
+            100.0,
+            100.0
+          ],
+          [
+            1100.0,
+            100.0
+          ],
+          [
+            100.0,
+            500.0
+          ],
+          [
+            1100.0,
+            500.0
+          ]
+        ]
+      ],
+      "rules": {
+        "portal": "Entras por un portal y sales por su pareja (mismo color). 1 s de espera para volver a usarlo. Los doblones no lo cruzan.",
+        "rayo": "Dos rayos que giran desde el orbe central (una vuelta cada 8 s, 280 px). Si te toca, cuenta como un golpe."
+      }
+    }
+  },
+  "sprites": {
+    "raices_aviso": {
+      "file": "trampas/raices_aviso.png",
+      "frame_w": 180,
+      "frame_h": 180,
+      "frames": 6,
+      "scale": 0.5
+    },
+    "raices_activas": {
+      "file": "trampas/raices_activas.png",
+      "frame_w": 180,
+      "frame_h": 180,
+      "frames": 6,
+      "scale": 0.5
+    },
+    "pinchos": {
+      "file": "trampas/pinchos.png",
+      "frame_w": 80,
+      "frame_h": 80,
+      "frames": 3,
+      "scale": 0.5
+    },
+    "fantasma": {
+      "file": "trampas/fantasma.png",
+      "frame_w": 200,
+      "frame_h": 200,
+      "frames": 8,
+      "scale": 0.5
+    },
+    "cinta": {
+      "file": "trampas/cinta.png",
+      "frame_w": 80,
+      "frame_h": 80,
+      "frames": 4,
+      "scale": 0.5,
+      "note": "Las flechas apuntan a +x; para dir=(-1,0) usar flip_h"
+    },
+    "cinta_rodillo": {
+      "file": "trampas/cinta_rodillo.png",
+      "frame_w": 80,
+      "frame_h": 80,
+      "frames": 4,
+      "scale": 0.5
+    },
+    "vapor_rejilla": {
+      "file": "trampas/vapor_rejilla.png",
+      "frame_w": 320,
+      "frame_h": 320,
+      "frames": 1,
+      "scale": 0.5
+    },
+    "vapor_aviso": {
+      "file": "trampas/vapor_aviso.png",
+      "frame_w": 320,
+      "frame_h": 320,
+      "frames": 4,
+      "scale": 0.5
+    },
+    "vapor_chorro": {
+      "file": "trampas/vapor_chorro.png",
+      "frame_w": 320,
+      "frame_h": 320,
+      "frames": 5,
+      "scale": 0.5
+    },
+    "barril": {
+      "file": "trampas/barril.png",
+      "frame_w": 240,
+      "frame_h": 240,
+      "frames": 1,
+      "scale": 0.5
+    },
+    "barril_mecha": {
+      "file": "trampas/barril_mecha.png",
+      "frame_w": 240,
+      "frame_h": 240,
+      "frames": 4,
+      "scale": 0.5
+    },
+    "barril_explosion": {
+      "file": "trampas/barril_explosion.png",
+      "frame_w": 480,
+      "frame_h": 480,
+      "frames": 6,
+      "scale": 0.5
+    },
+    "portal_cian": {
+      "file": "trampas/portal_cian.png",
+      "frame_w": 160,
+      "frame_h": 160,
+      "frames": 8,
+      "scale": 0.5
+    },
+    "portal_magenta": {
+      "file": "trampas/portal_magenta.png",
+      "frame_w": 160,
+      "frame_h": 160,
+      "frames": 8,
+      "scale": 0.5
+    },
+    "rayo_orbe": {
+      "file": "trampas/rayo_orbe.png",
+      "frame_w": 160,
+      "frame_h": 160,
+      "frames": 4,
+      "scale": 0.5
+    },
+    "rayo_haz": {
+      "file": "trampas/rayo_haz.png",
+      "frame_w": 584,
+      "frame_h": 60,
+      "frames": 1,
+      "scale": 0.5,
+      "note": "El haz empieza en x=6 px (mundo); poner offset para que el inicio quede en el centro del orbe y rotar el nodo"
+    }
+  },
+  "selection": "Cada partida elige una arena al azar (sin repetir la anterior). Doblones y cofres en casillas libres al azar, fuera de obstáculos y trampas fijas."
+}

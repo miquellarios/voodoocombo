@@ -1,0 +1,72 @@
+{
+  "frame_w": 224,
+  "frame_h": 256,
+  "origin": {
+    "x": 112,
+    "y": 168,
+    "note": "punto del muñeco que corresponde a su posición en el juego (pies en y≈227)"
+  },
+  "draw_radius_px": 60,
+  "files": "assets/characters/<personaje>_<color>.png",
+  "characters": {
+    "mago": {
+      "name": "BRASA",
+      "role": "Mago del fuego",
+      "portrait": "portrait_mago.png"
+    },
+    "trol": {
+      "name": "COLMILLO",
+      "role": "Trol del pantano",
+      "portrait": "portrait_trol.png"
+    },
+    "gnomo": {
+      "name": "TUERCA",
+      "role": "Gnomo inventor",
+      "portrait": "portrait_gnomo.png"
+    },
+    "nigro": {
+      "name": "CRIPTA",
+      "role": "Nigromante",
+      "portrait": "portrait_nigro.png"
+    }
+  },
+  "colors": {
+    "coral": "#D8484F",
+    "azul": "#3C7FD0",
+    "lima": "#63A83A",
+    "hueso": "#D9D0BE"
+  },
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "row": 1,
+      "frames": 8,
+      "fps": 12,
+      "loop": true
+    },
+    "dash": {
+      "row": 2,
+      "frames": 2,
+      "fps": 12,
+      "loop": true
+    },
+    "hurt": {
+      "row": 3,
+      "frames": 2,
+      "fps": 10,
+      "loop": false
+    },
+    "win": {
+      "row": 4,
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    }
+  },
+  "facing": "los sprites miran a la derecha; para la izquierda usar flip_h"
+}

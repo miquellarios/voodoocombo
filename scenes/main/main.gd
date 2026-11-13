@@ -11,6 +11,8 @@ var remaining := 90.0
 var countdown := 0.0
 var seed_value := 0
 var arena: Dictionary = {}
+var previous_arena_id := ""
+var obstacle_rects: Array[Rect2] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
 var chests: Array[Vector2] = []
@@ -22,9 +24,16 @@ var roll_time := 0.0
 var roll_player := -1
 var roll_result := ""
 var frenzy_notified := false
+var arena_background: Texture2D
+var character_metadata: Dictionary = {}
+var character_sheets: Dictionary = {}
+var hazard_sheets: Dictionary = {}
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
+	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
+	if metadata is Dictionary:
+		character_metadata = metadata
 	Fx.floating_text.connect(_on_floating_text)
 	Fx.shake.connect(_on_shake)
 	_build_menu()
@@ -65,6 +74,7 @@ func _process(delta: float) -> void:
 	_update_player(0, delta)
 	for i in range(1, players.size()):
 		_update_bot(i, delta)
+	_separate_players()
 	_update_pickups()
 	_update_dash_hits()
 	_update_roll(delta)
@@ -92,14 +102,22 @@ func _begin_match(classic: bool = false) -> void:
 	mode = "classic" if classic else "voodoo"
 	seed_value = int(Time.get_unix_time_from_system()) + randi()
 	rng.seed = seed_value
-	arena = ArenaGen.generate(seed_value)
+	arena = ArenaGen.generate(seed_value, previous_arena_id)
+	previous_arena_id = String(arena.get("map_id", ""))
+	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
+	arena_background = load("res://assets/arenas/" + String(arena.background)) if not String(arena.background).is_empty() else null
 	players.clear()
 	coins.clear()
 	chests.clear()
 	floating.clear()
 	var names := [Profile.nick, "Mordisquitos", "Conde Costura", "Dama del Pantano"]
+	var characters := ["mago", "trol", "gnomo", "nigro"]
+	var sprite_colors := ["coral", "azul", "lima", "hueso"]
 	for i in range(4):
-		players.append({"name": names[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0})
+		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
+		if not character_sheets.has(sheet_key):
+			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0})
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0})
 	elapsed = 0.0
@@ -128,20 +146,17 @@ func _update_player(index: int, delta: float) -> void:
 		player.dash_dir = direction
 	var speed := GameConfig.PLAYER_SPEED * (1.6 if player.item == "boots" else 1.0)
 	if player.item == "sheep": speed *= 0.6
-	var previous_position: Vector2 = player.pos
+	var motion: Vector2
 	if player.dash_left > 0.0:
 		player.dash_left = maxf(0.0, player.dash_left - delta)
-		player.pos += player.dash_dir * speed * GameConfig.DASH_MULTIPLIER * delta
+		motion = player.dash_dir * speed * GameConfig.DASH_MULTIPLIER * delta
 	else:
 		player.vel = direction * speed
-		player.pos += player.vel * delta
-	player.pos.x = clampf(player.pos.x, GameConfig.PLAYER_RADIUS, 1200.0 - GameConfig.PLAYER_RADIUS)
-	player.pos.y = clampf(player.pos.y, GameConfig.PLAYER_RADIUS, 600.0 - GameConfig.PLAYER_RADIUS)
-	for cell in arena.blocked:
-		var rect := Rect2(Vector2(cell) * 40.0, Vector2.ONE * 40.0)
-		if rect.grow(GameConfig.PLAYER_RADIUS).has_point(player.pos):
-			player.pos = previous_position
-			break
+		motion = player.vel * delta
+	var previous_position: Vector2 = player.pos
+	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
+		player.dash_left = 0.0
 	if player.item == "magnet":
 		for coin in coins:
 			if player.pos.distance_to(coin.pos) < 220.0:
@@ -164,7 +179,6 @@ func _update_bot(index: int, delta: float) -> void:
 		if j != index: opponents.append(players[j].pos)
 	var choice := BotBrain.choose_direction(player.pos, coin_positions, opponents, player.dash_cd <= 0.0, rng)
 	var direction: Vector2 = choice.direction
-	var previous_position: Vector2 = player.pos
 	if choice.dash and direction != Vector2.ZERO and player.item != "sheep":
 		player.dash_dir = direction
 		player.dash_left = GameConfig.DASH_DURATION
@@ -173,15 +187,12 @@ func _update_bot(index: int, delta: float) -> void:
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
-	player.pos += movement * GameConfig.PLAYER_SPEED * speed_scale * delta * (GameConfig.DASH_MULTIPLIER if player.dash_left > 0.0 else 1.0)
+	var motion := movement * GameConfig.PLAYER_SPEED * speed_scale * delta * (GameConfig.DASH_MULTIPLIER if player.dash_left > 0.0 else 1.0)
+	var previous_position: Vector2 = player.pos
+	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
+		player.dash_left = 0.0
 	if player.dash_left > 0.0: player.dash_left = maxf(0.0, player.dash_left - delta)
-	player.pos.x = clampf(player.pos.x, 22.0, 1178.0)
-	player.pos.y = clampf(player.pos.y, 22.0, 578.0)
-	for cell in arena.blocked:
-		var obstacle := Rect2(Vector2(cell) * 40.0, Vector2.ONE * 40.0)
-		if obstacle.grow(GameConfig.PLAYER_RADIUS).has_point(player.pos):
-			player.pos = previous_position
-			break
 	if player.item != "" and rng.randf() < delta * 0.4:
 		_use_spell_for_bot(index)
 	if player.item == "magnet":
@@ -513,16 +524,11 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
 	draw_set_transform(OFFSET)
-	var palette: Array = BIOME_COLORS[int(arena.get("biome", 0))]
-	draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), palette[0])
-	for x in range(30):
-		for y in range(15):
-			if (x + y) % 2 == 0:
-				draw_rect(Rect2(Vector2(x, y) * 40.0, Vector2.ONE * 40.0), palette[1])
-	for cell in arena.get("blocked", {}):
-		var rect := Rect2(Vector2(cell) * 40.0, Vector2.ONE * 40.0).grow(-4)
-		draw_rect(rect, Color("160e22"))
-		draw_rect(rect.grow(-4), Color("675575"))
+	if arena_background != null:
+		draw_texture_rect(arena_background, Rect2(-40.0, -40.0, 1280.0, 680.0), false)
+	else:
+		draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), Color("2b3a2a"))
+	_draw_arena_hazards()
 	for coin in coins:
 		var pos: Vector2 = coin.pos
 		draw_circle(pos + Vector2(2, 4), 10.0, Color(0, 0, 0, 0.35))
@@ -535,12 +541,18 @@ func _draw() -> void:
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
-		draw_circle(pos + Vector2(0, 5), 24.0, Color("160e22"))
-		draw_circle(pos, 21.0, player.color)
-		draw_circle(pos + Vector2(-7, -5), 3.0, Color("160e22"))
-		draw_circle(pos + Vector2(7, -5), 3.0, Color("160e22"))
-		draw_line(pos + Vector2(-5, 5), pos + Vector2(5, 5), Color("160e22"), 2.5)
-		draw_line(pos + Vector2(-5, 13), pos + Vector2(5, 13), Color("160e22"), 2.0)
+		var anim_name := "hurt" if player.stun > 0.0 else ("dash" if player.dash_left > 0.0 else ("walk" if player.vel.length() > 10.0 else "idle"))
+		var animation: Dictionary = character_metadata.get("animations", {}).get(anim_name, {"row": 0, "frames": 1, "fps": 1})
+		var frame_width := int(character_metadata.get("frame_w", 224))
+		var frame_height := int(character_metadata.get("frame_h", 256))
+		var frame := posmod(floori(elapsed * float(animation.get("fps", 6))), int(animation.get("frames", 1)))
+		var sheet: Texture2D = character_sheets.get("%s_%s" % [player.character, player.sprite_color])
+		if sheet != null:
+			var sprite_scale := 0.37
+			var face_left: bool = player.dash_dir.x < -0.1 if player.dash_left > 0.0 else player.vel.x < -0.1
+			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale))
+			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height))
+			draw_set_transform(OFFSET)
 		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
 		if i == 0 and player.combo > 1:
 			draw_string(ThemeDB.fallback_font, pos + Vector2(27, -16), "x%d · %d" % [Scoring.multiplier(player.combo, mode == "classic"), player.combo], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GameConfig.GOLD)
@@ -556,6 +568,70 @@ func _draw() -> void:
 		draw_string(ThemeDB.fallback_font, Vector2(570, 370), count_text, HORIZONTAL_ALIGNMENT_CENTER, 160, 68, Color.WHITE)
 	else:
 		draw_set_transform(Vector2.ZERO)
+
+func _draw_arena_hazards() -> void:
+	for hazard in arena.get("hazards", []):
+		var kind := String(hazard.get("type", ""))
+		if kind == "pinchos":
+			var cycle := fposmod(elapsed + float(hazard.get("phase", 0.0)), 3.6)
+			var frame := 0 if cycle < 2.0 else (1 if cycle < 2.6 else 2)
+			for tile in hazard.get("tiles", []):
+				var parts: Variant = tile if tile is Array else String(tile).split(" ", false)
+				if parts.size() >= 4:
+					_draw_hazard_sprite("pinchos", Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5), frame)
+		elif kind == "cinta":
+			for tile in hazard.get("tiles", []):
+				var parts: Variant = tile if tile is Array else String(tile).split(" ", false)
+				if parts.size() >= 4:
+					_draw_hazard_sprite("cinta", Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5), floori(elapsed * 8.0))
+		elif kind == "portal":
+			var portal_sprite := String(hazard.get("sprite", "portal_cian"))
+			_draw_hazard_sprite(portal_sprite, _json_point(hazard.get("a", [])), floori(elapsed * 8.0))
+			_draw_hazard_sprite(portal_sprite, _json_point(hazard.get("b", [])), floori(elapsed * 8.0))
+		elif kind == "vapor":
+			var center := _json_point(hazard.get("center", []))
+			var cycle := fposmod(elapsed, 4.0)
+			_draw_hazard_sprite("vapor_rejilla", center)
+			if cycle > 3.4:
+				_draw_hazard_sprite("vapor_aviso", center, floori(elapsed * 8.0))
+			elif cycle < 0.5:
+				_draw_hazard_sprite("vapor_chorro", center, floori(elapsed * 10.0))
+		elif kind == "barril":
+			_draw_hazard_sprite("barril", _json_point(hazard.get("center", [])))
+		elif kind == "rayo":
+			_draw_hazard_sprite("rayo_orbe", _json_point(hazard.get("center", [])), floori(elapsed * 5.0))
+		elif kind == "fantasma":
+			var path: Array = hazard.get("path", [])
+			if not path.is_empty():
+				var points: Array[Vector2] = []
+				for point in path:
+					var parts: Variant = point if point is Array else String(point).split(" ", false)
+					if parts.size() >= 2:
+						points.append(Vector2(float(parts[0]), float(parts[1])))
+				if not points.is_empty():
+					_draw_hazard_sprite("fantasma", points[posmod(floori(elapsed * 0.5), points.size())], floori(elapsed * 8.0))
+
+func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 0) -> void:
+	var info: Dictionary = arena.get("sprites", {}).get(sprite_id, {})
+	if info.is_empty():
+		return
+	if not hazard_sheets.has(sprite_id):
+		hazard_sheets[sprite_id] = load("res://assets/arenas/" + String(info.file))
+	var texture: Texture2D = hazard_sheets[sprite_id]
+	if texture == null:
+		return
+	var frame_width := int(info.get("frame_w", 1))
+	var frame_height := int(info.get("frame_h", 1))
+	var frame_count := int(info.get("frames", 1))
+	var frame := posmod(frame_index, frame_count)
+	var scale_factor := float(info.get("scale", 0.5))
+	var frame_size := Vector2(frame_width, frame_height) * scale_factor
+	draw_texture_rect_region(texture, Rect2(center - frame_size * 0.5, frame_size), Rect2(frame * frame_width, 0, frame_width, frame_height))
+
+func _json_point(value: Variant) -> Vector2:
+	if value is Array and value.size() >= 2:
+		return Vector2(float(value[0]), float(value[1]))
+	return Vector2.ZERO
 
 func _new_overlay() -> Control:
 	hud = CanvasLayer.new()
@@ -615,6 +691,21 @@ func _random_position() -> Vector2:
 		if clear:
 			return candidate
 	return Vector2(600.0, 300.0)
+
+func _get_obstacle_rects(obstacles: Array) -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for obstacle in obstacles:
+		var values: Array = obstacle.get("rect", [])
+		if values.size() >= 4:
+			rects.append(Rect2(Vector2(float(values[0]), float(values[1])), Vector2(float(values[2]), float(values[3]))))
+	return rects
+
+func _separate_players() -> void:
+	for first_index in range(players.size()):
+		for second_index in range(first_index + 1, players.size()):
+			var separated := ArenaPhysics.separate_pair(players[first_index].pos, players[second_index].pos, GameConfig.PLAYER_RADIUS, obstacle_rects)
+			players[first_index].pos = separated[0]
+			players[second_index].pos = separated[1]
 
 func _spawn_coin() -> void:
 	coins.append({"pos": _random_position(), "owner": -1, "lock": 0.0})

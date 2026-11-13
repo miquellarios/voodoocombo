@@ -16,6 +16,12 @@ Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el prof
 
 > Codex añade aquí una entrada por fase. Solo hechos reales: no se inventan problemas.
 
+### Fase 9a — Movimiento y colisiones (13/11/2026)
+- Qué se ha hecho: Añadida `ArenaPhysics` para desplazar círculos por ejes, deslizarse por obstáculos y separar jugadores sin atravesar la geometría. Jugador y bots usan la misma resolución de movimiento y el dash se detiene al chocar. Añadidas pruebas de deslizamiento y separación.
+- Decisiones: Las colisiones se calculan con los rectángulos exactos de `arenas.json`; el radio de jugador viene de `GameConfig`.
+- Problemas encontrados y cómo se resolvieron: Godot no registró la nueva clase global en la primera ejecución directa de tests; el escaneo headless del editor actualizó la caché de clases y después los tests pasaron.
+- Qué tienen que probar los humanos: Moverse en diagonal contra los cuatro lados de varios obstáculos, cruzar esquinas y dejar dos personajes superpuestos para confirmar que se deslizan/separan y que el dash se corta contra los muros.
+
 Formato de cada entrada:
 
 ```
@@ -86,3 +92,9 @@ Formato de cada entrada:
 - Decisiones: Las plantillas oficiales de exportación Windows no están instaladas. El paquete local usa un lanzador pequeño, el runtime Godot 4.7.2 y el PCK; deben permanecer juntos en `build/`.
 - Problemas encontrados y cómo se resolvieron: La exportación Windows oficial falló por ausencia de `windows_debug_x86_64.exe` y `windows_release_x86_64.exe`; se produjo y probó el paquete de runtime alternativo. La suite core y el arranque headless del runtime pasan.
 - Qué tienen que probar los humanos: Ejecutar `build/VoodooCombo-0.1.exe` en Windows, confirmar el menú y jugar una partida de cada modo. Para una exportación autocontenida estándar, instalar las plantillas de exportación de Godot 4.7.2 y usar `export_presets.cfg`.
+
+### Revisión — Integración del paquete de personajes y arenas (13/11/2026)
+- Qué se ha hecho: Copiados al proyecto los recursos y guías de `VoodooCombo-pack-companero`; `ArenaGen` ahora carga `arenas.json`, elige entre las cuatro arenas sin repetir la anterior, usa sus salidas/obstáculos y coloca doblones evitando trampas fijas. La partida dibuja los fondos, sprites de personajes con animaciones básicas y sprites de trampas periódicas. Actualizados `build/VoodooCombo-0.1.pck` y `build/VoodooCombo-0.1-Windows.zip`.
+- Decisiones: Se conservaron los datos y los nombres de archivos originales del paquete. El generador acepta los arrays que trae `arenas.json` y el formato de texto documentado en `ARENAS.md`; la selección de salidas y sus asignaciones usa la semilla.
+- Problemas encontrados y cómo se resolvieron: Godot no podía escribir su configuración en las rutas de usuario del entorno; al redirigir `APPDATA`, `LOCALAPPDATA` y las carpetas temporales a `.godot-appdata/` y `.godot-tmp/`, se generó un PCK válido. La suite core pasó y el PCK actualizado arranca en modo headless.
+- Qué tienen que probar los humanos: Abrir `build/VoodooCombo-0.1.exe` y confirmar las cuatro arenas, el encaje de los fondos, escala/animación de los personajes, colisiones y ubicación de doblones. Las imágenes de las trampas están integradas; sus efectos de juego aún no están conectados.

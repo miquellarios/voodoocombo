@@ -6,6 +6,7 @@ func _initialize() -> void:
 	_test_scoring()
 	_test_drop_limits()
 	_test_arena()
+	_test_arena_physics()
 	_test_items()
 	_test_ranking()
 	if failures == 0:
@@ -45,6 +46,14 @@ func _test_arena() -> void:
 		for i in range(arena.coins.size()):
 			for j in range(i + 1, arena.coins.size()):
 				_check(arena.coins[i].distance_to(arena.coins[j]) >= 35.0, "coin separation")
+
+func _test_arena_physics() -> void:
+	var obstacle: Array[Rect2] = [Rect2(100.0, 100.0, 40.0, 40.0)]
+	var start := Vector2(78.0, 89.0)
+	var slid := ArenaPhysics.move_circle(start, Vector2(12.0, 12.0), 22.0, obstacle)
+	_check(slid.y > start.y and is_equal_approx(slid.x, start.x), "circle slides along obstacle")
+	var separated := ArenaPhysics.separate_pair(Vector2(100.0, 100.0), Vector2(100.0, 100.0), 22.0, [])
+	_check(separated[0].distance_to(separated[1]) >= 44.0, "overlapping players separate to collision diameter")
 
 func _test_items() -> void:
 	var rng := RandomNumberGenerator.new()
