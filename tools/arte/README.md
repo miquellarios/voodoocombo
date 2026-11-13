@@ -20,6 +20,7 @@ Se ejecutan desde esta carpeta. Lo generado va a `out/`, que git ignora.
 |---|---|---|
 | `sprites3.py` | Sprites de los 4 personajes en 4 colores, retratos y corona | `out/godot_sprites/assets/characters/` → copiar a `assets/characters/` |
 | `export_arenas.py` | Fondos de las arenas, sprites de las trampas y `arenas.json` | `out/godot_arenas/assets/arenas/` → copiar a `assets/arenas/` |
+| `export_ui.py` | Doblón, cofre, iconos de hechizos, logo, fondo del menú, botones, paneles y retratos del marcador | `out/godot_ui/assets/items/` y `assets/ui/` → copiar a `assets/`; referencias en `out/godot_ui/referencias/` |
 | `arena_preview.py` | Vista previa de las 4 arenas con personajes | `out/arenas_preview.jpg` |
 | `stylesheet3.py` | Hoja de estilo de los personajes (la de la presentación) | `out/` |
 | `trailer.py full` | Tráiler completo con música y sonido sintetizados (≈4 min) | `out/VoodooCombo-trailer.mp4` |

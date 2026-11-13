@@ -1,0 +1,51 @@
+{
+  "export_scale": 2,
+  "items": {
+    "doblon": {
+      "file": "doblon.png",
+      "frame_w": 64,
+      "frame_h": 64,
+      "frames": 8,
+      "scale": 0.5,
+      "fps": 10,
+      "loop": true,
+      "note": "Centro del frame = centro del doblón. Para que bote, mover el sprite en y y dejar la sombra en el suelo."
+    },
+    "doblon_sombra": {
+      "file": "doblon_sombra.png",
+      "frame_w": 64,
+      "frame_h": 24,
+      "frames": 1,
+      "scale": 0.5,
+      "note": "Va en el suelo, 11 px por debajo del centro del doblón."
+    },
+    "cofre": {
+      "file": "cofre.png",
+      "frame_w": 224,
+      "frame_h": 256,
+      "frames": 6,
+      "scale": 0.5,
+      "fps": 20,
+      "loop": false,
+      "frames_info": "0 cerrado · 1-4 abriéndose · 5 abierto",
+      "note": "El cofre se apoya en (0, +16) respecto al centro del frame; su posición de juego es el centro del frame. Cerrado: frame 0 con un bote suave (sin(t·3,2)·2,5 px) y el brillo latiendo con modulate."
+    },
+    "hechizos": {
+      "file": "hechizos.png",
+      "frame_w": 128,
+      "frame_h": 128,
+      "frames": 7,
+      "scale": 0.5,
+      "order": [
+        "magnet",
+        "boots",
+        "cloak",
+        "pin",
+        "frost",
+        "sheep",
+        "ring"
+      ],
+      "note": "Un icono por frame, en el orden de ITEMS (magnet, boots, cloak, pin, frost, sheep, ring). Para la ranura del HUD y la ruleta."
+    }
+  }
+}
