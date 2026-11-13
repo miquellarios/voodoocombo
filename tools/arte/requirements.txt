@@ -1,0 +1,6 @@
+pycairo
+numpy
+scipy
+pillow
+fonttools
+brotli
