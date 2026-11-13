@@ -22,6 +22,12 @@ Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el prof
 - Problemas encontrados y cómo se resolvieron: Godot no registró la nueva clase global en la primera ejecución directa de tests; el escaneo headless del editor actualizó la caché de clases y después los tests pasaron.
 - Qué tienen que probar los humanos: Moverse en diagonal contra los cuatro lados de varios obstáculos, cruzar esquinas y dejar dos personajes superpuestos para confirmar que se deslizan/separan y que el dash se corta contra los muros.
 
+### Fase 9b — Rutas y antiatasco de bots (13/11/2026)
+- Qué se ha hecho: Los bots buscan monedas y cofres con AStarGrid2D, recalculan la ruta cada 0,3 s, evitan casillas de pinchos activas, encarecen barriles y rayos, reparten objetivos entre bots y prueban una dirección de escape al detectar un atasco.
+- Decisiones: Se inflan las celdas sólidas con el radio del jugador para que la ruta sea físicamente transitable, no solo libre en el centro de cada casilla.
+- Problemas encontrados y cómo se resolvieron: El primer test tomó un camino que rozaba una esquina y el círculo no podía seguirlo; al incluir la huella de colisión en la cuadrícula, el bot llega al objetivo en menos de cinco segundos.
+- Qué tienen que probar los humanos: Dejar bots en esquinas y alrededor de muros durante dos minutos y revisar que no se atasquen, que elijan cofres sin hechizo y que eviten pinchos, barriles y rayos.
+
 Formato de cada entrada:
 
 ```

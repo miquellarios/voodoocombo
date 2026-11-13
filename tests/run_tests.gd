@@ -7,6 +7,7 @@ func _initialize() -> void:
 	_test_drop_limits()
 	_test_arena()
 	_test_arena_physics()
+	_test_bot_pathfinding()
 	_test_items()
 	_test_ranking()
 	if failures == 0:
@@ -54,6 +55,30 @@ func _test_arena_physics() -> void:
 	_check(slid.y > start.y and is_equal_approx(slid.x, start.x), "circle slides along obstacle")
 	var separated := ArenaPhysics.separate_pair(Vector2(100.0, 100.0), Vector2(100.0, 100.0), 22.0, [])
 	_check(separated[0].distance_to(separated[1]) >= 44.0, "overlapping players separate to collision diameter")
+
+func _test_bot_pathfinding() -> void:
+	var blocked: Dictionary = {}
+	var map_obstacles: Array[Dictionary] = []
+	for y in range(8):
+		blocked[Vector2i(5, y)] = true
+		map_obstacles.append({"rect": [200, y * 40, 40, 40]})
+	var arena := {"blocked": blocked, "obstacles": map_obstacles, "hazards": []}
+	var goal := Vector2(300.0, 100.0)
+	var path := BotBrain.find_path(Vector2(100.0, 100.0), goal, arena)
+	_check(not path.is_empty(), "bot finds route around obstacle")
+	var obstacle_rects: Array[Rect2] = []
+	for cell in blocked:
+		obstacle_rects.append(Rect2(Vector2(cell) * 40.0, Vector2.ONE * 40.0))
+	var position := Vector2(100.0, 100.0)
+	var path_index := 0
+	for _frame in range(300):
+		while path_index < path.size() and position.distance_to(path[path_index]) <= GameConfig.BOT_WAYPOINT_RADIUS:
+			path_index += 1
+		if path_index >= path.size() or position.distance_to(goal) < 28.0:
+			break
+		var direction: Vector2 = (path[path_index] - position).normalized()
+		position = ArenaPhysics.move_circle(position, direction * GameConfig.PLAYER_SPEED / 60.0, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	_check(position.distance_to(goal) < 28.0, "bot reaches target behind obstacle within five seconds")
 
 func _test_items() -> void:
 	var rng := RandomNumberGenerator.new()

@@ -117,7 +117,7 @@ func _begin_match(classic: bool = false) -> void:
 		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
 		if not character_sheets.has(sheet_key):
 			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
-		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0})
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO})
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0})
 	elapsed = 0.0
@@ -174,12 +174,19 @@ func _update_bot(index: int, delta: float) -> void:
 		return
 	var coin_positions: Array[Vector2] = []
 	for coin in coins: coin_positions.append(coin.pos)
-	var opponents: Array[Vector2] = []
-	for j in range(players.size()):
-		if j != index: opponents.append(players[j].pos)
-	var choice := BotBrain.choose_direction(player.pos, coin_positions, opponents, player.dash_cd <= 0.0, rng)
-	var direction: Vector2 = choice.direction
-	if choice.dash and direction != Vector2.ZERO and player.item != "sheep":
+	var chest_positions: Array[Vector2] = []
+	if player.item.is_empty():
+		for chest in chests:
+			chest_positions.append(chest)
+	var direction := BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
+	var should_dash := false
+	if player.dash_cd <= 0.0 and player.item != "sheep":
+		for j in range(players.size()):
+			if j != index and player.pos.distance_to(players[j].pos) < 120.0 and rng.randf() < 0.3:
+				direction = (players[j].pos - player.pos).normalized()
+				should_dash = true
+				break
+	if should_dash and direction != Vector2.ZERO:
 		player.dash_dir = direction
 		player.dash_left = GameConfig.DASH_DURATION
 		player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
@@ -187,6 +194,7 @@ func _update_bot(index: int, delta: float) -> void:
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
+		player.vel = direction * GameConfig.PLAYER_SPEED * speed_scale
 	var motion := movement * GameConfig.PLAYER_SPEED * speed_scale * delta * (GameConfig.DASH_MULTIPLIER if player.dash_left > 0.0 else 1.0)
 	var previous_position: Vector2 = player.pos
 	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
