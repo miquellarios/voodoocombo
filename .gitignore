@@ -7,3 +7,8 @@
 .godot/
 .import/
 export_presets.cfg
+
+# Arte generado (se regenera con tools/arte)
+tools/arte/out/
+__pycache__/
+*.pyc

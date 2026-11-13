@@ -81,7 +81,7 @@ func _process(delta: float) -> void:
 		if results_elapsed >= 10.0: _build_menu()
 		return
 	if state == "menu":
-		character_idle += delta
+		if not Settings.reduce_motion: character_idle += delta
 		if is_instance_valid(character_preview): _update_character_preview()
 		return
 	if state == "playing" and Input.is_action_just_pressed("dash"):
@@ -695,7 +695,7 @@ func _update_hud() -> void:
 			score_values[slot] = value
 			score_change_times[slot] = Time.get_ticks_msec()
 		var age := Time.get_ticks_msec() - score_change_times[slot]
-		var pop := 1.0 + (0.24 * (1.0 - float(age) / 170.0) if age < 170 else 0.0)
+		var pop := 1.0 + (0.24 * (1.0 - float(age) / 170.0) if age < 170 and not Settings.reduce_motion else 0.0)
 		score_number_labels[slot].scale = Vector2.ONE * pop
 		score_number_labels[slot].pivot_offset = score_number_labels[slot].size * 0.5
 		score_number_labels[slot].text = str(value)
@@ -892,11 +892,12 @@ func _build_hud() -> void:
 		score_change_times.append(0)
 	var timer := Label.new()
 	timer.name = "Timer"
-	timer.position = Vector2(574, 10)
 	timer.position = Vector2(574, 2)
 	timer.size = Vector2(132, 58)
 	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer.add_theme_font_size_override("font_size", roundi(44 * Settings.ui_scale))
+	var clock_font := load("res://assets/fonts/LilitaOne-Regular.woff2") as Font
+	if clock_font != null: timer.add_theme_font_override("font", clock_font)
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
 	var slot_texture := TextureRect.new()
@@ -933,6 +934,9 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 	label.horizontal_alignment = alignment
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", roundi(font_size * Settings.ui_scale))
+	var font_path := "res://assets/fonts/LilitaOne-Regular.woff2" if font_size >= 30 else "res://assets/fonts/Baloo2-Regular.woff2"
+	var hud_font := load(font_path) as Font
+	if hud_font != null: label.add_theme_font_override("font", hud_font)
 	root.add_child(label)
 	return label
 
@@ -970,7 +974,7 @@ func _show_results() -> void:
 	for index in range(results_ranking.size()):
 		var player: Dictionary = results_ranking[index]
 		var pedestal := ColorRect.new()
-		var pedestal_height := [58, 44, 34, 28][index]
+		var pedestal_height: int = [58, 44, 34, 28][index]
 		pedestal.position = Vector2(408 + index * 150, 315 - pedestal_height)
 		pedestal.size = Vector2(94, pedestal_height)
 		pedestal.color = player.color.darkened(0.35)
@@ -1263,6 +1267,9 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 	label.size = Vector2(800, 52)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", roundi(size * Settings.ui_scale))
+	var label_font_path := "res://assets/fonts/LilitaOne-Regular.woff2" if _bold else "res://assets/fonts/Baloo2-Regular.woff2"
+	var label_font := load(label_font_path) as Font
+	if label_font != null: label.add_theme_font_override("font", label_font)
 	label.add_theme_color_override("font_color", tint)
 	label.add_theme_color_override("font_shadow_color", Color("160e22"))
 	label.add_theme_constant_override("shadow_offset_x", 2)
@@ -1276,6 +1283,8 @@ func _button(root: Control, text: String, offset: Vector2, action: Callable) -> 
 	button.position = Vector2(470, 0) + offset
 	button.size = Vector2(340, 54)
 	button.add_theme_font_size_override("font_size", roundi(26 * Settings.ui_scale))
+	var menu_font := load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	if menu_font != null: button.add_theme_font_override("font", menu_font)
 	button.focus_mode = Control.FOCUS_ALL
 	button.pressed.connect(func(): Sfx.play_tone(300.0, 0.07); action.call())
 	button.focus_entered.connect(func(): Sfx.play_tone(470.0, 0.045))

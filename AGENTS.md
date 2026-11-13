@@ -7,7 +7,7 @@
 ## 1. Qué es
 
 Party game **multijugador en tiempo real** de 2 a 4 jugadores, con partidas cortas en una sola pantalla y en una arena aleatoria.
-Cada jugador es un muñeco vudú que recoge doblones, encadena combos y golpea con el dash para robar.
+Cada jugador elige un personaje (muñecos vudú de fantasía: Brasa, Colmillo, Tuerca o Cripta) y recoge doblones en una de las 4 arenas con trampas, encadena combos y golpea con el dash para robar.
 Tiene dos modos (§4.6):
 - **VoodooCombo** (por defecto): gana quien tenga más doblones a los 90 s.
 - **Clásico:** literal del enunciado. Hay 50 doblones repartidos y gana el primero en recoger 15.
@@ -21,8 +21,11 @@ Si una funcionalidad añade reglas que no se entienden en 5 segundos, no entra.
 
 - **Motor:** Godot 4 + GDScript con tipos estáticos. Lee `config/features` de `project.godot` para saber la versión y usa solo APIs de esa versión.
 - **Renderer:** Compatibility. **Ventana:** 1280×720, stretch `canvas_items`, aspect `expand`.
-- **Assets:** ninguno externo salvo `assets/fonts/` (Lilita One y Baloo 2, licencia OFL). Si las fuentes faltan, se usa la fuente por defecto sin errores.
-  - Muñecos, arena, iconos, partículas y sonidos se generan por código (`_draw()`, `AudioStreamWAV`).
+- **Assets:** solo los del proyecto.
+  - `assets/fonts/`: New Rocker, Lilita One y Baloo 2 (licencia OFL). Si faltan, se usa la fuente por defecto sin errores.
+  - `assets/characters/`: sprites de los personajes, generados por Claude. Cómo usarlos: `assets/characters/SPRITES.md`.
+  - `assets/arenas/`: fondos, mapa (`arenas.json`) y sprites de las trampas, generados por Claude. Cómo usarlos: `assets/arenas/ARENAS.md`.
+  - Doblones, cofres, iconos de hechizos, partículas y sonidos se generan por código (`_draw()`, `AudioStreamWAV`).
 - **Escenas `.tscn` mínimas:** nodo raíz + script. La UI se construye en código.
 - **`core/` es lógica pura:** clases `RefCounted` sin nodos ni autoloads, con la aleatoriedad a partir de una semilla.
   - Contiene la generación de arena, las reglas de combo y robo, la tirada de hechizos y el ranking con los premios.
@@ -38,10 +41,10 @@ Si una funcionalidad añade reglas que no se entienden en 5 segundos, no entra.
 res://
   AGENTS.md  README.md
   docs/      DISENO.md  PLAN.md  BITACORA.md  HISTORIA-IA.md  INVESTIGACION.md  PROMPTS-CODEX.md  conversaciones/  capturas/
-  assets/fonts/
-  autoload/  net.gd  profile.gd  settings.gd  i18n.gd  sfx.gd  fx.gd
-  core/      game_config.gd  arena_gen.gd  scoring.gd  item_table.gd  ranking.gd
-  net/       match_server.gd  lan_discovery.gd  http_endpoint.gd  bot_brain.gd
+  assets/    fonts/  characters/  arenas/
+  autoload/  net.gd  profile.gd  settings.gd  i18n.gd  sfx.gd  fx.gd  char_sprites.gd
+  core/      game_config.gd  arena_data.gd  arena_gen.gd  scoring.gd  item_table.gd  ranking.gd
+  net/       match_server.gd  hazards.gd  lan_discovery.gd  http_endpoint.gd  bot_brain.gd
   scenes/    main/  menu/  lobby/  match/  podium/  customize/  settings/
   ui/        theme_builder.gd  widgets/
   tests/     run_tests.gd  test_*.gd
@@ -49,13 +52,21 @@ res://
 
 ## 4. Reglas del juego
 
-### 4.1 Arena
-- **Tamaño:** 1200×600 px dentro de la ventana, sobre una rejilla lógica de 30×15 casillas de 40 px.
-- **Generación:** con semilla. Entre 6 y 10 obstáculos de 1 a 3 casillas, colocados con **simetría en espejo horizontal y vertical**.
-- **Validación:** con BFS se comprueba que no queden zonas cerradas. Si las hay, se regenera con semilla+1.
-- **Salidas:** en cada partida se elige al azar un juego de 4 puntos simétricos (las 4 esquinas o los 4 centros de los lados, con un margen de 2 casillas) y se reparten al azar entre los jugadores.
-- **Al empezar:** cada jugador ve "¡Eres el Jugador N!" con una flecha sobre su muñeco durante 3 s.
-- **Bioma:** `seed % 4`. Solo cambia la parte visual (ver §7).
+### 4.1 Arenas
+- **Cuatro arenas** de 1200×600 px, con casillas de 40 px. Todo su contenido está en `assets/arenas/arenas.json`:
+
+  | id | Nombre | Trampas |
+  |---|---|---|
+  | `cienaga` | Ciénaga Embrujada | Lodo, Raíces |
+  | `cripta` | Cripta de Huesos | Pinchos, Fantasma |
+  | `taller` | Taller Gnómico | Cintas, Vapor, Barril explosivo |
+  | `biblioteca` | Biblioteca Arcana | Portales, Rayo arcano |
+
+- **Elección:** cada partida elige una arena al azar con la semilla, sin repetir la anterior. En el modo práctica se puede elegir.
+- **Mapa:** obstáculos, trampas y salidas salen de `arenas.json`. El layout es simétrico, así que todas las salidas son igual de justas.
+- **Salidas:** se elige al azar uno de los `spawn_sets` y se reparte al azar entre los jugadores.
+- **Al empezar:** cada jugador ve "¡Eres el Jugador N!" con una flecha sobre su personaje durante 3 s.
+- **Doblones y cofres:** van en casillas libres al azar. Nunca en obstáculos ni en trampas fijas; sobre el lodo sí.
 
 ### 4.2 Jugador
 - **Movimiento:** 260 px/s, radio de 22 px, choca con los obstáculos y con los bordes.
@@ -165,6 +176,9 @@ res://
 
 Los golpes comunes sueltan el 25 % de los doblones (mínimo 3, máximo 12; con corona 35 %), aturden 0,4 s, reinician el combo y dan 1,5 s de invulnerabilidad. La Capa Élfica los bloquea.
 
+- **Avisos:** toda trampa periódica anuncia antes de hacer daño.
+- **Bots:** esquivan los pinchos levantados y el rayo, y usan los portales si les acercan a un doblón.
+
 ## 5. Red (tiempo real)
 
 - **Transporte:** `ENetMultiplayerPeer`, puerto 7777.
@@ -178,10 +192,11 @@ Los golpes comunes sueltan el 25 % de los doblones (mínimo 3, máximo 12; con c
   - Cada cliente mueve su muñeco en local y manda `{pos, vel, facing}` al servidor 20 veces por segundo (`unreliable_ordered`).
   - El servidor descarta los saltos imposibles comparándolos con la velocidad máxima.
   - El servidor manda a todos un snapshot con las posiciones 20 veces por segundo, y los clientes interpolan a los demás jugadores con 100 ms de retraso.
-- **Intenciones del cliente** (`reliable`): `request_join(nick, cosmetics, version)`, `request_ready()`, `request_dash(dir)`, `request_use_item(dir)`, `request_rematch()`.
+- **Intenciones del cliente** (`reliable`): `request_join(nick, character, cosmetics, version)`, `request_ready()`, `request_dash(dir)`, `request_use_item(dir)`, `request_rematch()`.
 - **Servidor:**
   - Ejecuta la lógica a 30 Hz: doblones, cofres, golpes, hechizos y tiempo.
-  - Manda eventos `reliable`: `coin_spawned`, `coin_taken(id, by, value, combo)`, `player_hit(victim, attacker, dropped)`, `item_rolled`, `item_used`, `frenzy_started`, `match_over(ranking, awards)`.
+  - Manda eventos `reliable`: `coin_spawned`, `coin_taken(id, by, value, combo)`, `player_hit(victim, attacker, dropped)`, `item_rolled`, `item_used`, `frenzy_started`, `hazard_event(type, data)`, `match_over(ranking, awards)`.
+  - Las trampas periódicas (pinchos, vapor, fantasma, rayo) se calculan con el reloj de la partida en todos los peers. Raíces y barriles los decide el servidor.
 - **Datos:** en las RPC solo se mandan tipos simples. Los doblones son datos (`id`, `pos`, `value`) y no nodos sincronizados.
 - **Modo anfitrión:** el Jugador 1 es el peer 1, el mismo proceso que el servidor. Se le entregan los eventos directamente o con `call_local`.
 - **Sala:**
@@ -216,41 +231,46 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
 **Sonido:** todo sintetizado en código como `AudioStreamWAV`, más un bucle de tambores y bajo.
 
-## 7. Identidad visual
+## 7. Identidad visual (fantasía oscura)
 
-- **Regla general:** fondo oscuro y apagado. Solo lo importante va saturado: jugadores, doblones y ataques.
+- **Regla general:** fondo casi negro con niebla y velas. Solo lo importante va saturado: personajes, doblones dorados y trampas avisando.
 - **Paleta:**
 
   | Uso | Color |
   |---|---|
-  | Fondo | `#160E22` |
+  | Fondo | `#0B0710` |
+  | Sombra de títulos | `#5C1018` (rojo sangre) |
   | Doblón | `#FFD23F`, con brillo `#FFF6C2` |
+  | Hueso | `#E8DCC4` |
   | Escarcha | `#7FE7FF` |
+  | Almas | `#B06BFF` |
   | Texto | `#FFFFFF` y, secundario, `#B8A9D1` |
 
-- **Jugadores:** Coral `#FF5A5F` ● · Azul `#3DA5FF` ▲ · Lima `#7BE042` ■ · Hueso `#F3EEFC` ◆.
-  - La forma aparece siempre junto al nombre y bajo el muñeco.
-  - Los ataques y proyectiles llevan el color de quien los lanza.
-- **Contornos:** de 4 px en `#160E22` en todo lo jugable. Las siluetas tienen que reconocerse a 40 px.
-- **Muñeco:**
-  - Silueta de judía con cabeza grande, dos ojos de botón, boca cosida y costura en X.
-  - Botea al andar, se estira en la dirección del movimiento y se aplasta en el dash.
-  - Cosméticos: sombrero, ojos, estela y baile.
-- **Doblones:** giran (escala X), brillan y tienen sombra.
-- **Tipografía:** Lilita One para títulos y números, Baloo 2 para el resto. Texto de 18 px como mínimo.
-- **HUD:** solo 3 elementos fijos.
-  1. Jugadores ordenados con su puntuación (la corona en el líder).
-  2. Tiempo en grande arriba, en el centro.
-  3. Ranura del hechizo abajo a la izquierda, con su tecla.
-  - El combo flota junto a tu muñeco y el anillo de espera del dash va bajo sus pies.
-- **Biomas:** suelo apagado de dos tonos y decorado de bajo contraste.
+- **Jugadores:** J1 coral `#D8484F` ● · J2 azul `#3C7FD0` ▲ · J3 lima `#63A83A` ■ · J4 hueso `#D9D0BE` ◆.
+  - Los sprites ya vienen en cada color.
+  - La forma (● ▲ ■ ◆) la dibuja el juego bajo el personaje y junto al nombre.
+- **Personajes:** son cosméticos (sprites de `assets/characters/`). Muñecos vudú de arpillera con aspecto de fantasía:
 
-  | Bioma | Suelo | Obstáculos |
-  |---|---|---|
-  | Ciénaga | `#2B3A2A` / `#243223` | Lápidas |
-  | Bosque | `#33402A` / `#2B3723` | Árboles blancos |
-  | Hielo | `#2A3A4A` / `#233241` | Cristales |
-  | Forja | `#3A2A2A` / `#322323` | Rocas |
+  | Personaje | Rol |
+  |---|---|
+  | Brasa | Mago del fuego |
+  | Colmillo | Trol del pantano |
+  | Tuerca | Gnomo inventor |
+  | Cripta | Nigromante |
+
+  - Animaciones: idle, walk, dash, hurt y win.
+  - En el HUD se muestra el nombre del personaje junto a "J1"-"J4".
+- **Tipografía:**
+  - **New Rocker:** logo, títulos, banners ("¡FRENESÍ!", "¡VOODOO COMBO!") y palabras grandes. Relleno hueso (`#F4ECDA` → `#A8977A`) u oro viejo (`#FFE7A0` → `#8A5A12`), con contorno `#0B0710` y sombra roja sangre.
+  - **Lilita One:** números (marcador, tiempo, "+N", cuenta atrás).
+  - **Baloo 2:** el resto del texto. Mínimo 18 px.
+- **Logo:** "VOODOO" en hueso y "COMBO" en oro viejo, con un alfiler clavado en la última O.
+- **HUD:** solo 3 elementos fijos.
+  1. Jugadores con su personaje y su puntuación (la corona en el líder).
+  2. Tiempo en grande arriba, en el centro.
+  3. Ranura del hechizo abajo a la izquierda.
+  - Paneles `#241838` con borde de costura.
+- **Ambiente:** encima de la arena, niebla que se mueve despacio, velas que parpadean y viñeta oscura. Todo respeta "Reducir movimiento".
 
 ## 8. Accesibilidad
 
