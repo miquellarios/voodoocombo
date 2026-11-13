@@ -40,6 +40,12 @@ Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el prof
 - Problemas encontrados y cómo se resolvieron: Godot detectó inferencias ambiguas en dos vectores; se declararon como `Vector2`. Los tests de reglas y el arranque headless de la escena pasaron.
 - Qué tienen que probar los humanos: Probar cada trampa de las cuatro arenas, observar sus avisos/daños/caídas de doblones y repetir con Capa Élfica e invulnerabilidad activas.
 
+### Fase 9e — Texturas de objetos y hechizos (13/11/2026)
+- Qué se ha hecho: Integrados `assets/items/`; los doblones giran con desfases y bote sobre su sombra, los cofres tienen reposo y apertura animados, y los iconos de hechizo aparecen en la ranura y en la ruleta.
+- Decisiones: Los tamaños, fps, escalas y tiras se leen desde `items.json`; la apertura dura 0,25 s y deja la ruleta del hechizo en sus 0,8 s existentes.
+- Problemas encontrados y cómo se resolvieron: Los sprites no estaban aún en el proyecto; se copiaron desde el paquete de fase 9 y Godot los importó correctamente. Arranque headless y tests core pasaron.
+- Qué tienen que probar los humanos: Recoger doblones, abrir cofres de cada arena, comprobar que los iconos de hechizo coinciden con el objeto ganado y que sus animaciones se distinguen sin solaparse.
+
 Formato de cada entrada:
 
 ```

@@ -2,6 +2,10 @@ extends Node2D
 
 const OFFSET := Vector2(40, 60)
 const ITEMS := ["magnet", "boots", "cloak", "pin", "frost", "sheep", "ring"]
+const COIN_TEXTURE := preload("res://assets/items/doblon.png")
+const COIN_SHADOW_TEXTURE := preload("res://assets/items/doblon_sombra.png")
+const CHEST_TEXTURE := preload("res://assets/items/cofre.png")
+const SPELL_TEXTURE := preload("res://assets/items/hechizos.png")
 const BIOME_COLORS := [[Color("2b3a2a"), Color("243223")], [Color("33402a"), Color("2b3723")], [Color("2a3a4a"), Color("233241")], [Color("3a2a2a"), Color("322323")]]
 
 var state := "menu"
@@ -17,6 +21,7 @@ var hazard_runtime: Array[Dictionary] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
 var chests: Array[Vector2] = []
+var opened_chests: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
 var hud: CanvasLayer
 var hud_root: Control
@@ -29,6 +34,8 @@ var arena_background: Texture2D
 var character_metadata: Dictionary = {}
 var character_sheets: Dictionary = {}
 var hazard_sheets: Dictionary = {}
+var item_metadata: Dictionary = {}
+var spell_atlases: Array[AtlasTexture] = []
 var bots_dash_global_left := 0.0
 
 func _ready() -> void:
@@ -36,6 +43,15 @@ func _ready() -> void:
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
 		character_metadata = metadata
+	var items_data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/items/items.json"))
+	if items_data is Dictionary:
+		item_metadata = items_data.get("items", {})
+	var spell_info: Dictionary = item_metadata.get("hechizos", {})
+	for frame in range(ITEMS.size()):
+		var atlas := AtlasTexture.new()
+		atlas.atlas = SPELL_TEXTURE
+		atlas.region = Rect2(frame * int(spell_info.get("frame_w", 128)), 0, int(spell_info.get("frame_w", 128)), int(spell_info.get("frame_h", 128)))
+		spell_atlases.append(atlas)
 	Fx.floating_text.connect(_on_floating_text)
 	Fx.shake.connect(_on_shake)
 	_build_menu()
@@ -68,6 +84,7 @@ func _process(delta: float) -> void:
 		_spawn_coin()
 	for coin in coins:
 		coin.lock = maxf(0.0, coin.lock - delta)
+	_update_opened_chests(delta)
 	var public_players: Array[Dictionary] = []
 	for player in players:
 		public_players.append({"name": player.name, "score": player.score, "combo": player.combo})
@@ -114,6 +131,7 @@ func _begin_match(classic: bool = false) -> void:
 	players.clear()
 	coins.clear()
 	chests.clear()
+	opened_chests.clear()
 	floating.clear()
 	var names := [Profile.nick, "Mordisquitos", "Conde Costura", "Dama del Pantano"]
 	var characters := ["mago", "trol", "gnomo", "nigro"]
@@ -124,7 +142,7 @@ func _begin_match(classic: bool = false) -> void:
 			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
 		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1})
 	for coin_pos in arena.coins:
-		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0})
+		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 	elapsed = 0.0
 	remaining = GameConfig.CLASSIC_SECONDS if mode == "classic" else GameConfig.MATCH_SECONDS
 	frenzy_notified = false
@@ -277,6 +295,7 @@ func _update_pickups() -> void:
 			break
 		for chest_i in range(chests.size() - 1, -1, -1):
 			if player.item == "" and player.pos.distance_to(chests[chest_i]) < 30.0 and roll_time <= 0.0:
+				opened_chests.append({"pos": chests[chest_i], "elapsed": 0.0})
 				_start_roll(i)
 				chests.remove_at(chest_i)
 				break
@@ -543,6 +562,12 @@ func _start_roll(index: int) -> void:
 	roll_time = 0.8
 	Sfx.play_tone(420.0, 0.12)
 
+func _update_opened_chests(delta: float) -> void:
+	for index in range(opened_chests.size() - 1, -1, -1):
+		opened_chests[index].elapsed = float(opened_chests[index].elapsed) + delta
+		if opened_chests[index].elapsed >= GameConfig.CHEST_OPEN_SECONDS:
+			opened_chests.remove_at(index)
+
 func _update_roll(delta: float) -> void:
 	if roll_time <= 0.0: return
 	roll_time -= delta
@@ -629,7 +654,12 @@ func _update_hud() -> void:
 		score_label.text = "     ".join(lines)
 	var spell_label := hud_root.get_node_or_null("Spell") as Label
 	if spell_label and not players.is_empty():
-		spell_label.text = "E  ✦  %s" % (players[0].item.to_upper() if players[0].item != "" else "—")
+		spell_label.text = "E  %s" % (players[0].item.to_upper() if players[0].item != "" else "—")
+	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
+	if spell_icon and not players.is_empty():
+		var spell_index := ITEMS.find(String(players[0].item))
+		spell_icon.visible = spell_index >= 0
+		spell_icon.texture = spell_atlases[spell_index] if spell_index >= 0 else null
 
 func _build_menu() -> void:
 	_clear_hud()
@@ -733,10 +763,18 @@ func _build_hud() -> void:
 	root.add_child(timer)
 	var spell := Label.new()
 	spell.name = "Spell"
-	spell.position = Vector2(28, 650)
-	spell.size = Vector2(300, 42)
+	spell.position = Vector2(88, 650)
+	spell.size = Vector2(240, 42)
 	spell.add_theme_font_size_override("font_size", 21)
 	root.add_child(spell)
+	var spell_icon := TextureRect.new()
+	spell_icon.name = "SpellIcon"
+	spell_icon.position = Vector2(24, 630)
+	spell_icon.size = Vector2(56, 56)
+	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	spell_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	spell_icon.visible = false
+	root.add_child(spell_icon)
 	var pause := Button.new()
 	pause.text = "Ⅱ"
 	pause.position = Vector2(1200, 648)
@@ -788,12 +826,23 @@ func _draw() -> void:
 	_draw_arena_hazards()
 	for coin in coins:
 		var pos: Vector2 = coin.pos
-		draw_circle(pos + Vector2(2, 4), 10.0, Color(0, 0, 0, 0.35))
-		draw_circle(pos, 10.0, GameConfig.GOLD)
-		draw_circle(pos, 5.0, Color("fff6c2"))
+		var phase := float(coin.get("phase", 0.0))
+		draw_texture_rect(COIN_SHADOW_TEXTURE, Rect2(pos + Vector2(-16.0, 5.0), Vector2(32.0, 12.0)), false)
+		var coin_bounce := GameConfig.COIN_BOB_PIXELS * absf(sin(elapsed * GameConfig.COIN_BOB_SPEED + phase))
+		var coin_meta: Dictionary = item_metadata.get("doblon", {})
+		var coin_size := Vector2(int(coin_meta.get("frame_w", 64)), int(coin_meta.get("frame_h", 64)))
+		_draw_strip_frame(COIN_TEXTURE, coin_size, floori(elapsed * float(coin_meta.get("fps", 10.0)) + phase), pos - Vector2(0.0, coin_bounce), float(coin_meta.get("scale", 0.5)), int(coin_meta.get("frames", 8)))
 	for chest in chests:
-		draw_rect(Rect2(chest - Vector2(13, 10), Vector2(26, 20)), Color("94652e"), true, 3.0)
-		draw_circle(chest, 3.0, GameConfig.GOLD)
+		var chest_meta: Dictionary = item_metadata.get("cofre", {})
+		var chest_size := Vector2(int(chest_meta.get("frame_w", 224)), int(chest_meta.get("frame_h", 256)))
+		var chest_bounce := GameConfig.CHEST_BOB_PIXELS * sin(elapsed * GameConfig.CHEST_BOB_SPEED)
+		_draw_strip_frame(CHEST_TEXTURE, chest_size, 0, chest - Vector2(0.0, chest_bounce), float(chest_meta.get("scale", 0.5)), int(chest_meta.get("frames", 6)))
+	for chest in opened_chests:
+		var opened_meta: Dictionary = item_metadata.get("cofre", {})
+		var opened_size := Vector2(int(opened_meta.get("frame_w", 224)), int(opened_meta.get("frame_h", 256)))
+		var progress: float = clampf(float(chest.elapsed) / GameConfig.CHEST_OPEN_SECONDS, 0.0, 0.999)
+		var opening_frame := 1 + mini(4, floori(progress * 5.0))
+		_draw_strip_frame(CHEST_TEXTURE, opened_size, opening_frame, chest.pos, float(opened_meta.get("scale", 0.5)), int(opened_meta.get("frames", 6)))
 	for i in range(players.size()):
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
@@ -815,6 +864,11 @@ func _draw() -> void:
 			draw_string(ThemeDB.fallback_font, pos + Vector2(27, -16), "x%d · %d" % [Scoring.multiplier(player.combo, mode == "classic"), player.combo], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GameConfig.GOLD)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
+	if roll_time > 0.0 and roll_player >= 0 and roll_player < players.size():
+		var spell_meta: Dictionary = item_metadata.get("hechizos", {})
+		var spell_size := Vector2(int(spell_meta.get("frame_w", 128)), int(spell_meta.get("frame_h", 128)))
+		var roll_frame := posmod(floori(elapsed * 20.0), ITEMS.size())
+		_draw_strip_frame(SPELL_TEXTURE, spell_size, roll_frame, players[roll_player].pos + Vector2(0.0, -94.0), 0.5, ITEMS.size())
 	for effect in floating:
 		draw_string(ThemeDB.fallback_font, effect.pos, effect.text, HORIZONTAL_ALIGNMENT_CENTER, -1, 22, effect.color)
 	if mode == "voodoo" and remaining <= 15.0:
@@ -825,6 +879,13 @@ func _draw() -> void:
 		draw_string(ThemeDB.fallback_font, Vector2(570, 370), count_text, HORIZONTAL_ALIGNMENT_CENTER, 160, 68, Color.WHITE)
 	else:
 		draw_set_transform(Vector2.ZERO)
+
+func _draw_strip_frame(texture: Texture2D, frame_size: Vector2, frame_index: int, center: Vector2, scale_factor: float, frame_count: int) -> void:
+	if texture == null or frame_count <= 0:
+		return
+	var frame := posmod(frame_index, frame_count)
+	var draw_size := frame_size * scale_factor
+	draw_texture_rect_region(texture, Rect2(center - draw_size * 0.5, draw_size), Rect2(frame * frame_size.x, 0.0, frame_size.x, frame_size.y))
 
 func _draw_arena_hazards() -> void:
 	for hazard_index in range(arena.get("hazards", []).size()):
@@ -1041,7 +1102,7 @@ func _separate_players() -> void:
 			players[second_index].pos = separated[1]
 
 func _spawn_coin() -> void:
-	coins.append({"pos": _random_position(), "owner": -1, "lock": 0.0})
+	coins.append({"pos": _random_position(), "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 
 func _leader_index() -> int:
 	if players.is_empty(): return -1
