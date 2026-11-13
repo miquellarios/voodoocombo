@@ -28,7 +28,7 @@ assets/arenas/
 - **Coordenadas:** todas las de `arenas.json` están en píxeles del mundo. La arena mide 1200×600 y la casilla, 40 px.
 - **Escala:** los PNG están exportados al doble de resolución (`export_scale: 2`), así que los `Sprite2D` y `AnimatedSprite2D` van con `scale = 0.5`.
 - **Fondo:** `Sprite2D` con `centered = false`, en `position = (-40, -40)` y con `scale = 0.5`.
-- **Obstáculos:** ya están dibujados en el fondo. Solo hay que crear la colisión: un `StaticBody2D` con un `RectangleShape2D` por cada `obstacles[i].rect` (`[x, y, ancho, alto]`).
+- **Obstáculos:** ya están dibujados en el fondo. La colisión es `obstacles[i].hitbox` (`[x, y, ancho, alto]`): la huella del objeto en el suelo, que es lo que se ve. `rect` son las casillas que ocupa y solo sirve para la rejilla de los bots y para no poner doblones encima.
 
 ## Cargar una tira de sprites (Godot 4)
 

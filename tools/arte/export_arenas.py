@@ -27,6 +27,24 @@ def at(ctx, fw, fh, wx, wy):
     ctx.translate(fw / 2 - wx, fh / 2 - wy)
 
 
+# Huella de cada obstáculo en el suelo (lo que se ve), en píxeles relativos a su rect de casillas (x, y, w, h).
+# El juego choca contra esto, no contra la casilla entera: así un árbol o una columna no ocupan "dos casillas".
+HITBOX = {
+    'stone':    lambda x, y, w, h: (x + 6, y + 14, w - 12, h - 16),
+    'bigstone': lambda x, y, w, h: (x + 8, y + 10, w - 16, h - 12),
+    'log':      lambda x, y, w, h: (x + 4, y + 9, w - 8, h - 14),
+    'tree':     lambda x, y, w, h: (x + w / 2 - 10, y + h - 16, 20, 14),
+    'sarc':     lambda x, y, w, h: (x + 4, y + 5, w - 8, h - 10),
+    'column':   lambda x, y, w, h: (x + w / 2 - 12, y + h - 14, 24, 12),
+    'altar':    lambda x, y, w, h: (x + 2, y + 4, w - 4, h - 4),
+    'crate':    lambda x, y, w, h: (x + 4, y + 4, w - 8, h - 8),
+    'anvil':    lambda x, y, w, h: (x + 6, y + 10, w - 12, h - 12),
+    'boiler':   lambda x, y, w, h: (x + 6, y + 6, w - 12, h - 10),
+    'shelf':    lambda x, y, w, h: (x + 3, y + 4, w - 6, h - 4),
+    'books':    lambda x, y, w, h: (x + w / 2 - 15, y + h / 2 - 8, 30, 26),
+}
+
+
 def export_backgrounds(meta):
     for aid in ORDER:
         os.makedirs(os.path.join(AD, aid), exist_ok=True)
@@ -39,7 +57,7 @@ def export_backgrounds(meta):
             "name": A['name'], "accent": A['accent'],
             "background": {"file": f"{aid}/fondo.png", "offset": [-PAD, -PAD], "scale": 1 / S,
                            "note": "Sprite2D con centered=false en la posición (-40,-40) y escala 0.5: la esquina (0,0) de la arena coincide con el mundo"},
-            "obstacles": [{"kind": k, "rect": [px(x), px(y), px(w), px(h)]} for (x, y, w, h, k) in A['obstacles']],
+            "obstacles": [{"kind": k, "rect": [px(x), px(y), px(w), px(h)], "hitbox": [round(v) for v in HITBOX[k](px(x), px(y), px(w), px(h))]} for (x, y, w, h, k) in A['obstacles']],
             "hazards": [], "spawn_sets": [[[px(a), px(b)] for (a, b) in ss] for ss in A['spawns']], "rules": A['rules'],
         }
         for h in A['hazards']:

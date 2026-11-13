@@ -34,3 +34,18 @@ static func box(path: String) -> StyleBoxTexture:
 #   theme.set_stylebox("pressed", "Button", box("res://assets/ui/boton_pulsado.png"))
 #   theme.set_stylebox("panel", "PanelContainer", box("res://assets/ui/panel.png"))
 ```
+
+## Fase 10
+
+`fase10.json` tiene los datos de todo esto.
+
+| Archivo | Tamaño (px) | Uso |
+|---|---|---|
+| `hechizo_ranura.png` | 192×192 | Ranura nueva del hechizo (aro de oro). Dibujar a 96×96; el icono va en el hueco del centro |
+| `hechizo_brillo.png` | 192×192 | Aro de luz encima de la ranura cuando hay un hechizo listo para usar. Late |
+| `tecla_e.png`, `tecla_b.png` | 72×72 | Tecla que hay que pulsar: E con teclado, B con mando. Abajo a la derecha de la ranura |
+| `emotes.png` | 8 × 128×128 | Emotes en bocadillo: risa, enfado, llanto, corazón, GG, calavera, pulgar, fuego. Pico abajo en (64, 120). Dibujar a 64×64 |
+| `marco_<id>.png` | 128×128 | Marcos cosméticos del retrato: madera, hueso, plata, oro, almas |
+| `podio.png` | 1080×400 | Los tres bloques del podio. `fase10.json` dice dónde va cada personaje |
+| `resultados_fondo.png` | 1920×1080 | Fondo limpio de la pantalla de resultados |
+| `zona_niebla.png` | 256×256 | Niebla que se repite sin costuras, para lo que queda fuera de la zona segura |

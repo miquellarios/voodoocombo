@@ -1,0 +1,103 @@
+{
+  "hechizo_ranura": {
+    "file": "hechizo_ranura.png",
+    "size": [
+      192,
+      192
+    ],
+    "note": "Ranura del hechizo. Dibujar a 96×96. Hueco interior de radio 63 (en la imagen) para el icono."
+  },
+  "hechizo_brillo": {
+    "file": "hechizo_brillo.png",
+    "size": [
+      192,
+      192
+    ],
+    "note": "Encima de la ranura cuando hay hechizo listo, latiendo (modulate.a 0,5-1)."
+  },
+  "tecla_e": {
+    "file": "tecla_e.png",
+    "size": [
+      72,
+      72
+    ]
+  },
+  "tecla_b": {
+    "file": "tecla_b.png",
+    "size": [
+      72,
+      72
+    ],
+    "note": "Si se juega con mando."
+  },
+  "emotes": {
+    "file": "emotes.png",
+    "frame_w": 128,
+    "frame_h": 128,
+    "frames": 8,
+    "order": [
+      "risa",
+      "enfado",
+      "llanto",
+      "corazon",
+      "gg",
+      "calavera",
+      "pulgar",
+      "fuego"
+    ],
+    "note": "Bocadillo con el pico abajo en el centro (64, 120): colocar ese punto encima de la cabeza. Dibujar a 64×64."
+  },
+  "marcos": {
+    "file": "marco_<id>.png",
+    "ids": [
+      "madera",
+      "hueso",
+      "plata",
+      "oro",
+      "almas"
+    ],
+    "size": [
+      128,
+      128
+    ],
+    "note": "Va encima del retrato (retrato 112 px centrado). En el marcador: retrato a 44 px y marco a 50 px."
+  },
+  "podio": {
+    "file": "podio.png",
+    "size": [
+      1080,
+      400
+    ],
+    "tops": {
+      "1": [
+        540,
+        60
+      ],
+      "2": [
+        210,
+        150
+      ],
+      "3": [
+        870,
+        210
+      ]
+    },
+    "note": "Tres bloques; 'tops' es el centro de la parte de arriba de cada bloque en la imagen (donde se pone el personaje). En 1280×720 se dibuja a escala 2/3 (720×267) con la base en y = 680."
+  },
+  "zona_niebla": {
+    "file": "zona_niebla.png",
+    "size": [
+      256,
+      256
+    ],
+    "note": "Se repite sin costuras (texture_repeat). Rellena lo que queda fuera de la zona segura y se desplaza despacio (≈12 px/s)."
+  },
+  "resultados_fondo": {
+    "file": "resultados_fondo.png",
+    "size": [
+      1920,
+      1080
+    ],
+    "note": "Fondo limpio de la pantalla de resultados (telón y focos)."
+  }
+}
