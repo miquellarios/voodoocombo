@@ -225,3 +225,9 @@ Formato de cada entrada:
 - API contrastada con la documentación oficial Godot 4.7 de ENet y multijugador de alto nivel. Logs fechados de conexión y desconexión.
 - Verificación: importación headless y servidor UDP 17777 con dos procesos cliente de tests/test_network_client.gd; ambos completan ping/pong y salen correctamente.
 - Humanos: arrancar con --headless -- --server --port 7777 y comprobar conexiones desde el segundo PC. Las salas se implementan en 11d.
+
+### Fase 11d — Salas con código
+- RoomDirectory gestiona códigos únicos, ocho salas, aforo de cuatro, migración del anfitrión, bloqueo al empezar, caducidad vacía y cinco intentos/minuto. Net usa siempre el remitente real de ENet.
+- Tests: test_rooms.gd comprueba aforo, versión, códigos inexistentes, límite, migración y caducidad. Importación headless sin errores.
+- La prueba ENet de 11c necesitó ejecutar servidor y clientes juntos fuera del aislamiento de red; dos rondas ping/pong verificadas. La prueba completa con cuatro clientes queda integrada con 11g.
+- Humanos: comprobar los mensajes de error y copiar el código en el lobby que incorpora 11e.

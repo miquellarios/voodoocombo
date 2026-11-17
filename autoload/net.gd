@@ -55,6 +55,27 @@ func _receive(action: String, data: Dictionary) -> void:
 		request_received.emit(multiplayer.get_remote_sender_id(), action, data)
 
 @rpc("any_peer", "call_remote", "reliable")
+func create_room(nick: String, character: String, cosmetics: Dictionary, version: String) -> void:
+	_receive("create", {"nick": nick, "character": character, "cosmetics": cosmetics, "version": version})
+
+@rpc("any_peer", "call_remote", "reliable")
+func join_room(code: String, nick: String, character: String, cosmetics: Dictionary, version: String) -> void:
+	_receive("join", {"code": code, "nick": nick, "character": character, "cosmetics": cosmetics, "version": version})
+
+@rpc("any_peer", "call_remote", "reliable")
+func leave_room() -> void:
+	_receive("leave", {})
+
+@rpc("any_peer", "call_remote", "reliable")
+func lobby_action(action: String, data: Dictionary = {}) -> void:
+	if action.length() <= 24: _receive(action, data)
+
+@rpc("authority", "call_remote", "reliable")
+func room_joined(code: String, state: Dictionary) -> void:
+	state["code"] = code
+	room_state(state)
+
+@rpc("any_peer", "call_remote", "reliable")
 func ping(stamp: int) -> void:
 	_receive("ping", {"stamp": stamp})
 
