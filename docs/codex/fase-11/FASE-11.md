@@ -35,7 +35,7 @@
 ## Hito 0 · Lo que hay ahora (revisado por Claude)
 
 - Godot **4.7**, GDScript, renderizador Compatibility.
-- **Todo pasa en `scenes/main/main.gd`** (unas 1360 líneas): estado de la partida, simulación, dibujo, HUD y menús juntos. Los jugadores son diccionarios en `players`, y los doblones y cofres son arrays.
+- **Casi todo pasa en `scenes/main/main.gd`** (unas 2400 líneas tras la fase 10): estado de la partida, simulación, dibujo, HUD y menús juntos. Los jugadores son diccionarios en `players`, y los doblones y cofres son arrays.
 - **Lógica reutilizable** que ya está separada en `core/`:
   - `arena_gen.gd`, `arena_physics.gd`, `hazard_rules.gd`, `scoring.gd`, `item_table.gd`, `ranking.gd`;
   - y `net/bot_brain.gd`.

@@ -7,10 +7,14 @@ func _initialize() -> void:
 	_test_drop_limits()
 	_test_arena()
 	_test_arena_physics()
+	_test_player_foot_collision()
 	_test_bot_pathfinding()
 	_test_bot_dash_rate()
 	_test_hazard_rules()
 	_test_items()
+	_test_spell_rules()
+	_test_nickname_rules()
+	_test_safe_zone()
 	_test_ranking()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
@@ -26,8 +30,14 @@ func _check(condition: bool, label: String) -> void:
 
 func _test_scoring() -> void:
 	_check(Scoring.multiplier(4) == 1 and Scoring.multiplier(5) == 2, "combo x2 threshold")
-	_check(Scoring.multiplier(10) == 3 and Scoring.multiplier(20) == 4, "combo x3/x4 thresholds")
-	_check(Scoring.coin_value(5, true, true) == 8, "frenzy and ring value")
+	_check(Scoring.multiplier(11) == 2 and Scoring.multiplier(12) == 3 and Scoring.multiplier(20) == 3, "combo x3 threshold and cap")
+	_check(Scoring.coin_value(0, false, false) == 1, "base coin value")
+	_check(Scoring.coin_value(5, false, false) == 2, "combo bonus value")
+	_check(Scoring.coin_value(12, false, false) == 3, "high combo value")
+	_check(Scoring.coin_value(5, true, false) == 3, "frenzy adds one point")
+	_check(Scoring.coin_value(5, false, true) == 3, "ring adds one point")
+	_check(Scoring.coin_value(12, true, true) == 5, "maximum coin value is five")
+	_check(Scoring.coin_value(99, true, true) <= 5, "coin value never exceeds five")
 	_check(Scoring.coin_value(20, false, false, true) == 1, "classic coin value")
 	_check(Scoring.next_combo(7, 1.49) == 8 and Scoring.next_combo(7, 1.5) == 1, "combo timer")
 
@@ -38,11 +48,15 @@ func _test_drop_limits() -> void:
 	_check(Scoring.dropped_coins(20, false, true) == 8, "ring drop")
 
 func _test_arena() -> void:
+	for arena_id in GameConfig.ARENA_IDS:
+		_check(ArenaGen.generate(41, "", arena_id).map_id == arena_id, "explicit arena selection: " + arena_id)
 	for seed_value in range(1, 30):
 		var arena := ArenaGen.generate(seed_value)
 		_check(arena.biome == posmod(seed_value, 4), "biome from seed")
 		_check(ArenaGen.is_arena_connected(arena.blocked), "arena connectivity")
-		_check(arena.coins.size() == 50, "50 starting coins")
+		_check(arena.coins.size() == GameConfig.STARTING_COINS, "Voodoo starts with 30 coins")
+		_check(ArenaGen.generate(seed_value, arena.map_id).map_id != arena.map_id, "random arena avoids the previous map")
+		_check(ArenaGen.generate(seed_value, "", "", true).coins.size() == GameConfig.CLASSIC_STARTING_COINS, "Classic starts with 50 coins")
 		for cell in arena.blocked:
 			_check(arena.blocked.has(Vector2i(29 - cell.x, cell.y)), "horizontal obstacle symmetry")
 			_check(arena.blocked.has(Vector2i(cell.x, 14 - cell.y)), "vertical obstacle symmetry")
@@ -57,6 +71,14 @@ func _test_arena_physics() -> void:
 	_check(slid.y > start.y and is_equal_approx(slid.x, start.x), "circle slides along obstacle")
 	var separated := ArenaPhysics.separate_pair(Vector2(100.0, 100.0), Vector2(100.0, 100.0), 22.0, [])
 	_check(separated[0].distance_to(separated[1]) >= 44.0, "overlapping players separate to collision diameter")
+
+func _test_player_foot_collision() -> void:
+	var obstacle: Array[Rect2] = [Rect2(100.0, 100.0, 40.0, 40.0)]
+	var feet := Vector2(78.0, 100.0)
+	for _frame in range(60):
+		feet = ArenaPhysics.move_circle(feet, Vector2(2.0, 0.0), GameConfig.PLAYER_FOOT_RADIUS, obstacle)
+	_check(feet.x > 80.0 and feet.x <= 86.1, "feet reach the obstacle before stopping")
+	_check(feet.distance_to(Vector2(100.0, 100.0)) >= GameConfig.PLAYER_FOOT_RADIUS - 0.1, "feet circle does not penetrate obstacle")
 
 func _test_bot_pathfinding() -> void:
 	var blocked: Dictionary = {}
@@ -125,6 +147,11 @@ func _test_hazard_rules() -> void:
 	_check(HazardRules.drop_amount(40, 0.25, 3, 12) == 10, "hit drop percentage")
 	_check(HazardRules.drop_amount(100, 0.4, 3, 12) == 12, "hit drop upper limit")
 	_check(HazardRules.drop_amount(2, 0.25, 3, 12) == 2, "hit drop cannot exceed coins held")
+	_check(HazardRules.drop_amount(0, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX) == 0, "trap cannot drop coins when empty")
+	_check(HazardRules.drop_amount(1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX) == 1, "trap drops only the one held coin")
+	_check(HazardRules.drop_amount(10, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX) == 2, "trap minimum is two coins")
+	_check(HazardRules.drop_amount(40, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX) == 6, "trap drops fifteen percent")
+	_check(HazardRules.drop_amount(200, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX) == 10, "trap maximum is ten coins")
 	var shielded := HazardRules.resolve_hit({"coins": 10, "score": 10, "item": "cloak", "item_time": 8.0, "invuln": 0.0, "combo": 5, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
 	_check(shielded.blocked and shielded.victim.coins == 10 and shielded.victim.item == "", "cloak blocks and consumes a hit")
 	var invulnerable := HazardRules.resolve_hit({"coins": 10, "item": "", "invuln": 1.0, "combo": 5, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
@@ -140,6 +167,26 @@ func _test_items() -> void:
 	_check(ItemTable.probabilities_sum("middle", true) == 97, "classic excludes ring weights")
 	for _i in range(100):
 		_check(ItemTable.roll("first", rng, true) != "ring", "classic excludes ring")
+
+func _test_spell_rules() -> void:
+	var held := {"item": "boots", "item_time": 0.0}
+	_check(SpellRules.can_activate(held) and not SpellRules.is_active(held, "boots"), "picked-up spell waits for activation")
+	var active := SpellRules.activate(held)
+	_check(is_equal_approx(float(active.item_time), GameConfig.SPELL_BOOTS_SECONDS), "activating boots starts its duration")
+	_check(not SpellRules.can_activate(active) and SpellRules.is_active(active, "boots"), "active spell cannot be activated twice")
+	_check(SpellRules.duration("pin") == 0.0 and SpellRules.duration("frost") == 0.0, "instant spells have no duration")
+	var inactive_cloak := HazardRules.resolve_hit({"coins": 10, "score": 10, "item": "cloak", "item_time": 0.0, "invuln": 0.0, "combo": 1, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
+	_check(inactive_cloak.applied, "held cloak does not block before activation")
+
+func _test_nickname_rules() -> void:
+	_check(NicknameRules.is_valid(" Ada ") and NicknameRules.normalize(" Ada ") == "Ada", "nickname trims outside spaces")
+	_check(not NicknameRules.is_valid("AB") and not NicknameRules.is_valid("ABCDEFGHIJKLM"), "nickname length is limited to 3-12 characters")
+
+func _test_safe_zone() -> void:
+	_check(ZoneRules.safe_rect(GameConfig.ZONE_MAX_STEPS).size == Vector2(GameConfig.ZONE_FINAL_GRID_SIZE) * GameConfig.CELL_SIZE, "safe zone reaches 18 by 9 cells")
+	_check(ZoneRules.step_for_remaining(25.0, false) == 3 and ZoneRules.step_for_remaining(60.0, true) == 3, "zone uses mode-specific closing times")
+	var drain := ZoneRules.advance_drain(GameConfig.ZONE_DRAIN_INTERVAL, 3.0, GameConfig.ZONE_DRAIN_INTERVAL)
+	_check(int(drain.ticks) == 4, "outside player loses four coins in three seconds")
 
 func _test_ranking() -> void:
 	var players: Array[Dictionary] = [{"name": "A", "score": 10, "max_combo": 4}, {"name": "B", "score": 10, "max_combo": 9}]

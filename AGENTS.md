@@ -208,7 +208,7 @@ Sin otros humanos, a partir de los 5 s se puede saltar con Espacio.
 | Objetivo | Tener más doblones a los 90 s (60/90/120 a elegir) | **El primero en recoger 15 gana al instante**. Si a los 3 min nadie llega, gana quien tenga más |
 | Combo | Con multiplicador x1–x3 | Solo visual: cada doblón vale 1 |
 | Frenesí | Sí | No |
-| La zona se cierra | Sí | No |
+| La zona se cierra | A los 45, 35 y 25 s del final | A los 120, 90 y 60 s del final |
 | Dash y robo | Sí | Sí |
 | Cofres y hechizos | Sí | Sí, menos el Anillo |
 | Punto de partido | Aviso en los últimos 15 s | Aviso cuando alguien llega a 12 |
@@ -416,7 +416,7 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
   |---|---|---|
   | Mover | WASD o flechas | Stick izquierdo |
   | Dash | Espacio o Shift | A |
-  | Hechizo | E o Enter | B |
+  | Hechizo | E | B |
   | Rueda de emotes (lobby) | Mantener Q | Y |
   | Emotes rápidos (lobby y podio) | 1-4 | Cruceta |
   | Pantalla completa | F11 | — |

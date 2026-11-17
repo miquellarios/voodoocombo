@@ -134,3 +134,75 @@ Formato de cada entrada:
 - Decisiones: Se conserva el runtime de consola que usa el lanzador en el ZIP y se omite el ejecutable GUI de 181 MB, que el lanzador no utiliza. El tema asigna New Rocker a botones, Lilita One a títulos y cifras, y Baloo 2 al texto general.
 - Problemas encontrados y cómo se resolvieron: El escaneo de Godot sigue avisando de un segundo `project.godot` dentro de `voodoocombo/`; se deja fuera de los commits porque es un proyecto anidado ajeno al checkout activo. La primera comprobación tras integrar las fuentes encontró que Godot no infería como entero la altura del podio; se tipó explícitamente y las comprobaciones posteriores quedaron limpias.
 - Qué tienen que probar los humanos: Navegar el menú solo con teclado y solo con mando; elegir cada personaje y reiniciar para verificar el perfil; jugar tres partidas seguidas y comprobar que tras el resultado o al salir de pausa vuelve un menú limpio; probar todas las trampas en las cuatro arenas, el HUD a escalas 100/125/150 % y los bots contra muros/esquinas durante dos minutos.
+
+### Fase 10a — Puntos y reposición (17/11/2026)
+- Qué se ha hecho: Combo x1/x2/x3 con umbrales 5 y 12; Frenesí y Anillo añaden un punto cada uno, hasta 5. VoodooCombo empieza con 30 monedas y repone bajo 12 a ritmo de 1/s, hasta 18 en Frenesí; Clásico conserva 50 y no repone. Actualizados la generación y los tests de ambos modos.
+- Decisiones: `ArenaGen.generate()` recibe un indicador de modo y un `arena_id` opcional preparado para la selección de mapas del bloque 10f.
+- Problemas encontrados y cómo se resolvieron: Ninguno; pasaron los tests core y el smoke test del proyecto.
+- Qué tienen que probar los humanos: Confirmar que una partida VoodooCombo termina normalmente entre 60 y 150 puntos, que Clásico sigue empezando con 50 y que el Frenesí no permite superar 5 puntos por doblón.
+
+### Fase 10b — Daño porcentual de trampas (17/11/2026)
+- Qué se ha hecho: Las raíces, pinchos, fantasma, vapor, barril y rayo usan el mismo `apply_hit`: quitan 15 % de doblones, con mínimo 2 y máximo 10, sueltan las monedas en abanico con bloqueo de recogida 0,6 s y conservan aturdimiento/empuje. Los golpes de dash entre jugadores mantienen sus porcentajes. Actualizados `AGENTS.md`, `ARENAS.md` y tests de límites.
+- Decisiones: El redondeo porcentual sigue usando techo, igual que los golpes de dash; el resultado nunca supera las monedas que lleva el jugador.
+- Problemas encontrados y cómo se resolvieron: Ninguno; Godot cargó los scripts y pasó la suite core.
+- Qué tienen que probar los humanos: En cada trampa, comprobar pérdidas de 15 % (0, 1, 10, 40 y 200 monedas: 0, 1, 2, 6 y 10), abanico, bloqueo de 0,6 s y diferencias con el dash de otro jugador.
+
+### Fase 10c — Activación de hechizos (17/11/2026)
+- Qué se ha hecho: Los cofres guardan el hechizo y E/B activa la ranura. Los efectos temporales empiezan al activarlos; los instantáneos requieren un objetivo. Los bots activan efectos útiles durante sus decisiones. Añadidos el aro de la ranura, el brillo, las teclas E/B y una tarjeta con nombre y descripción traducidos.
+- Decisiones: Capa, botas, imán y anillo duran 8/4/5/6 s desde la activación; oveja conserva sus 3 s y los instantáneos se consumen al lanzarse.
+- Problemas encontrados y cómo se resolvieron: Ninguno en los tests core; la carga headless del editor y los tests pasan.
+- Qué tienen que probar los humanos: Abrir cofres, guardar varios tipos de hechizo, activar con E y B, comprobar duración/caducidad, escudo y resultados contra rivales; verificar que la tarjeta desaparece a los 2 s y que los bots usan hechizos con sentido.
+
+### Fase 10d — Colisión con la huella visible (17/11/2026)
+- Qué se ha hecho: El movimiento y los empujes de jugadores usan el campo `hitbox` de los obstáculos y un círculo en los pies de radio 14 px, 12 px bajo el centro. Se mantienen el rectángulo de rejilla/monedas y el radio de 22 px para separación entre jugadores.
+- Decisiones: Se deja la geometría de bordes de arena en el radio de jugador y se usa el radio de pies solo frente a objetos.
+- Problemas encontrados y cómo se resolvieron: Ninguno; suite core y carga del editor pasan.
+- Qué tienen que probar los humanos: Caminar despacio contra troncos y otros obstáculos de las cuatro arenas; comprobar que el sprite llega a la huella visible, que no atraviesa el objeto y que la separación de jugadores sigue funcionando.
+
+### Fase 10e — Alineación de rayo y cintas (17/11/2026)
+- Qué se ha hecho: El rayo ahora dibuja sus brazos desde `center + OFFSET`, alineados con el centro usado para el daño. Las cintas voltean el sprite cuando `dir.x` es negativo y dibujan rodillos en los extremos; el empuje ya usa la dirección `dir` del JSON. Revisada la referencia visual de las cuatro arenas.
+- Decisiones: No cambié las posiciones del JSON porque coinciden con la imagen de referencia.
+- Problemas encontrados y cómo se resolvieron: Ninguno; carga headless del editor y suite core pasan.
+- Qué tienen que probar los humanos: Confirmar que el daño del rayo coincide con el haz visible en Biblioteca y que ambas cintas del Taller muestran flechas y rodillos en la dirección del empuje.
+
+### Fase 10f — Elección de arena (17/11/2026)
+- Qué se ha hecho: Tras seleccionar VoodooCombo o Clásico se muestran cuatro tarjetas con miniatura, nombre traducido e iconos de trampas, además de ALEATORIA. Ratón, foco de teclado/mando y Esc funcionan. Se guarda la selección preferida y la última arena en el perfil; `ArenaGen` aplica la seleccionada o elige aleatoriamente evitando la anterior.
+- Decisiones: La opción aleatoria se conserva como preferencia, y la última arena concreta se guarda por separado para no repetirla.
+- Problemas encontrados y cómo se resolvieron: Ninguno; se copiaron las miniaturas e iconos del kit y pasan tests de selección explícita y aleatoria.
+- Qué tienen que probar los humanos: Elegir las cuatro tarjetas y aleatoria en ambos modos, volver con Esc, verificar los iconos, y reiniciar para confirmar que recuerda la preferencia y que aleatoria no repite el mapa anterior.
+
+### Fase 10g — Pantalla de carga (17/11/2026)
+- Qué se ha hecho: Entre la elección y la cuenta atrás se muestran durante 15 s el nombre y la miniatura de la arena, sus trampas con icono y efecto, los controles, el personaje/nombre/J1, un consejo que cambia cada 4 s y una barra de progreso. En práctica aparece Espacio para saltar desde el segundo 5.
+- Decisiones: La partida y las monedas se preparan antes de abrir la carga; saltar solo evita la espera y siempre conserva la cuenta atrás 3-2-1.
+- Problemas encontrados y cómo se resolvieron: Ninguno; el manifiesto `carga.json`, carga headless del editor, tests core y smoke test pasan.
+- Qué tienen que probar los humanos: Comprobar la carga de 15 s, el cambio de consejos, iconos/textos según cada arena y el salto con Espacio a partir de 5 s; verificarlo en ambos modos.
+
+### Fase 10h — Nombre e identidad del jugador (17/11/2026)
+- Qué se ha hecho: En un perfil sin nick aparece el diálogo inicial; valida 3–12 caracteres y recorta espacios externos. PERSONAJES permite cambiarlo. En partida cada muñeco lleva su nick contorneado; el local añade «TÚ», su color, una flecha y un aro bajo los pies. Los bots conservan sus nombres propios.
+- Decisiones: La validación vive en `NicknameRules` para poder probarla como lógica pura. El nick se guarda en el mismo `Profile` que se usa para el marcador.
+- Problemas encontrados y cómo se resolvieron: La primera versión del test intentó acceder al autoload `Profile` desde el test `SceneTree` y no compiló; se extrajo la regla a `NicknameRules` y los tests core pasan.
+- Qué tienen que probar los humanos: Crear un perfil nuevo, probar nombres de 2, 3 y 13 caracteres y espacios externos; cambiar el nick desde PERSONAJES y comprobar sobre la arena colores, contornos, flecha, aro y nombres de bots.
+
+### Fase 10i — Textos flotantes legibles (17/11/2026)
+- Qué se ha hecho: Los doblones usan Lilita One de 30/36 px con contorno de 6 px; avisos de combo y trampas usan New Rocker de 44/64 px con contorno de 8 px. Duran 1,2/1,6 s, suben 40 px y se desvanecen al final. Los avisos de combo aparecen centrados arriba y el jugador local muestra multiplicador y racha en un círculo.
+- Decisiones: El color de «+N» sigue el nivel de combo (blanco, naranja, rosa); reducir movimiento elimina el ascenso y el pop.
+- Problemas encontrados y cómo se resolvieron: Ninguno; suite core, smoke y carga headless pasan.
+- Qué tienen que probar los humanos: Recoger doblones con multiplicadores x1/x2/x3, confirmar tamaños/colores/contorno/duración, y activar avisos de trampa y combos con «Reducir movimiento» encendido y apagado.
+
+### Fase 10j — Cierre de la zona segura (17/11/2026)
+- Qué se ha hecho: La zona se encoge según el reloj de cada modo y termina en 18×9 casillas. Tres segundos antes se anuncia con borde morado y sonido. Fuera, los jugadores van al 70 % y pierden un doblón cada 0,75 s; monedas y cofres exteriores se reubican dentro con fundido. Los bots que quedan fuera buscan volver al centro. La niebla usa la textura del kit y se detiene con Reducir movimiento.
+- Decisiones: Las reapariciones nuevas de cofres y monedas también usan la zona actual. Se usa `ZoneRules` para la geometría y el temporizador de pérdida.
+- Problemas encontrados y cómo se resolvieron: La primera prueba de escena reveló un `return` no válido dentro del fragment shader; se cambió por una rama `if/else`. La escena real pudo crear el HUD y aplicar el tercer paso sin error de shader.
+- Qué tienen que probar los humanos: Probar los tres avisos y encogimientos en ambos modos, medir 18×9 al final, dejar un jugador fuera 3 s (4 doblones menos), y comprobar reubicación de cofres/monedas, movimiento de niebla y bots que regresan.
+
+### Fase 10k — Ventana ajustable (17/11/2026)
+- Qué se ha hecho: El lienzo continúa en 1280×720; la ventana abre a 1920×1080, se puede redimensionar y usa `canvas_items` con aspecto `keep`. AJUSTES permite ventana/pantalla completa y los tres tamaños previstos. F11 alterna pantalla completa; se guardan ambas opciones.
+- Decisiones: Al cambiar resolución en pantalla completa se actualiza la preferencia guardada; se aplica al volver a modo ventana.
+- Problemas encontrados y cómo se resolvieron: Ninguno; carga del editor, tests core y arranque headless pasan.
+- Qué tienen que probar los humanos: Abrir a 1920×1080, redimensionar, probar los tres tamaños, alternar pantalla completa desde AJUSTES y F11 y reiniciar para comprobar persistencia y proporciones.
+
+### Fase 10l — Podio, emotes y taquilla (17/11/2026)
+- Qué se ha hecho: Se rediseñaron los resultados con el fondo y podio del kit, personajes animados que entran en orden, corona y placas de nombre/puntuación. Se añadieron emotes temporales con teclas 1–4 y cruceta, una barra visual y reacciones aleatorias de bots. La taquilla agrupa personaje, marcos, estelas y emotes equipables; los desbloqueos se derivan del nivel, se guardan las selecciones y los marcos aparecen en el HUD. La XP sigue persistiendo, pero ya no se muestra en menú ni resultados; el retorno automático es a los 15 s.
+- Decisiones: El nivel empieza en 1; los desbloqueos múltiples de una partida se condensan en una tarjeta con el primer objeto de la lista. El marco de calavera usa el marco de hueso del kit con un símbolo de calavera superpuesto porque el kit no incluye un PNG separado. Los umbrales, espera, tamaños y tiempos de emote están en `GameConfig`.
+- Problemas encontrados y cómo se resolvieron: La primera sonda de resultados encontró un tween de respiración del logo que seguía activo al cerrar la escena; ahora se detiene al limpiar la interfaz. La sonda de podio y emote pasó después del cambio. La carga del editor y la suite core también pasan; el editor aún avisa de la carpeta de proyecto anidada `voodoocombo/` y el arranque headless termina con el aviso previo de instancias ObjectDB.
+- Qué tienen que probar los humanos: Completar una partida y comprobar orden/animación del podio, monedas y puntuaciones, corona, 15 s sin entrada, volver a activar el temporizador con una tecla y usar ¡Otra!. Probar emotes 1–4 y cruceta, duración de 2 s, enfriamiento de 1 s y emotes de bots. En TAQUILLA, equipar personaje/marco/estela y exactamente cuatro emotes; comprobar marcos bloqueados, niveles, desbloqueos, marco en HUD y estelas al hacer dash. Confirmar que XP no aparece en menú/resultados y se conserva al reiniciar.

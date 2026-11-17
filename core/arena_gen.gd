@@ -6,7 +6,7 @@ const H := 15
 const SIZE := 40.0
 const DATA_PATH := "res://assets/arenas/arenas.json"
 
-static func generate(seed_value: int, previous_arena_id: String = "") -> Dictionary:
+static func generate(seed_value: int, previous_arena_id: String = "", arena_id: String = "", classic: bool = false) -> Dictionary:
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
 	if not data is Dictionary or not data.has("arenas"):
 		push_error("No se pudo cargar %s" % DATA_PATH)
@@ -16,10 +16,12 @@ static func generate(seed_value: int, previous_arena_id: String = "") -> Diction
 	var arena_ids: Array = data.arenas.keys()
 	arena_ids.sort()
 	var selected_index := posmod(seed_value, arena_ids.size())
-	var arena_id: String = arena_ids[selected_index]
-	if arena_ids.size() > 1 and arena_id == previous_arena_id:
-		arena_id = arena_ids[(selected_index + 1) % arena_ids.size()]
-	var source: Dictionary = data.arenas[arena_id]
+	var selected_arena: String = arena_ids[selected_index] if arena_id.is_empty() else arena_id
+	if not data.arenas.has(selected_arena):
+		selected_arena = arena_ids[selected_index]
+	if arena_id.is_empty() and arena_ids.size() > 1 and selected_arena == previous_arena_id:
+		selected_arena = arena_ids[(selected_index + 1) % arena_ids.size()]
+	var source: Dictionary = data.arenas[selected_arena]
 	var map_data: Dictionary = source.duplicate(true)
 	var blocked: Dictionary = {}
 	for obstacle in map_data.get("obstacles", []):
@@ -37,12 +39,12 @@ static func generate(seed_value: int, previous_arena_id: String = "") -> Diction
 	for point in spawn_set:
 		spawns.append(Vector2(float(point[0]), float(point[1])))
 	_shuffle_points(spawns, rng)
-	var coins := coin_positions(rng, map_data)
+	var coins := coin_positions(rng, map_data, GameConfig.CLASSIC_STARTING_COINS if classic else GameConfig.STARTING_COINS)
 	return {
 		"seed": seed_value,
 		"biome": posmod(seed_value, 4),
-		"map_id": arena_id,
-		"name": String(map_data.get("name", arena_id)),
+		"map_id": selected_arena,
+		"name": String(map_data.get("name", selected_arena)),
 		"background": String(map_data.background.file),
 		"obstacles": map_data.get("obstacles", []),
 		"hazards": map_data.get("hazards", []),
@@ -52,12 +54,12 @@ static func generate(seed_value: int, previous_arena_id: String = "") -> Diction
 		"coins": coins
 	}
 
-static func coin_positions(rng: RandomNumberGenerator, map_data: Dictionary) -> Array[Vector2]:
+static func coin_positions(rng: RandomNumberGenerator, map_data: Dictionary, target_count: int = GameConfig.STARTING_COINS) -> Array[Vector2]:
 	var coins: Array[Vector2] = []
 	var obstacles: Array = map_data.get("obstacles", [])
 	var hazards: Array = map_data.get("hazards", [])
 	var attempts := 0
-	while coins.size() < GameConfig.STARTING_COINS and attempts < 30000:
+	while coins.size() < target_count and attempts < 30000:
 		attempts += 1
 		var position := Vector2(rng.randf_range(35.0, 1165.0), rng.randf_range(35.0, 565.0))
 		var clear := true
@@ -141,4 +143,4 @@ static func _fallback_arena(seed_value: int) -> Dictionary:
 	var blocked: Dictionary = {}
 	var spawns: Array[Vector2] = [Vector2(100, 100), Vector2(1100, 100), Vector2(100, 500), Vector2(1100, 500)]
 	_shuffle_points(spawns, rng)
-	return {"seed": seed_value, "biome": posmod(seed_value, 4), "map_id": "", "name": "", "background": "", "obstacles": [], "hazards": [], "blocked": blocked, "spawns": spawns, "coins": coin_positions(rng, {})}
+	return {"seed": seed_value, "biome": posmod(seed_value, 4), "map_id": "", "name": "", "background": "", "obstacles": [], "hazards": [], "blocked": blocked, "spawns": spawns, "coins": coin_positions(rng, {}, GameConfig.STARTING_COINS)}

@@ -27,7 +27,7 @@
 | Fase | Estado |
 |---|---|
 | 1-9 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
-| **10** | Escrita, pendiente de que Codex la haga: `docs/codex/fase-10-arreglos.md`. Arregla lo que falló al probar la 9 (bloques 10a-10l). |
+| **10** | Hecha por Codex (10a-10l, 17/11/2026): `docs/codex/fase-10-arreglos.md`. Falta que la probéis. |
 | **11** | Escrita, pendiente: `docs/codex/fase-11/FASE-11.md` y su `AGENTS.md`. Letra "Brasa minimal" (11a) y online + lobby (11b-11j). |
 | **12** | Escrita, pendiente: `docs/codex/fase-12/FASE-12.md` y su `AGENTS.md`. Dopamina (12a-12h) y modos (12i-12l). |
 

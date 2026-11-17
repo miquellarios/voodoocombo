@@ -54,19 +54,21 @@ La información de cada sprite está en `arenas.json → sprites.<nombre>`. Todo
 
 **Sincronización:** las trampas periódicas (pinchos, vapor, fantasma, rayo) se calculan con el **reloj de la partida**, así que todos los clientes las ven igual sin mandar nada por red. Las que dependen de algo aleatorio o de un jugador (raíces y barril) las decide el **servidor** y las comunica con `hazard_event`.
 
-**Golpe:** cuando una regla dice "cuenta como un golpe", significa lo mismo que el dash: sueltas el 25 % de los doblones (mínimo 3, máximo 12), quedas aturdido 0,4 s, pierdes el combo y quedas invulnerable 1,5 s. La Capa Élfica lo bloquea.
+**Daño de trampas:** raíces, pinchos, fantasma, vapor, barril y rayo quitan el 15 % de los doblones (mínimo 2, máximo 10; si tienes menos, los que tengas). Las monedas caen en abanico y no se pueden recoger durante 0,6 s. La Capa Élfica y la invulnerabilidad bloquean el efecto.
+
+**Golpe de dash entre jugadores:** suelta el 25 % de los doblones (mínimo 3, máximo 12; 35 % con corona y 40 % con Anillo), aturde 0,4 s, reinicia el combo y da 1,5 s de invulnerabilidad.
 
 | Trampa | Dónde | Regla | Sprites |
 |---|---|---|---|
 | **Lodo** | Elipses `center` y `radius` | Mientras estás dentro: velocidad x0,6 | Ya está en el fondo |
-| **Raíces** | Punto libre al azar cada 6 s (servidor) | Aviso de 0,7 s y después atrapan 1 s a quien esté a ≤36 px: no se mueve, puede usar el hechizo y suelta 2 doblones | `raices_aviso` (6), `raices_activas` (6) |
-| **Pinchos** | Casillas `tiles` | Ciclo `down` 2 s → `warn` 0,6 s → `up` 1 s, con `phase` de desfase. Pisarlos arriba cuenta como un golpe | `pinchos`: frame 0 abajo, 1 aviso, 2 arriba |
-| **Fantasma** | Recorre `path` en bucle a 120 px/s | Si toca a alguien (radio 22): aturdido 0,6 s y suelta 3 doblones. Después ignora a ese jugador 2 s | `fantasma` (8, bucle). `flip_h` según la dirección |
+| **Raíces** | Punto libre al azar cada 6 s (servidor) | Aviso de 0,7 s y después atrapan 1 s a quien esté a ≤36 px: no se mueve, puede usar el hechizo y quitan el 15 % (mín. 2, máx. 10) | `raices_aviso` (6), `raices_activas` (6) |
+| **Pinchos** | Casillas `tiles` | Ciclo `down` 2 s → `warn` 0,6 s → `up` 1 s, con `phase` de desfase. Pisarlos arriba quita el 15 % (mín. 2, máx. 10) | `pinchos`: frame 0 abajo, 1 aviso, 2 arriba |
+| **Fantasma** | Recorre `path` en bucle a 120 px/s | Si toca a alguien (radio 22): aturde 0,6 s y quita el 15 % (mín. 2, máx. 10). Después ignora a ese jugador 2 s | `fantasma` (8, bucle). `flip_h` según la dirección |
 | **Cinta** | Casillas `tiles` y dirección `dir` | Empuja a jugadores y doblones a 140 px/s | `cinta` (4 frames por casilla, `flip_h` si dir = -1) y `cinta_rodillo` en los extremos |
-| **Vapor** | `center` | Cada 4 s: aviso 0,6 s y chorro 0,5 s. Quien esté a ≤70 px sale empujado 90 px, queda aturdido 0,3 s y suelta 2 doblones | `vapor_rejilla` (fija), `vapor_aviso` (4), `vapor_chorro` (5) |
-| **Barril** | `center` | Si lo golpeas con un dash, explota a los 0,8 s. Todos a ≤110 px salen empujados 90 px y sueltan el 20 % de sus doblones (mínimo 2). Reaparece a los 15 s | `barril`, `barril_mecha` (4), `barril_explosion` (6, sin bucle) |
+| **Vapor** | `center` | Cada 4 s: aviso 0,6 s y chorro 0,5 s. Quien esté a ≤70 px sale empujado 90 px, queda aturdido 0,3 s y pierde el 15 % (mín. 2, máx. 10) | `vapor_rejilla` (fija), `vapor_aviso` (4), `vapor_chorro` (5) |
+| **Barril** | `center` | Si lo golpeas con un dash, explota a los 0,8 s. Todos a ≤110 px salen empujados 90 px y pierden el 15 % (mín. 2, máx. 10). Reaparece a los 15 s | `barril`, `barril_mecha` (4), `barril_explosion` (6, sin bucle) |
 | **Portal** | Parejas `a` y `b` del mismo color | Al entrar (radio 22) apareces en el otro portal. 1 s de espera por jugador. Los doblones no lo cruzan | `portal_cian` y `portal_magenta` (8, bucle) |
-| **Rayo** | Orbe en `center` | Dos brazos opuestos de 280 px. Una vuelta cada 8 s. Tocarlo (10 px de grosor) cuenta como un golpe | `rayo_orbe` (4) y `rayo_haz`. El haz empieza en x=6: offset y rotación |
+| **Rayo** | Orbe en `center` | Dos brazos opuestos de 280 px. Una vuelta cada 8 s. Tocarlo (10 px de grosor) quita el 15 % (mín. 2, máx. 10) | `rayo_orbe` (4) y `rayo_haz`. El haz empieza en x=6: offset y rotación |
 
 ## Prompt para Codex
 

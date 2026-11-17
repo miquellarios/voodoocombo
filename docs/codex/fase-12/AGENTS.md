@@ -512,7 +512,7 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
   |---|---|---|
   | Mover | WASD o flechas | Stick izquierdo |
   | Dash | Espacio o Shift | A |
-  | Hechizo | E o Enter | B |
+  | Hechizo | E | B |
   | Rueda de emotes (lobby) | Mantener Q | Y |
   | Emotes rápidos (lobby y podio) | 1-4 | Cruceta |
   | Pantalla completa | F11 | — |

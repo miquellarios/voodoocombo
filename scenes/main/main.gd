@@ -6,6 +6,13 @@ const COIN_TEXTURE := preload("res://assets/items/doblon.png")
 const COIN_SHADOW_TEXTURE := preload("res://assets/items/doblon_sombra.png")
 const CHEST_TEXTURE := preload("res://assets/items/cofre.png")
 const SPELL_TEXTURE := preload("res://assets/items/hechizos.png")
+const SPELL_SLOT_TEXTURE := preload("res://assets/ui/hechizo_ranura.png")
+const SPELL_GLOW_TEXTURE := preload("res://assets/ui/hechizo_brillo.png")
+const SPELL_KEY_E_TEXTURE := preload("res://assets/ui/tecla_e.png")
+const SPELL_KEY_B_TEXTURE := preload("res://assets/ui/tecla_b.png")
+const TRAP_ICONS_TEXTURE := preload("res://assets/ui/trampas_iconos.png")
+const SAFE_ZONE_FOG_TEXTURE := preload("res://assets/ui/zona_niebla.png")
+const SAFE_ZONE_FOG_SHADER := preload("res://assets/ui/safe_zone_fog.gdshader")
 const BIOME_COLORS := [[Color("2b3a2a"), Color("243223")], [Color("33402a"), Color("2b3723")], [Color("2a3a4a"), Color("233241")], [Color("3a2a2a"), Color("322323")]]
 
 var state := "menu"
@@ -16,7 +23,14 @@ var countdown := 0.0
 var seed_value := 0
 var arena: Dictionary = {}
 var previous_arena_id := ""
+var selected_arena_id := ""
+var arena_select_classic := false
+var safe_zone_step := 0
+var safe_zone_warning_step := 0
+var fog_material: ShaderMaterial
+var chest_fade_alpha: Array[float] = []
 var obstacle_rects: Array[Rect2] = []
+var player_hitbox_rects: Array[Rect2] = []
 var hazard_runtime: Array[Dictionary] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
@@ -26,12 +40,15 @@ var rng := RandomNumberGenerator.new()
 var hud: CanvasLayer
 var hud_root: Control
 var floating: Array[Dictionary] = []
+var dash_trails: Array[Dictionary] = []
+var dash_trail_emit := 0.0
 var roll_time := 0.0
 var roll_player := -1
 var roll_result := ""
 var frenzy_notified := false
 var arena_background: Texture2D
 var character_metadata: Dictionary = {}
+var loading_metadata: Dictionary = {}
 var character_sheets: Dictionary = {}
 var hazard_sheets: Dictionary = {}
 var item_metadata: Dictionary = {}
@@ -40,6 +57,8 @@ var score_name_labels: Array[Label] = []
 var score_tag_labels: Array[Label] = []
 var score_number_labels: Array[Label] = []
 var score_portraits: Array[TextureRect] = []
+var score_frames: Array[TextureRect] = []
+var score_frame_skulls: Array[Label] = []
 var score_crowns: Array[TextureRect] = []
 var score_values: Array[int] = []
 var score_change_times: Array[int] = []
@@ -49,15 +68,40 @@ var results_elapsed := 0.0
 var results_ranking: Array[Dictionary] = []
 var results_awards: Dictionary = {}
 var results_xp := 0
+var results_characters: Array[TextureRect] = []
+var results_bubbles: Array[Dictionary] = []
+var results_emote_cooldown := 0.0
+var result_bot_emote_at: Array[float] = []
 var character_preview: TextureRect
 var character_preview_id := "mago"
 var character_idle := 0.0
+var locker_tab := "character"
+var spell_notice_time := 0.0
+var spell_notice_item := ""
+var last_input_controller := false
+var loading_elapsed := 0.0
+var loading_tip_index := -1
+var nick_line_edit: LineEdit
+var nick_error_label: Label
+var nick_dialog_returns_to_characters := false
+var player_name_font: Font
+var floating_coin_font: Font
+var floating_notice_font: Font
+var menu_logo_tween: Tween
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
+	Settings.apply_display()
+	player_name_font = load("res://assets/fonts/Baloo2-Regular.woff2") as Font
+	floating_coin_font = load("res://assets/fonts/LilitaOne-Regular.woff2") as Font
+	floating_notice_font = load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	previous_arena_id = Profile.last_arena_id
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
 		character_metadata = metadata
+	var loading_source: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/ui/carga.json"))
+	if loading_source is Dictionary:
+		loading_metadata = loading_source
 	var items_data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/items/items.json"))
 	if items_data is Dictionary:
 		item_metadata = items_data.get("items", {})
@@ -69,7 +113,10 @@ func _ready() -> void:
 		spell_atlases.append(atlas)
 	Fx.floating_text.connect(_on_floating_text)
 	Fx.shake.connect(_on_shake)
-	_build_menu()
+	if Profile.nick.strip_edges().is_empty():
+		_build_nickname_dialog()
+	else:
+		_build_menu()
 
 func _process(delta: float) -> void:
 	if state == "match_end":
@@ -78,16 +125,34 @@ func _process(delta: float) -> void:
 		return
 	if state == "results":
 		results_elapsed += delta
-		if results_elapsed >= 10.0: _build_menu()
+		results_emote_cooldown = maxf(0.0, results_emote_cooldown - delta)
+		_update_result_emotes(delta)
+		if results_elapsed >= GameConfig.RESULTS_AUTO_MENU_SECONDS: _build_menu()
 		return
 	if state == "menu":
 		if not Settings.reduce_motion: character_idle += delta
 		if is_instance_valid(character_preview): _update_character_preview()
 		return
+	if state == "loading":
+		loading_elapsed = minf(GameConfig.LOADING_SECONDS, loading_elapsed + delta)
+		var next_tip := posmod(floori(loading_elapsed / GameConfig.LOADING_TIP_INTERVAL), GameConfig.LOADING_TIP_COUNT)
+		if next_tip != loading_tip_index:
+			loading_tip_index = next_tip
+			var tip_label := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
+			if tip_label: tip_label.text = I18n.t("loading_tip_%d" % (loading_tip_index + 1))
+		var progress := hud_root.get_node_or_null("LoadingProgress") as ProgressBar if is_instance_valid(hud_root) else null
+		if progress: progress.value = loading_elapsed / GameConfig.LOADING_SECONDS * GameConfig.LOADING_PERCENT_MAX
+		var skip_prompt := hud_root.get_node_or_null("LoadingSkip") as Label if is_instance_valid(hud_root) else null
+		if skip_prompt: skip_prompt.visible = loading_elapsed >= GameConfig.LOADING_SKIP_SECONDS and _is_practice_match()
+		if loading_elapsed >= GameConfig.LOADING_SECONDS: _start_countdown()
+		return
 	if state == "playing" and Input.is_action_just_pressed("dash"):
 		_start_dash(0)
 	if state == "playing" and Input.is_action_just_pressed("use_spell"):
 		_use_spell(0)
+	if state == "playing":
+		_update_dash_trails(delta)
+		spell_notice_time = maxf(0.0, spell_notice_time - delta)
 	if state == "countdown":
 		countdown -= delta
 		if countdown <= 0.0:
@@ -104,9 +169,9 @@ func _process(delta: float) -> void:
 	remaining = maxf(0.0, remaining - delta)
 	if not frenzy_notified and mode == "voodoo" and remaining <= 15.0:
 		frenzy_notified = true
-		Fx.pop("¡FRENESÍ!", Vector2(640, 150), GameConfig.GOLD)
+		Fx.pop(I18n.t("frenzy"), Vector2(640, 150), GameConfig.GOLD)
 		Sfx.play_tone(520.0, 0.35)
-	var coin_target := 30 if remaining <= GameConfig.FRENZY_SECONDS else GameConfig.COIN_RESPAWN_THRESHOLD
+	var coin_target := GameConfig.FRENZY_COIN_TARGET if remaining <= GameConfig.FRENZY_SECONDS else GameConfig.COIN_RESPAWN_THRESHOLD
 	if mode == "voodoo" and int(elapsed / GameConfig.COIN_RESPAWN_INTERVAL) != int((elapsed - delta) / GameConfig.COIN_RESPAWN_INTERVAL) and coins.size() < coin_target:
 		_spawn_coin()
 	for coin in coins:
@@ -117,13 +182,15 @@ func _process(delta: float) -> void:
 		public_players.append({"name": player.name, "score": player.score, "combo": player.combo})
 	HttpEndpoint.set_status({"mode": mode, "time": remaining, "players": public_players})
 	if int(elapsed / 8.0) != int((elapsed - delta) / 8.0) and chests.size() < 2:
-		chests.append(_random_position())
+		chests.append(_random_position_in_safe_zone())
+		chest_fade_alpha.append(1.0)
 	_update_player(0, delta)
 	for i in range(1, players.size()):
 		_update_bot(i, delta)
 	_update_arena_hazards(delta)
 	_update_dash_hits()
 	_separate_players()
+	_update_safe_zone(delta)
 	_update_pickups()
 	_update_roll(delta)
 	_update_hud()
@@ -133,11 +200,29 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == GameConfig.SETTINGS_F11_KEY:
+		Settings.toggle_fullscreen()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		last_input_controller = true
+	elif event is InputEventKey or event is InputEventMouseButton:
+		last_input_controller = false
+	if state == "results":
+		if event is InputEventKey and event.pressed and not event.echo:
+			results_elapsed = 0.0
+			if event.keycode >= KEY_1 and event.keycode <= KEY_4:
+				_launch_result_emote(int(event.keycode - KEY_1))
+				get_viewport().set_input_as_handled()
+		elif event is InputEventJoypadButton and event.pressed:
+			results_elapsed = 0.0
+			var dpad_emote := {JOY_BUTTON_DPAD_UP: 0, JOY_BUTTON_DPAD_RIGHT: 1, JOY_BUTTON_DPAD_DOWN: 2, JOY_BUTTON_DPAD_LEFT: 3}
+			if dpad_emote.has(event.button_index):
+				_launch_result_emote(int(dpad_emote[event.button_index]))
+				get_viewport().set_input_as_handled()
 	if state == "playing" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode in [KEY_SPACE, KEY_SHIFT]:
 			_start_dash(0)
-		elif event.keycode in [KEY_E, KEY_ENTER, KEY_KP_ENTER]:
-			_use_spell(0)
 		elif event.keycode == KEY_ESCAPE:
 			state = "paused"
 			_build_pause()
@@ -145,19 +230,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif state == "paused" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		state = "playing"
 		_build_hud()
+	elif state == "arena_select" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_build_menu()
+	elif state == "loading" and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE and loading_elapsed >= GameConfig.LOADING_SKIP_SECONDS:
+		_start_countdown()
+		get_viewport().set_input_as_handled()
 
-func _begin_match(classic: bool = false) -> void:
+func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 	mode = "classic" if classic else "voodoo"
 	seed_value = int(Time.get_unix_time_from_system()) + randi()
 	rng.seed = seed_value
-	arena = ArenaGen.generate(seed_value, previous_arena_id)
+	arena = ArenaGen.generate(seed_value, previous_arena_id, arena_id, classic)
 	previous_arena_id = String(arena.get("map_id", ""))
+	Profile.last_arena_id = previous_arena_id
+	selected_arena_id = previous_arena_id
+	Profile.save()
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
+	player_hitbox_rects = _get_obstacle_hitboxes(arena.get("obstacles", []))
 	_initialize_hazard_runtime()
 	arena_background = load("res://assets/arenas/" + String(arena.background)) if not String(arena.background).is_empty() else null
 	players.clear()
 	coins.clear()
 	chests.clear()
+	chest_fade_alpha.clear()
 	opened_chests.clear()
 	floating.clear()
 	var names := [Profile.nick, "Mordisquitos", "Conde Costura", "Dama del Pantano"]
@@ -168,12 +263,99 @@ func _begin_match(classic: bool = false) -> void:
 		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
 		if not character_sheets.has(sheet_key):
 			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
-		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1})
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1, "zone_drain_left": GameConfig.ZONE_DRAIN_INTERVAL})
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 	elapsed = 0.0
 	remaining = GameConfig.CLASSIC_SECONDS if mode == "classic" else GameConfig.MATCH_SECONDS
+	safe_zone_step = 0
+	safe_zone_warning_step = 0
 	frenzy_notified = false
+	_build_loading()
+
+func _build_loading() -> void:
+	state = "loading"
+	loading_elapsed = 0.0
+	loading_tip_index = -1
+	_clear_hud()
+	var root := _new_overlay()
+	var backdrop := _screen_backdrop()
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	var title := _label(root, I18n.t("arena_" + String(arena.map_id)), Vector2(0.0, GameConfig.LOADING_TITLE_Y), GameConfig.LOADING_TITLE_SIZE, GameConfig.GOLD, true)
+	var title_font := load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	if title_font != null: title.add_theme_font_override("font", title_font)
+	var thumbnail := TextureRect.new()
+	thumbnail.texture = load(_arena_thumbnail_path(String(arena.map_id)))
+	thumbnail.position = GameConfig.LOADING_THUMB_POSITION
+	thumbnail.size = GameConfig.LOADING_THUMB_SIZE
+	thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	root.add_child(thumbnail)
+	var trap_keys: Array = GameConfig.ARENA_TRAP_KEYS.get(String(arena.map_id), [])
+	var trap_icons: Array = GameConfig.ARENA_TRAP_ICONS.get(String(arena.map_id), [])
+	for index in range(trap_keys.size()):
+		var trap_name := String(trap_keys[index])
+		var icon := TextureRect.new()
+		var atlas := AtlasTexture.new()
+		atlas.atlas = TRAP_ICONS_TEXTURE
+		var trap_manifest: Dictionary = loading_metadata.get("trampas_iconos", {})
+		var icon_frame := float(trap_manifest.get("frame_w", GameConfig.ARENA_ICON_FRAME_SIZE))
+		atlas.region = Rect2(float(trap_icons[index]) * icon_frame, 0.0, icon_frame, float(trap_manifest.get("frame_h", icon_frame)))
+		icon.texture = atlas
+		icon.position = GameConfig.LOADING_TRAP_POSITION + Vector2(0.0, index * GameConfig.LOADING_TRAP_ROW_GAP)
+		icon.size = Vector2.ONE * GameConfig.LOADING_TRAP_ICON_SIZE
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		root.add_child(icon)
+		var trap_text := _hud_label(root, icon.position + Vector2(GameConfig.LOADING_TRAP_TEXT_OFFSET, 0.0), GameConfig.LOADING_TRAP_TEXT_SIZE, GameConfig.LOADING_TRAP_TEXT_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+		trap_text.text = I18n.t("loading_trap_" + trap_name)
+	var controls := _hud_label(root, Vector2(48.0, GameConfig.LOADING_CONTROLS_Y), GameConfig.LOADING_CONTROLS_SIZE, GameConfig.LOADING_CONTROLS_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	controls.text = I18n.t("loading_controls")
+	var tip := _hud_label(root, GameConfig.LOADING_TIP_POSITION, GameConfig.LOADING_TIP_SIZE, GameConfig.LOADING_TIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+	tip.name = "LoadingTip"
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var portrait_path := "res://assets/ui/retrato_%s_coral.png" % String(players[0].character)
+	var portrait := TextureRect.new()
+	portrait.texture = load(portrait_path)
+	portrait.position = GameConfig.LOADING_CHARACTER_POSITION
+	portrait.size = GameConfig.LOADING_PORTRAIT_SIZE
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	root.add_child(portrait)
+	var player_text := _hud_label(root, GameConfig.LOADING_CHARACTER_POSITION + GameConfig.LOADING_PLAYER_TEXT_OFFSET, GameConfig.LOADING_PLAYER_TEXT_SIZE, GameConfig.LOADING_PLAYER_TEXT_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	player_text.text = "%s\n%s %d · %s" % [String(players[0].name), I18n.t("loading_player"), GameConfig.LOADING_LOCAL_PLAYER_NUMBER, String(players[0].character).capitalize()]
+	var progress := ProgressBar.new()
+	progress.name = "LoadingProgress"
+	progress.position = GameConfig.LOADING_PROGRESS_POSITION
+	progress.size = GameConfig.LOADING_PROGRESS_SIZE
+	progress.max_value = GameConfig.LOADING_PERCENT_MAX
+	progress.show_percentage = false
+	root.add_child(progress)
+	var skip_text := _hud_label(root, GameConfig.LOADING_SKIP_POSITION, GameConfig.LOADING_SKIP_SIZE, GameConfig.LOADING_SKIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	skip_text.name = "LoadingSkip"
+	skip_text.text = I18n.t("loading_skip")
+	skip_text.visible = false
+	_update_loading_text()
+
+func _update_loading_text() -> void:
+	var tip := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
+	if tip:
+		loading_tip_index = posmod(floori(loading_elapsed / GameConfig.LOADING_TIP_INTERVAL), GameConfig.LOADING_TIP_COUNT)
+		tip.text = I18n.t("loading_tip_%d" % (loading_tip_index + 1))
+
+func _is_practice_match() -> bool:
+	for index in range(1, players.size()):
+		if not bool(players[index].is_bot): return false
+	return true
+
+func _arena_thumbnail_path(arena_id: String) -> String:
+	var manifest: Dictionary = loading_metadata.get("arena_mini", {})
+	var filename := String(manifest.get("file", "arena_<id>_mini.png")).replace("<id>", arena_id)
+	return "res://assets/ui/" + filename
+
+func _start_countdown() -> void:
+	if state != "loading": return
 	countdown = 3.0
 	state = "countdown"
 	_build_hud()
@@ -194,7 +376,7 @@ func _update_player(index: int, delta: float) -> void:
 		return
 	if player.recoil_left > 0.0:
 		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
-		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		player.pos = _move_player(player.pos, recoil_motion)
 		player.recoil_left = maxf(0.0, player.recoil_left - delta)
 		player.vel = Vector2.ZERO
 		return
@@ -206,22 +388,26 @@ func _update_player(index: int, delta: float) -> void:
 		return
 	if direction != Vector2.ZERO:
 		player.dash_dir = direction
-	var speed := GameConfig.PLAYER_SPEED * (1.6 if player.item == "boots" else 1.0) * _terrain_speed(player.pos)
-	if player.item == "sheep": speed *= 0.6
+	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
+	var speed := GameConfig.PLAYER_SPEED * (1.6 if SpellRules.is_active(player, "boots") else 1.0) * _terrain_speed(player.pos) * zone_speed
+	if SpellRules.is_active(player, "sheep"): speed *= 0.6
 	var motion: Vector2
 	if player.dash_left > 0.0:
+		if index == 0 and dash_trail_emit <= 0.0:
+			_add_dash_trail(player.pos, player.color)
+			dash_trail_emit = GameConfig.DASH_TRAIL_INTERVAL
 		player.dash_left = maxf(0.0, player.dash_left - delta)
 		motion = player.dash_dir * speed * GameConfig.DASH_MULTIPLIER * delta
 	else:
 		player.vel = direction * speed
 		motion = player.vel * delta
 	var previous_position: Vector2 = player.pos
-	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	player.pos = _move_player(player.pos, motion)
 	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
 		player.dash_left = 0.0
-	if player.item == "magnet":
+	if SpellRules.is_active(player, "magnet"):
 		for coin in coins:
-			if player.pos.distance_to(coin.pos) < 220.0:
+			if player.pos.distance_to(coin.pos) < GameConfig.SPELL_MAGNET_RADIUS:
 				coin.pos = coin.pos.move_toward(player.pos, 260.0 * delta)
 
 func _update_bot(index: int, delta: float) -> void:
@@ -237,7 +423,7 @@ func _update_bot(index: int, delta: float) -> void:
 		return
 	if player.recoil_left > 0.0:
 		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
-		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		player.pos = _move_player(player.pos, recoil_motion)
 		player.recoil_left = maxf(0.0, player.recoil_left - delta)
 		player.vel = Vector2.ZERO
 		return
@@ -253,9 +439,14 @@ func _update_bot(index: int, delta: float) -> void:
 		for chest in chests:
 			chest_positions.append(chest)
 	var direction := BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
+	if not ZoneRules.is_inside(player.pos, safe_zone_step):
+		coin_positions = [ZoneRules.safe_rect(safe_zone_step).get_center()]
+		chest_positions.clear()
+		direction = BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
 	player.bot_action_left = float(player.bot_action_left) - delta
 	if player.bot_action_left <= 0.0:
 		player.bot_action_left = rng.randf_range(GameConfig.BOT_DECISION_MIN_SECONDS, GameConfig.BOT_DECISION_MAX_SECONDS)
+		_use_spell_for_bot(index)
 		player.bot_dash_target = BotBrain.choose_dash_target(player, players, index, obstacle_rects, rng) if bots_dash_global_left <= 0.0 else -1
 	if bots_dash_global_left <= 0.0 and player.dash_cd <= 0.0 and int(player.bot_dash_target) >= 0 and player.dash_lock <= 0.0:
 		var target_index := int(player.bot_dash_target)
@@ -263,39 +454,39 @@ func _update_bot(index: int, delta: float) -> void:
 			direction = (players[target_index].pos - player.pos).normalized()
 			player.dash_dir = direction
 			player.dash_left = GameConfig.DASH_DURATION
-			player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
+			player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 			bots_dash_global_left = GameConfig.BOT_TEAM_DASH_INTERVAL
 		player.bot_dash_target = -1
-	var speed_scale := (0.6 if player.item == "sheep" else (1.6 if player.item == "boots" else 1.0)) * _terrain_speed(player.pos)
+	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
+	var speed_scale := (0.6 if SpellRules.is_active(player, "sheep") else (1.6 if SpellRules.is_active(player, "boots") else 1.0)) * _terrain_speed(player.pos) * zone_speed
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
 		player.vel = direction * GameConfig.PLAYER_SPEED * speed_scale
 	var motion := movement * GameConfig.PLAYER_SPEED * speed_scale * delta * (GameConfig.DASH_MULTIPLIER if player.dash_left > 0.0 else 1.0)
 	var previous_position: Vector2 = player.pos
-	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	player.pos = _move_player(player.pos, motion)
 	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
 		player.dash_left = 0.0
 	if player.dash_left > 0.0: player.dash_left = maxf(0.0, player.dash_left - delta)
-	if player.item != "" and rng.randf() < delta * 0.4:
-		_use_spell_for_bot(index)
-	if player.item == "magnet":
+	if SpellRules.is_active(player, "magnet"):
 		for coin in coins:
-			if player.pos.distance_to(coin.pos) < 220.0:
+			if player.pos.distance_to(coin.pos) < GameConfig.SPELL_MAGNET_RADIUS:
 				coin.pos = coin.pos.move_toward(player.pos, 260.0 * delta)
 
 func _start_dash(index: int) -> void:
 	var player := players[index]
-	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or player.item == "sheep": return
+	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or SpellRules.is_active(player, "sheep"): return
 	player.dash_left = GameConfig.DASH_DURATION
-	player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
+	if index == 0: _add_dash_trail(player.pos, player.color)
+	player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 	if player.vel.length() > 0.1: player.dash_dir = player.vel.normalized()
 	Sfx.play_tone(180.0, 0.12)
 
 func _update_pickups() -> void:
 	for i in range(players.size()):
 		var player := players[i]
-		if player.item == "sheep": continue
+		if SpellRules.is_active(player, "sheep"): continue
 		for c in range(coins.size() - 1, -1, -1):
 			var coin: Dictionary = coins[c]
 			if player.pos.distance_to(coin.pos) > 28.0 or (coin.owner == i and coin.lock > 0.0): continue
@@ -307,15 +498,17 @@ func _update_pickups() -> void:
 			else:
 				player.combo = Scoring.next_combo(player.combo, elapsed - player.last_pickup)
 				player.max_combo = maxi(player.max_combo, player.combo)
-				value = Scoring.coin_value(player.combo, remaining <= 15.0, player.item == "ring", false)
+				value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, SpellRules.is_active(player, "ring"), false)
 				player.coins += value
 				player.score = player.coins
 				player.last_pickup = elapsed
-				if player.combo in [5, 10, 20]:
-					var text := "¡Combo!" if player.combo == 5 else ("¡Vudú!" if player.combo == 10 else "¡VOODOO COMBO!")
-					Fx.pop(text, player.pos + OFFSET + Vector2(0, -44), GameConfig.GOLD)
+				if player.combo in [5, 12]:
+					var text := I18n.t("combo") if player.combo == 5 else I18n.t("voodoo_combo")
+					Fx.pop(text, GameConfig.COMBO_NOTICE_POSITION, GameConfig.GOLD)
 					Sfx.play_tone(500.0 + player.combo * 14.0, 0.18)
-			Fx.pop("+%d" % (player.score if mode == "classic" else value), player.pos + OFFSET, GameConfig.GOLD)
+			var combo_multiplier := Scoring.multiplier(player.combo, mode == "classic")
+			var pickup_color := GameConfig.FLOAT_COLOR_VOODOO if combo_multiplier >= 3 else (GameConfig.FLOAT_COLOR_FRENZY if combo_multiplier == 2 else GameConfig.FLOAT_COLOR_BASE)
+			Fx.pop("+%d" % (1 if mode == "classic" else value), player.pos + OFFSET, pickup_color)
 			Sfx.play_tone(600.0 + player.combo * 18.0, 0.09)
 			coins.remove_at(c)
 			if mode == "classic" and player.coins >= GameConfig.CLASSIC_TARGET:
@@ -326,6 +519,7 @@ func _update_pickups() -> void:
 				opened_chests.append({"pos": chests[chest_i], "elapsed": 0.0})
 				_start_roll(i)
 				chests.remove_at(chest_i)
+				chest_fade_alpha.remove_at(chest_i)
 				break
 		if player.combo > 0 and elapsed - player.last_pickup > GameConfig.COMBO_WINDOW:
 			player.combo = 0
@@ -350,7 +544,7 @@ func _update_dash_hits() -> void:
 				Fx.hit()
 				Sfx.play_tone(210.0, 0.12)
 				break
-			var fraction := GameConfig.RING_HIT_DROP_FRACTION if players[j].item == "ring" else (GameConfig.CROWN_HIT_DROP_FRACTION if j == _leader_index() else GameConfig.HIT_DROP_FRACTION)
+			var fraction := GameConfig.RING_HIT_DROP_FRACTION if SpellRules.is_active(players[j], "ring") else (GameConfig.CROWN_HIT_DROP_FRACTION if j == _leader_index() else GameConfig.HIT_DROP_FRACTION)
 			var result := _apply_hit(j, i, fraction, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
 			if not result.applied:
 				players[i].dash_left = 0.0
@@ -363,6 +557,63 @@ func _update_dash_hits() -> void:
 				players[i].bot_repath_left = 0.0
 			players[i].dash_left = 0.0
 			break
+
+func _update_safe_zone(delta: float) -> void:
+	var thresholds: Array = GameConfig.CLASSIC_ZONE_TIMES if mode == "classic" else GameConfig.VOODOO_ZONE_TIMES
+	for step_index in range(thresholds.size()):
+		var step := step_index + 1
+		var threshold := float(thresholds[step_index])
+		if safe_zone_warning_step < step and remaining <= threshold + GameConfig.ZONE_WARNING_SECONDS:
+			safe_zone_warning_step = step
+			Fx.pop(I18n.t("zone_warning"), GameConfig.ZONE_WARNING_POSITION, GameConfig.ZONE_WARNING_COLOR)
+			Sfx.play_tone(GameConfig.ZONE_WARNING_TONE_HZ, GameConfig.ZONE_WARNING_TONE_SECONDS)
+		if safe_zone_step < step and remaining <= threshold:
+			safe_zone_step = step
+	var safe_rect := ZoneRules.safe_rect(safe_zone_step)
+	for coin in coins:
+		if not safe_rect.has_point(coin.pos):
+			coin.pos = _random_position_in_safe_zone()
+			coin.fade_left = GameConfig.ZONE_COIN_FADE_SECONDS
+			coin.fade_alpha = 0.0
+		elif float(coin.get("fade_left", 0.0)) > 0.0:
+			coin.fade_left = maxf(0.0, float(coin.fade_left) - delta)
+			coin.fade_alpha = 1.0 - float(coin.fade_left) / GameConfig.ZONE_COIN_FADE_SECONDS
+	for chest_index in range(chests.size()):
+		if not safe_rect.has_point(chests[chest_index]):
+			chests[chest_index] = _random_position_in_safe_zone()
+			chest_fade_alpha[chest_index] = 0.0
+		elif chest_fade_alpha[chest_index] < 1.0:
+			chest_fade_alpha[chest_index] = minf(1.0, chest_fade_alpha[chest_index] + delta / GameConfig.ZONE_COIN_FADE_SECONDS)
+	for index in range(players.size()):
+		var player: Dictionary = players[index]
+		if safe_rect.has_point(player.pos):
+			player.zone_drain_left = GameConfig.ZONE_DRAIN_INTERVAL
+			continue
+		var drain := ZoneRules.advance_drain(float(player.zone_drain_left), delta, GameConfig.ZONE_DRAIN_INTERVAL)
+		player.zone_drain_left = float(drain.remaining)
+		for _tick in range(int(drain.ticks)):
+			if int(player.coins) <= 0: continue
+			player.coins -= 1
+			player.score = player.coins
+			Fx.pop("-1", player.pos + OFFSET, GameConfig.ZONE_DRAIN_COLOR)
+	if fog_material != null:
+		var screen_rect := Vector4(OFFSET.x + safe_rect.position.x, OFFSET.y + safe_rect.position.y, OFFSET.x + safe_rect.end.x, OFFSET.y + safe_rect.end.y)
+		fog_material.set_shader_parameter("safe_bounds", screen_rect)
+		fog_material.set_shader_parameter("scroll_time", 0.0 if Settings.reduce_motion else elapsed * GameConfig.ZONE_FOG_SCROLL_SPEED)
+
+func _random_position_in_safe_zone() -> Vector2:
+	var safe_rect := ZoneRules.safe_rect(safe_zone_step)
+	var margin := GameConfig.ZONE_PICKUP_MARGIN
+	for _attempt in range(GameConfig.ZONE_RANDOM_ATTEMPTS):
+		var candidate := Vector2(rng.randf_range(safe_rect.position.x + margin, safe_rect.end.x - margin), rng.randf_range(safe_rect.position.y + margin, safe_rect.end.y - margin))
+		if not _coin_position_is_clear(candidate): continue
+		var near_coin := false
+		for coin in coins:
+			if candidate.distance_to(coin.pos) < GameConfig.ZONE_COIN_SEPARATION:
+				near_coin = true
+				break
+		if not near_coin: return candidate
+	return safe_rect.get_center()
 
 func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum: int, maximum: int, stun_seconds: float, text_key: String = "trap_zap") -> Dictionary:
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
@@ -452,7 +703,7 @@ func _update_roots(runtime: Dictionary, delta: float) -> void:
 	for player_index in range(players.size()):
 		if players[player_index].rooted_left > 0.0 or players[player_index].pos.distance_to(runtime.roots_position) > GameConfig.ROOTS_RADIUS:
 			continue
-		var result := _apply_hit(player_index, -1, 0.0, GameConfig.ROOTS_DROP_COUNT, GameConfig.ROOTS_DROP_COUNT, 0.0, "trap_root")
+		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_root")
 		if result.applied:
 			players[player_index].rooted_left = GameConfig.ROOTED_SECONDS
 
@@ -464,7 +715,7 @@ func _update_spikes(hazard: Dictionary) -> void:
 		for tile in hazard.get("tiles", []):
 			var rect := _tile_rect(tile).grow(GameConfig.PLAYER_RADIUS)
 			if rect.has_point(players[player_index].pos):
-				_apply_hit(player_index, -1, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
+				_apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
 				break
 
 func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
@@ -473,7 +724,7 @@ func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> voi
 	for index in range(players.size()):
 		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
 		if cooldowns[index] <= 0.0 and players[index].pos.distance_to(ghost_pos) <= GameConfig.PLAYER_RADIUS + GameConfig.GHOST_RADIUS:
-			_apply_hit(index, -1, 0.0, GameConfig.GHOST_DROP_COUNT, GameConfig.GHOST_DROP_COUNT, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
+			_apply_hit(index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
 			cooldowns[index] = GameConfig.GHOST_IGNORE_SECONDS
 	runtime.player_cooldowns = cooldowns
 
@@ -484,7 +735,7 @@ func _update_conveyor(hazard: Dictionary, delta: float) -> void:
 		var rect := _tile_rect(tile)
 		for player_index in range(players.size()):
 			if rect.has_point(players[player_index].pos):
-				players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+				players[player_index].pos = _move_player(players[player_index].pos, motion)
 		for coin in coins:
 			if rect.has_point(coin.pos):
 				coin.pos += motion
@@ -503,9 +754,9 @@ func _update_steam(hazard: Dictionary, runtime: Dictionary, _delta: float) -> vo
 		if offset.length() > GameConfig.STEAM_RADIUS:
 			continue
 		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
-		var result := _apply_hit(player_index, -1, 0.0, GameConfig.STEAM_DROP_COUNT, GameConfig.STEAM_DROP_COUNT, GameConfig.STEAM_STUN_SECONDS, "trap_steam")
+		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.STEAM_STUN_SECONDS, "trap_steam")
 		if result.applied:
-			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.STEAM_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
+			players[player_index].pos = _move_player(players[player_index].pos, direction * GameConfig.STEAM_PUSH_DISTANCE)
 
 func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
 	var center := _json_point(hazard.get("center", []))
@@ -540,9 +791,9 @@ func _explode_barrel(center: Vector2) -> void:
 		if offset.length() > GameConfig.BARREL_RADIUS:
 			continue
 		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
-		var result := _apply_hit(player_index, -1, GameConfig.BARREL_DROP_FRACTION, GameConfig.BARREL_DROP_MIN, GameConfig.BARREL_DROP_MAX, 0.0, "trap_barrel")
+		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_barrel")
 		if result.applied:
-			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.BARREL_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
+			players[player_index].pos = _move_player(players[player_index].pos, direction * GameConfig.BARREL_PUSH_DISTANCE)
 
 func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
 	var cooldowns: Array = runtime.player_cooldowns
@@ -562,7 +813,7 @@ func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 		var direction: Vector2 = players[index].vel.normalized()
 		if direction == Vector2.ZERO:
 			direction = (destination - source).normalized()
-		players[index].pos = ArenaPhysics.move_circle(destination + direction * GameConfig.PORTAL_EXIT_DISTANCE, Vector2.ZERO, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		players[index].pos = _move_player(destination + direction * GameConfig.PORTAL_EXIT_DISTANCE, Vector2.ZERO)
 		cooldowns[index] = GameConfig.PORTAL_COOLDOWN_SECONDS
 		Fx.pop(I18n.t("trap_portal"), players[index].pos + OFFSET, Color("7fe7ff"))
 		Sfx.play_tone(760.0, 0.1)
@@ -579,7 +830,7 @@ func _update_ray(hazard: Dictionary) -> void:
 				hit = true
 				break
 		if hit:
-			_apply_hit(player_index, -1, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_ray")
+			_apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_ray")
 
 func _start_roll(index: int) -> void:
 	roll_player = index
@@ -601,73 +852,82 @@ func _update_roll(delta: float) -> void:
 	roll_time -= delta
 	if roll_time <= 0.0 and roll_player >= 0:
 		players[roll_player].item = roll_result
-		players[roll_player].item_time = 8.0 if roll_result == "cloak" else (6.0 if roll_result == "ring" else (5.0 if roll_result == "magnet" else 4.0))
-		Fx.pop(roll_result.to_upper(), players[roll_player].pos + OFFSET + Vector2(0, -52), GameConfig.GOLD)
+		players[roll_player].item_time = 0.0
+		if roll_player == 0:
+			spell_notice_item = roll_result
+			spell_notice_time = GameConfig.SPELL_NOTICE_SECONDS
+		Fx.pop(I18n.t("spell_" + roll_result), players[roll_player].pos + OFFSET + Vector2(0, -52), GameConfig.GOLD)
 		Sfx.play_tone(880.0, 0.16)
 
 func _use_spell_for_bot(index: int) -> void:
-	var player := players[index]
-	if player.item == "" or player.item in ["cloak", "boots", "magnet", "ring"]: return
-	if player.item == "frost":
-		for j in range(players.size()):
-			if j != index and player.pos.distance_to(players[j].pos) < 180.0:
-				if players[j].item == "cloak": players[j].item = ""
-				else: players[j].stun = 1.5
-		player.item = ""
-	elif player.item == "sheep":
-		var leader := _leader_index()
-		if leader != index:
-			if players[leader].item == "cloak":
-				players[leader].item = ""
-			else:
-				players[leader].item = "sheep"
-				players[leader].item_time = 3.0
-				players[leader].sheep += 1
-			player.item = ""
-	elif player.item == "pin":
-		var target := -1
-		var best := 900.0
-		for j in range(players.size()):
-			if j != index and player.pos.distance_to(players[j].pos) < best:
-				best = player.pos.distance_to(players[j].pos)
-				target = j
-		if target >= 0:
-			player.dash_dir = (players[target].pos - player.pos).normalized()
-			player.dash_left = GameConfig.DASH_DURATION
-			player.dash_cd = GameConfig.DASH_COOLDOWN
-			player.item = ""
+	var player: Dictionary = players[index]
+	if not SpellRules.can_activate(player): return
+	var item := String(player.item)
+	if SpellRules.duration(item) > 0.0:
+		var useful := item in ["cloak", "boots", "ring"]
+		if item == "magnet":
+			for coin in coins:
+				if player.pos.distance_to(coin.pos) <= GameConfig.SPELL_MAGNET_RADIUS: useful = true; break
+		if useful: player.item_time = SpellRules.duration(item)
+	elif _spell_is_useful(index, item):
+		_cast_instant_spell(index)
 
-func _use_spell(index: int) -> void:
-	if players.is_empty() or players[index].item == "": return
-	var player := players[index]
-	match player.item:
-		"cloak", "boots", "magnet", "ring": return
+func _spell_is_useful(index: int, item: String) -> bool:
+	var player: Dictionary = players[index]
+	if item == "frost":
+		for j in range(players.size()):
+			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_FROST_RADIUS: return true
+	if item == "sheep": return _leader_index() != index
+	if item == "pin":
+		for j in range(players.size()):
+			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_PIN_RANGE: return true
+	return false
+
+func _cast_instant_spell(index: int) -> void:
+	var player: Dictionary = players[index]
+	match String(player.item):
 		"frost":
 			for j in range(players.size()):
-				if j != index and player.pos.distance_to(players[j].pos) <= 180.0:
-					if players[j].item == "cloak": players[j].item = ""
-					else: players[j].stun = 1.5
+				if j == index or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
+				if SpellRules.is_active(players[j], "cloak"):
+					players[j].item = ""
+					players[j].item_time = 0.0
+				else: players[j].stun = GameConfig.SPELL_FROST_SECONDS
 		"sheep":
 			var leader := _leader_index()
 			if leader != index:
-				if players[leader].item == "cloak": players[leader].item = ""
+				if SpellRules.is_active(players[leader], "cloak"):
+					players[leader].item = ""
+					players[leader].item_time = 0.0
 				else:
 					players[leader].item = "sheep"
-					players[leader].item_time = 3.0
+					players[leader].item_time = GameConfig.SPELL_SHEEP_SECONDS
 					players[leader].sheep += 1
 		"pin":
 			var target := -1
-			var best := INF
+			var best := GameConfig.SPELL_PIN_RANGE * GameConfig.SPELL_PIN_RANGE
 			for j in range(players.size()):
 				if j != index and player.pos.distance_squared_to(players[j].pos) < best:
 					best = player.pos.distance_squared_to(players[j].pos)
 					target = j
-			if target >= 0 and best < 900.0 * 900.0:
-				players[target].pos = player.pos.move_toward(players[target].pos, 60.0)
-				players[target].dash_left = GameConfig.DASH_DURATION
+			if target >= 0:
+				var outcome := _apply_hit(target, index, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS)
+				if outcome.applied:
+					players[target].pos += player.pos.direction_to(players[target].pos) * GameConfig.SPELL_PIN_PUSH_DISTANCE
 	player.item = ""
+	player.item_time = 0.0
+	spell_notice_time = 0.0
 	Sfx.play_tone(720.0, 0.2)
 
+func _use_spell(index: int) -> void:
+	if players.is_empty() or index >= players.size() or not SpellRules.can_activate(players[index]): return
+	var item := String(players[index].item)
+	if SpellRules.duration(item) > 0.0:
+		players[index] = SpellRules.activate(players[index])
+		spell_notice_time = 0.0
+		Sfx.play_tone(720.0, 0.2)
+	elif _spell_is_useful(index, item):
+		_cast_instant_spell(index)
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
 	var time_label := hud_root.get_node_or_null("Timer") as Label
@@ -678,7 +938,7 @@ func _update_hud() -> void:
 	var leader := _leader_index() if not players.is_empty() else -1
 	for slot in range(score_name_labels.size()):
 		var active := slot < players.size()
-		for control in [score_name_labels[slot], score_tag_labels[slot], score_number_labels[slot], score_portraits[slot]]:
+		for control in [score_name_labels[slot], score_tag_labels[slot], score_number_labels[slot], score_portraits[slot], score_frames[slot], score_frame_skulls[slot]]:
 			control.visible = active
 		score_crowns[slot].visible = active and slot == leader
 		if not active: continue
@@ -690,6 +950,10 @@ func _update_hud() -> void:
 		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
 		var portrait_texture: Texture2D = load(portrait_path)
 		if portrait_texture != null: score_portraits[slot].texture = portrait_texture
+		var frame_id := String(Profile.cosmetics.get("frame", "madera")) if slot == 0 else "madera"
+		var frame_texture: Texture2D = load("res://assets/ui/marco_%s.png" % ("hueso" if frame_id == "calavera" else frame_id))
+		if frame_texture != null: score_frames[slot].texture = frame_texture
+		score_frame_skulls[slot].visible = slot == 0 and frame_id == "calavera"
 		var value := int(player.score)
 		if score_values[slot] != value:
 			score_values[slot] = value
@@ -702,12 +966,31 @@ func _update_hud() -> void:
 		score_number_labels[slot].add_theme_color_override("font_color", GameConfig.GOLD if age < 170 else Color.WHITE)
 	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
 	var spell_name := hud_root.get_node_or_null("SpellName") as Label
+	var spell_glow := hud_root.get_node_or_null("SpellGlow") as TextureRect
+	var spell_key := hud_root.get_node_or_null("SpellKey") as TextureRect
 	if spell_icon and not players.is_empty():
 		var spell_index := ITEMS.find(String(players[0].item))
 		spell_icon.visible = spell_index >= 0
 		spell_icon.texture = spell_atlases[spell_index] if spell_index >= 0 else null
+		if spell_glow:
+			spell_glow.visible = spell_index >= 0
+			spell_glow.modulate.a = 0.65 + 0.25 * sin(Time.get_ticks_msec() / 180.0) if not Settings.reduce_motion else 0.8
+		if spell_key: spell_key.texture = SPELL_KEY_B_TEXTURE if last_input_controller else SPELL_KEY_E_TEXTURE
 	if spell_name and not players.is_empty():
-		spell_name.text = String(players[0].item).to_upper() if not String(players[0].item).is_empty() else I18n.t("spell")
+		var item := String(players[0].item)
+		var is_active := float(players[0].item_time) > 0.0
+		spell_name.text = (I18n.t("spell_" + item) + "  %.1f" % float(players[0].item_time)) if is_active else (I18n.t("spell_" + item) if not item.is_empty() else I18n.t("spell"))
+		spell_name.modulate.a = 1.0 if SpellRules.can_activate(players[0]) else 0.72
+	var notice := hud_root.get_node_or_null("SpellNotice") as Control
+	if notice:
+		notice.visible = spell_notice_time > 0.0
+		var notice_icon := hud_root.get_node_or_null("SpellNoticeIcon") as TextureRect
+		var notice_name := hud_root.get_node_or_null("SpellNoticeName") as Label
+		var notice_text := hud_root.get_node_or_null("SpellNoticeText") as Label
+		var notice_index := ITEMS.find(spell_notice_item)
+		if notice_icon and notice_index >= 0: notice_icon.texture = spell_atlases[notice_index]
+		if notice_name: notice_name.text = I18n.t("spell_" + spell_notice_item)
+		if notice_text: notice_text.text = I18n.t("spell_desc_" + spell_notice_item)
 
 func _build_menu() -> void:
 	_clear_hud()
@@ -733,12 +1016,12 @@ func _build_menu() -> void:
 	root.add_child(logo)
 	if not Settings.reduce_motion:
 		logo.position.y = -230
-		var logo_tween := create_tween()
-		logo_tween.tween_property(logo, "position:y", 14.0, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		logo_tween.set_loops()
+		menu_logo_tween = create_tween()
+		menu_logo_tween.tween_property(logo, "position:y", 14.0, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		menu_logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		menu_logo_tween.set_loops()
 	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
-	var actions: Array[Callable] = [func(): _begin_match(false), func(): _begin_match(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
+	var actions: Array[Callable] = [func(): _build_arena_select(false), func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
 	for index in range(labels.size()):
 		var button := _button(root, labels[index], Vector2(0, 302 + index * 59), actions[index])
 		if not Settings.reduce_motion:
@@ -746,13 +1029,100 @@ func _build_menu() -> void:
 			var tween := create_tween()
 			tween.tween_interval(index * 0.05)
 			tween.tween_property(button, "modulate:a", 1.0, 0.2)
-	_label(root, "Nivel %d · %d XP" % [Profile.level() + 1, Profile.xp], Vector2(-222, 666), 16, Color("b8a9d1"), false)
 	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
 
-func _build_characters() -> void:
+func _build_arena_select(classic: bool) -> void:
 	_clear_hud()
+	arena_select_classic = classic
+	state = "arena_select"
 	var root := _new_overlay()
-	_label(root, I18n.t("characters"), Vector2(0, 65), 42, GameConfig.GOLD, true)
+	var backdrop := _screen_backdrop()
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	_label(root, I18n.t("choose_arena"), Vector2(0, GameConfig.ARENA_SELECT_TITLE_Y), GameConfig.ARENA_SELECT_TITLE_SIZE, GameConfig.GOLD, true)
+	var preferred_button: Button
+	for index in range(GameConfig.ARENA_IDS.size()):
+		var arena_id: String = GameConfig.ARENA_IDS[index]
+		var card := Panel.new()
+		card.position = Vector2(GameConfig.ARENA_CARD_X + index * (GameConfig.ARENA_CARD_SIZE.x + GameConfig.ARENA_CARD_GAP), GameConfig.ARENA_CARD_Y)
+		card.size = GameConfig.ARENA_CARD_SIZE
+		var card_style := StyleBoxFlat.new()
+		card_style.bg_color = Color("241838")
+		card_style.border_color = Color("8A6B45")
+		card_style.set_border_width_all(2)
+		card_style.set_corner_radius_all(10)
+		card.add_theme_stylebox_override("panel", card_style)
+		card.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_select_arena(arena_id)
+		)
+		root.add_child(card)
+		var thumbnail := TextureRect.new()
+		thumbnail.texture = load(_arena_thumbnail_path(arena_id))
+		thumbnail.position = Vector2.ONE * GameConfig.ARENA_THUMB_MARGIN
+		thumbnail.size = GameConfig.ARENA_THUMB_SIZE
+		thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		thumbnail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(thumbnail)
+		var arena_name := _hud_label(card, Vector2(8, GameConfig.ARENA_NAME_Y), GameConfig.ARENA_NAME_SIZE, GameConfig.ARENA_NAME_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+		arena_name.text = I18n.t("arena_" + arena_id)
+		arena_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for icon_order in range(GameConfig.ARENA_TRAP_ICONS[arena_id].size()):
+			var icon := TextureRect.new()
+			var icon_atlas := AtlasTexture.new()
+			icon_atlas.atlas = TRAP_ICONS_TEXTURE
+			var trap_manifest: Dictionary = loading_metadata.get("trampas_iconos", {})
+			var icon_frame := float(trap_manifest.get("frame_w", GameConfig.ARENA_ICON_FRAME_SIZE))
+			icon_atlas.region = Rect2(float(GameConfig.ARENA_TRAP_ICONS[arena_id][icon_order]) * icon_frame, 0.0, icon_frame, float(trap_manifest.get("frame_h", icon_frame)))
+			icon.texture = icon_atlas
+			icon.position = Vector2(GameConfig.ARENA_ICON_START.x + icon_order * GameConfig.ARENA_ICON_GAP, GameConfig.ARENA_ICON_START.y)
+			icon.size = Vector2.ONE * GameConfig.ARENA_ICON_SIZE
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(icon)
+		var select := Button.new()
+		select.text = I18n.t("play")
+		select.position = Vector2(GameConfig.ARENA_BUTTON_MARGIN, GameConfig.ARENA_BUTTON_Y)
+		select.size = GameConfig.ARENA_BUTTON_SIZE
+		select.focus_mode = Control.FOCUS_ALL
+		select.pressed.connect(_select_arena.bind(arena_id))
+		card.add_child(select)
+		if Profile.preferred_arena_id == arena_id:
+			preferred_button = select
+	var random_button := _button(root, I18n.t("random_arena"), Vector2(0, 520), func(): _select_arena(""))
+	random_button.size = GameConfig.ARENA_RANDOM_BUTTON_SIZE
+	random_button.position = GameConfig.ARENA_RANDOM_BUTTON_POSITION
+	if preferred_button != null:
+		preferred_button.grab_focus()
+	_button(root, I18n.t("menu"), Vector2(0, GameConfig.ARENA_MENU_BUTTON_Y), _build_menu)
+
+func _select_arena(arena_id: String) -> void:
+	selected_arena_id = arena_id
+	Profile.preferred_arena_id = arena_id if not arena_id.is_empty() else "random"
+	Profile.save()
+	_begin_match(arena_select_classic, arena_id)
+
+func _build_characters() -> void:
+	_build_locker("character")
+
+func _build_locker(tab: String) -> void:
+	_clear_hud()
+	state = "locker"
+	locker_tab = tab
+	var root := _new_overlay()
+	_label(root, I18n.t("characters"), Vector2(0, 44), 42, GameConfig.GOLD, true)
+	var tab_ids := ["character", "frame", "trail", "emotes"]
+	var tab_keys := ["locker_character", "locker_frame", "locker_trail", "locker_emotes"]
+	for index in range(tab_ids.size()):
+		var tab_button := _button(root, I18n.t(tab_keys[index]), Vector2(0, 102), Callable(self, "_build_locker").bind(tab_ids[index]))
+		tab_button.position = Vector2(180.0 + index * 235.0, 102.0)
+		tab_button.size = Vector2(210.0, 46.0)
+	if tab != "character":
+		_build_cosmetic_tab(root, tab)
+		_button(root, I18n.t("menu"), Vector2(0, 610), _build_menu)
+		return
 	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
 	character_preview_id = Profile.character
 	character_preview = TextureRect.new()
@@ -766,6 +1136,8 @@ func _build_characters() -> void:
 	var display: Dictionary = character_metadata.get("characters", {}).get(character_preview_id, {})
 	_label(root, String(display.get("name", character_preview_id.to_upper())), Vector2(0, 420), 34, Color("fff6c2"), true)
 	_label(root, String(display.get("role", "")), Vector2(0, 465), 20, Color("b8a9d1"), false)
+	_label(root, Profile.nick, Vector2(0.0, GameConfig.CHARACTER_NICKNAME_Y), GameConfig.CHARACTER_NICKNAME_FONT_SIZE, Color("fff6c2"), false)
+	_button(root, I18n.t("name_edit"), Vector2(0.0, GameConfig.NICK_EDIT_BUTTON_Y), func(): _build_nickname_dialog(true))
 	var previous_button := _button(root, "◀", Vector2(-210, 265), func(): _cycle_character(-1))
 	previous_button.position = Vector2(350, 265)
 	previous_button.size = Vector2(64, 54)
@@ -774,6 +1146,120 @@ func _build_characters() -> void:
 	next_button.size = Vector2(64, 54)
 	_button(root, I18n.t("menu"), Vector2(0, 565), _build_menu)
 	character_idle = 0.0
+
+func _build_cosmetic_tab(root: Control, tab: String) -> void:
+	var ids: Array[String] = []
+	var levels: Dictionary = {}
+	if tab == "frame":
+		ids = ["madera", "hueso", "calavera", "plata", "oro", "almas"]
+		levels = GameConfig.FRAME_UNLOCK_LEVELS
+	elif tab == "trail":
+		ids = ["color", "oro", "escarcha", "almas"]
+		levels = GameConfig.TRAIL_UNLOCK_LEVELS
+	else:
+		ids = ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
+		levels = GameConfig.EMOTE_UNLOCK_LEVELS
+	var equipped: Array = Profile.cosmetics.get("emotes", [])
+	for index in range(ids.size()):
+		var item_id := ids[index]
+		var col := index % 4
+		var row := index / 4
+		var card := Panel.new()
+		card.position = Vector2(122.0 + col * 264.0, 180.0 + row * 192.0)
+		card.size = Vector2(230.0, 166.0)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("241838")
+		style.border_color = GameConfig.GOLD if (Profile.cosmetics.get("frame", "madera") == item_id or Profile.cosmetics.get("trail", "color") == item_id or equipped.has(item_id)) else Color("5c496d")
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(8)
+		card.add_theme_stylebox_override("panel", style)
+		root.add_child(card)
+		var icon := TextureRect.new()
+		icon.position = Vector2(82.0, 10.0)
+		icon.size = Vector2(66.0, 66.0)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if tab == "frame":
+			icon.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if item_id == "calavera" else item_id))
+			card.add_child(icon)
+		elif tab == "emotes":
+			icon = _result_emote_icon(item_id)
+			icon.position = Vector2(82.0, 10.0)
+			icon.size = Vector2(66.0, 66.0)
+			card.add_child(icon)
+		else:
+			var swatch := ColorRect.new()
+			swatch.position = Vector2(100.0, 16.0)
+			swatch.size = Vector2(30.0, 52.0)
+			swatch.color = {"color": Color("d9a8ff"), "oro": GameConfig.GOLD, "escarcha": Color("7fe7ff"), "almas": Color("b06bff")}.get(item_id, Color.WHITE)
+			card.add_child(swatch)
+		var title := _hud_label(card, Vector2(4.0, 80.0), Vector2(222.0, 30.0), 17, HORIZONTAL_ALIGNMENT_CENTER)
+		title.text = I18n.t("cosmetic_" + item_id)
+		var unlocked := Profile.level() >= int(levels.get(item_id, 99))
+		var action_text := I18n.t("locker_equipped") if (Profile.cosmetics.get(tab, "") == item_id or equipped.has(item_id)) else I18n.t("locker_select")
+		if not unlocked: action_text = "🔒 " + (I18n.t("unlock_level") % int(levels.get(item_id, 1)))
+		var pick := _button(card, action_text, Vector2(0.0, 119.0), Callable(self, "_select_locker_item").bind(tab, item_id))
+		pick.position = Vector2(8.0, 118.0)
+		pick.size = Vector2(214.0, 40.0)
+
+func _select_locker_item(tab: String, item_id: String) -> void:
+	var levels: Dictionary = GameConfig.EMOTE_UNLOCK_LEVELS if tab == "emotes" else (GameConfig.FRAME_UNLOCK_LEVELS if tab == "frame" else GameConfig.TRAIL_UNLOCK_LEVELS)
+	if Profile.level() < int(levels.get(item_id, 99)): return
+	if tab == "emotes":
+		var emotes: Array = Profile.cosmetics.get("emotes", []).duplicate()
+		if emotes.has(item_id):
+			if emotes.size() > 1: emotes.erase(item_id)
+		else:
+			if emotes.size() >= 4: emotes.pop_front()
+			emotes.append(item_id)
+		for default_emote in ["risa", "enfado", "gg", "corazon"]:
+			if emotes.size() >= 4: break
+			if not emotes.has(default_emote): emotes.append(default_emote)
+		Profile.cosmetics.emotes = emotes
+	else:
+		Profile.cosmetics["frame" if tab == "frame" else "trail"] = item_id
+	Profile.save()
+	_build_locker(tab)
+
+func _build_nickname_dialog(return_to_characters: bool = false) -> void:
+	_clear_hud()
+	state = "nickname"
+	nick_dialog_returns_to_characters = return_to_characters
+	var root := _new_overlay()
+	var backdrop := _screen_backdrop()
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	_label(root, I18n.t("name_title"), Vector2(0.0, GameConfig.NICK_DIALOG_TITLE_Y), GameConfig.NICK_DIALOG_TITLE_SIZE, GameConfig.GOLD, true)
+	var hint := _hud_label(root, GameConfig.NICK_DIALOG_HINT_POSITION, GameConfig.NICK_DIALOG_HINT_SIZE, GameConfig.NICK_DIALOG_HINT_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	hint.text = I18n.t("name_hint")
+	nick_line_edit = LineEdit.new()
+	nick_line_edit.position = GameConfig.NICK_DIALOG_FIELD_POSITION
+	nick_line_edit.size = GameConfig.NICK_DIALOG_FIELD_SIZE
+	nick_line_edit.max_length = GameConfig.NICK_MAX_LENGTH
+	nick_line_edit.text = Profile.nick
+	nick_line_edit.placeholder_text = I18n.t("name_hint")
+	nick_line_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nick_line_edit.focus_mode = Control.FOCUS_ALL
+	nick_line_edit.text_submitted.connect(_save_nickname)
+	root.add_child(nick_line_edit)
+	nick_error_label = _hud_label(root, Vector2(GameConfig.NICK_DIALOG_HINT_POSITION.x, GameConfig.NICK_DIALOG_ERROR_Y), GameConfig.NICK_DIALOG_ERROR_SIZE, GameConfig.NICK_DIALOG_ERROR_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	nick_error_label.add_theme_color_override("font_color", Color("ff7474"))
+	var save_button := _button(root, I18n.t("name_save"), Vector2(0.0, GameConfig.NICK_DIALOG_BUTTON_Y), func(): _save_nickname(nick_line_edit.text))
+	save_button.grab_focus()
+	nick_line_edit.grab_focus()
+	nick_line_edit.caret_column = nick_line_edit.text.length()
+
+func _save_nickname(value: String) -> void:
+	var cleaned := NicknameRules.normalize(value)
+	if not NicknameRules.is_valid(cleaned):
+		if is_instance_valid(nick_error_label): nick_error_label.text = I18n.t("name_invalid")
+		return
+	Profile.nick = cleaned
+	Profile.save()
+	if nick_dialog_returns_to_characters:
+		_build_characters()
+	else:
+		_build_menu()
 
 func _cycle_character(direction: int) -> void:
 	var keys := ["mago", "trol", "gnomo", "nigro"]
@@ -821,19 +1307,27 @@ func _build_settings() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	_label(root, I18n.t("settings"), Vector2(0, 130), 44, GameConfig.GOLD, true)
-	_button(root, "Reducir movimiento: %s" % ("Sí" if Settings.reduce_motion else "No"), Vector2(0, 235), func():
+	_button(root, "%s: %s" % [I18n.t("settings_reduce_motion"), I18n.t("settings_yes") if Settings.reduce_motion else I18n.t("settings_no")], Vector2(0, 215), func():
 		Settings.reduce_motion = not Settings.reduce_motion
 		Settings.save()
 		_build_settings())
-	_button(root, "Escala UI: %d%%" % int(Settings.ui_scale * 100.0), Vector2(0, 300), func():
+	_button(root, "%s: %d%%" % [I18n.t("settings_ui_scale"), int(Settings.ui_scale * 100.0)], Vector2(0, 275), func():
 		Settings.ui_scale = 1.0 if Settings.ui_scale >= 1.5 else Settings.ui_scale + 0.25
 		Settings.save()
 		_build_settings())
-	_button(root, "Idioma: %s" % I18n.language, Vector2(0, 365), func():
+	var display_mode := I18n.t("settings_fullscreen") if Settings.window_fullscreen else I18n.t("settings_windowed")
+	_button(root, "%s: %s" % [I18n.t("settings_display_mode"), display_mode], Vector2(0, GameConfig.SETTINGS_DISPLAY_MODE_Y), func():
+		Settings.toggle_fullscreen()
+		_build_settings())
+	var window_size: Vector2i = GameConfig.WINDOW_SIZE_OPTIONS[Settings.window_size_index]
+	_button(root, "%s: %d×%d" % [I18n.t("settings_window_size"), window_size.x, window_size.y], Vector2(0, GameConfig.SETTINGS_WINDOW_SIZE_Y), func():
+		Settings.cycle_window_size()
+		_build_settings())
+	_button(root, "%s: %s" % [I18n.t("settings_language"), I18n.language], Vector2(0, GameConfig.SETTINGS_LANGUAGE_Y), func():
 		I18n.set_language("ca" if I18n.language == "es" else ("en" if I18n.language == "ca" else "es"))
 		Settings.save()
 		_build_settings())
-	_button(root, I18n.t("menu"), Vector2(0, 440), _build_menu)
+	_button(root, I18n.t("menu"), Vector2(0, GameConfig.SETTINGS_MENU_Y), _build_menu)
 
 func _build_pause() -> void:
 	_clear_hud()
@@ -846,10 +1340,27 @@ func _build_hud() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	if state == "menu": return
+	if state in ["playing", "countdown"]:
+		var fog_rect := ColorRect.new()
+		fog_rect.position = Vector2.ZERO
+		fog_rect.size = Vector2(1280.0, 720.0)
+		fog_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fog_rect.z_index = -1
+		fog_material = ShaderMaterial.new()
+		fog_material.shader = SAFE_ZONE_FOG_SHADER
+		fog_material.set_shader_parameter("fog_texture", SAFE_ZONE_FOG_TEXTURE)
+		fog_material.set_shader_parameter("logical_size", Vector2(1280.0, 720.0))
+		fog_material.set_shader_parameter("tile_size", GameConfig.ZONE_FOG_TILE_SIZE)
+		fog_material.set_shader_parameter("fog_alpha", GameConfig.ZONE_FOG_ALPHA)
+		fog_material.set_shader_parameter("scroll_y_ratio", GameConfig.ZONE_FOG_SCROLL_Y_RATIO)
+		fog_rect.material = fog_material
+		root.add_child(fog_rect)
 	score_name_labels.clear()
 	score_tag_labels.clear()
 	score_number_labels.clear()
 	score_portraits.clear()
+	score_frames.clear()
+	score_frame_skulls.clear()
 	score_crowns.clear()
 	score_values.clear()
 	score_change_times.clear()
@@ -871,6 +1382,16 @@ func _build_hud() -> void:
 		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		portrait.texture = load("res://assets/ui/retrato_mago_coral.png")
 		root.add_child(portrait)
+		var frame := TextureRect.new()
+		frame.position = Vector2(card_x[slot] + 3.0, 10.0)
+		frame.size = Vector2(50.0, 50.0)
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(frame)
+		var skull_overlay := _hud_label(root, Vector2(card_x[slot] + 12.0, 23.0), Vector2(32.0, 28.0), 18, HORIZONTAL_ALIGNMENT_CENTER)
+		skull_overlay.text = "☠"
+		skull_overlay.visible = false
+		score_frame_skulls.append(skull_overlay)
 		var crown := TextureRect.new()
 		crown.position = Vector2(card_x[slot] + 11, 3)
 		crown.size = Vector2(34, 20)
@@ -887,6 +1408,7 @@ func _build_hud() -> void:
 		score_tag_labels.append(tag_label)
 		score_number_labels.append(number)
 		score_portraits.append(portrait)
+		score_frames.append(frame)
 		score_crowns.append(crown)
 		score_values.append(-1)
 		score_change_times.append(0)
@@ -901,24 +1423,66 @@ func _build_hud() -> void:
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
 	var slot_texture := TextureRect.new()
-	slot_texture.texture = load("res://assets/ui/ranura.png")
+	slot_texture.name = "SpellSlot"
+	slot_texture.texture = SPELL_SLOT_TEXTURE
 	slot_texture.position = Vector2(12, 626)
 	slot_texture.size = Vector2(80, 80)
 	slot_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	slot_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	root.add_child(slot_texture)
+	var glow := TextureRect.new()
+	glow.name = "SpellGlow"
+	glow.texture = SPELL_GLOW_TEXTURE
+	glow.position = Vector2(12, 626)
+	glow.size = Vector2(80, 80)
+	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glow.visible = false
+	root.add_child(glow)
 	var spell_icon := TextureRect.new()
 	spell_icon.name = "SpellIcon"
-	spell_icon.position = Vector2(28, 642)
-	spell_icon.size = Vector2(48, 48)
+	spell_icon.position = Vector2(31, 645)
+	spell_icon.size = Vector2(42, 42)
 	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	spell_icon.visible = false
 	root.add_child(spell_icon)
-	var spell_key := _hud_label(root, Vector2(65, 675), Vector2(34, 26), 18, HORIZONTAL_ALIGNMENT_CENTER)
-	spell_key.text = "E"
-	var spell_name := _hud_label(root, Vector2(99, 651), Vector2(170, 30), 17, HORIZONTAL_ALIGNMENT_LEFT)
+	var spell_key := TextureRect.new()
+	spell_key.name = "SpellKey"
+	spell_key.texture = SPELL_KEY_E_TEXTURE
+	spell_key.position = Vector2(65, 675)
+	spell_key.size = Vector2(26, 26)
+	spell_key.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	spell_key.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	spell_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(spell_key)
+	var spell_name := _hud_label(root, Vector2(101, 651), Vector2(180, 34), 17, HORIZONTAL_ALIGNMENT_LEFT)
 	spell_name.name = "SpellName"
+	var notice := Panel.new()
+	notice.name = "SpellNotice"
+	notice.position = Vector2(18, 526)
+	notice.size = Vector2(330, 86)
+	var notice_style := StyleBoxFlat.new()
+	notice_style.bg_color = Color("241838")
+	notice_style.border_color = GameConfig.GOLD
+	notice_style.set_border_width_all(2)
+	notice_style.set_corner_radius_all(8)
+	notice.add_theme_stylebox_override("panel", notice_style)
+	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	notice.visible = false
+	root.add_child(notice)
+	var notice_icon := TextureRect.new()
+	notice_icon.name = "SpellNoticeIcon"
+	notice_icon.position = Vector2(10, 12)
+	notice_icon.size = Vector2(58, 58)
+	notice_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	notice_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	notice.add_child(notice_icon)
+	var notice_name := _hud_label(notice, Vector2(76, 8), Vector2(238, 31), 20, HORIZONTAL_ALIGNMENT_LEFT)
+	notice_name.name = "SpellNoticeName"
+	var notice_text := _hud_label(notice, Vector2(76, 42), Vector2(238, 34), 15, HORIZONTAL_ALIGNMENT_LEFT)
+	notice_text.name = "SpellNoticeText"
 	var pause := Button.new()
 	pause.text = "Ⅱ"
 	pause.position = Vector2(1200, 648)
@@ -968,39 +1532,211 @@ func _show_results() -> void:
 	_clear_hud()
 	state = "results"
 	results_elapsed = 0.0
+	results_characters.clear()
+	results_bubbles.clear()
+	results_emote_cooldown = 0.0
 	var root := _new_overlay()
-	root.add_child(_screen_backdrop())
-	_label(root, "%s  %s" % [I18n.t("winner"), String(results_ranking[0].get("name", ""))], Vector2(0, 36), 42, GameConfig.GOLD, true)
+	var backdrop := TextureRect.new()
+	backdrop.texture = load("res://assets/ui/resultados_fondo.png")
+	backdrop.size = Vector2(1280.0, 720.0)
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	var podium := TextureRect.new()
+	podium.texture = load("res://assets/ui/podio.png")
+	podium.position = Vector2(280.0, 413.0)
+	podium.size = Vector2(720.0, 267.0)
+	podium.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	podium.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(podium)
+	_label(root, I18n.t("winner_named") % String(results_ranking[0].get("name", "")), Vector2(0, 26), 44, GameConfig.GOLD, true)
+	var podium_rank_for_player: Array[int] = []
+	for place_index in range(results_ranking.size()):
+		var player: Dictionary = results_ranking[place_index]
+		var place := place_index + 1
+		var center: Vector2 = GameConfig.RESULTS_PODIUM_TOPS.get(place, Vector2(1100.0, 602.0))
+		var sprite := TextureRect.new()
+		sprite.name = "ResultCharacter%d" % place_index
+		sprite.position = center - Vector2(GameConfig.RESULTS_CHARACTER_SIZE.x * 0.5, GameConfig.RESULTS_CHARACTER_SIZE.y)
+		sprite.size = GameConfig.RESULTS_CHARACTER_SIZE
+		sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(sprite)
+		results_characters.append(sprite)
+		podium_rank_for_player.append(place_index)
+		_update_result_character(place_index, "win" if place == 1 else ("hurt" if place == 4 else "idle"))
+		var plaque_x := center.x - 96.0
+		if place == 4: plaque_x = 1000.0
+		var plaque := Panel.new()
+		plaque.position = Vector2(plaque_x, 590.0 if place < 4 else 555.0)
+		plaque.size = Vector2(192.0, 48.0)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("241838", 0.94)
+		style.border_color = Color("8a6b45")
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(8)
+		plaque.add_theme_stylebox_override("panel", style)
+		root.add_child(plaque)
+		var name_label := _hud_label(plaque, Vector2(8.0, 0.0), Vector2(120.0, 48.0), 17, HORIZONTAL_ALIGNMENT_LEFT)
+		name_label.text = String(player.get("name", ""))
+		var coin_icon := TextureRect.new()
+		var coin_atlas := AtlasTexture.new()
+		coin_atlas.atlas = COIN_TEXTURE
+		coin_atlas.region = Rect2(0.0, 0.0, 64.0, 64.0)
+		coin_icon.texture = coin_atlas
+		coin_icon.position = Vector2(128.0, 11.0)
+		coin_icon.size = Vector2(26.0, 26.0)
+		coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plaque.add_child(coin_icon)
+		var score_label := _hud_label(plaque, Vector2(151.0, 0.0), Vector2(34.0, 48.0), 18, HORIZONTAL_ALIGNMENT_RIGHT)
+		score_label.text = str(int(player.get("score", 0)))
+		score_label.add_theme_color_override("font_color", GameConfig.GOLD)
+		if place == 1:
+			var crown := TextureRect.new()
+			crown.texture = load("res://assets/characters/crown.png")
+			crown.position = center + Vector2(-24.0, -GameConfig.RESULTS_CHARACTER_SIZE.y - 30.0)
+			crown.size = Vector2(48.0, 32.0)
+			crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			root.add_child(crown)
+	if not Profile.new_unlocks.is_empty(): _add_unlock_card(root, Profile.new_unlocks[0])
+	_build_result_emote_bar(root)
+	var main_button := _button(root, I18n.t("main_menu"), Vector2(0.0, 600.0), _build_menu)
+	main_button.position = Vector2(920.0, 632.0)
+	main_button.size = Vector2(170.0, 54.0)
+	var again_button := _button(root, I18n.t("again"), Vector2(0.0, 600.0), func(): _begin_match(mode == "classic", selected_arena_id))
+	again_button.position = Vector2(1100.0, 632.0)
+	again_button.size = Vector2(150.0, 54.0)
+	main_button.grab_focus()
+	result_bot_emote_at.clear()
+	for player in results_ranking:
+		result_bot_emote_at.append(rng.randf_range(2.0, 10.0) if bool(player.get("is_bot", false)) else -1.0)
+	for index in range(results_characters.size()):
+		var character_node := results_characters[index]
+		var target_y := character_node.position.y
+		character_node.position.y = -150.0 - index * 35.0
+		if not Settings.reduce_motion:
+			var tween := create_tween()
+			tween.tween_interval(index * 0.3)
+			tween.tween_property(character_node, "position:y", target_y, 0.65).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		else:
+			character_node.position.y = target_y
+
+func _update_result_character(index: int, animation_name: String) -> void:
+	if index < 0 or index >= results_characters.size(): return
+	var player: Dictionary = results_ranking[index]
+	var sheet: Texture2D = character_sheets.get("%s_%s" % [player.get("character", "mago"), player.get("sprite_color", "coral")])
+	if sheet == null: return
+	var anim: Dictionary = character_metadata.get("animations", {}).get(animation_name, {"row": 0, "frames": 6, "fps": 6})
+	var frame_w := int(character_metadata.get("frame_w", 224))
+	var frame_h := int(character_metadata.get("frame_h", 256))
+	var frame := posmod(floori(results_elapsed * float(anim.get("fps", 6))), int(anim.get("frames", 1)))
+	var atlas := AtlasTexture.new()
+	atlas.atlas = sheet
+	atlas.region = Rect2(frame * frame_w, int(anim.get("row", 0)) * frame_h, frame_w, frame_h)
+	results_characters[index].texture = atlas
+
+func _build_result_emote_bar(root: Control) -> void:
+	var equipped: Array = Profile.cosmetics.get("emotes", ["risa", "enfado", "gg", "corazon"])
+	for index in range(4):
+		var emote_id := String(equipped[index]) if index < equipped.size() else "risa"
+		var icon := _result_emote_icon(emote_id)
+		icon.position = Vector2(20.0 + index * 66.0, GameConfig.RESULTS_EMOTE_BAR_Y)
+		icon.size = Vector2(48.0, 48.0)
+		root.add_child(icon)
+		var key := _hud_label(root, Vector2(20.0 + index * 66.0, 690.0), Vector2(48.0, 24.0), 16, HORIZONTAL_ALIGNMENT_CENTER)
+		key.text = str(index + 1)
+
+func _result_emote_icon(emote_id: String) -> TextureRect:
+	var icon := TextureRect.new()
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load("res://assets/ui/emotes.png")
+	var ids := ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
+	var frame := ids.find(emote_id)
+	if frame < 0: frame = 0
+	atlas.region = Rect2(frame * 128.0, 0.0, 128.0, 128.0)
+	icon.texture = atlas
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+func _launch_result_emote(index: int) -> void:
+	if index < 0 or index >= results_ranking.size() or results_emote_cooldown > 0.0: return
+	var equipped: Array = Profile.cosmetics.get("emotes", ["risa", "enfado", "gg", "corazon"])
+	if equipped.is_empty(): return
+	var emote_id := String(equipped[posmod(index, equipped.size())])
+	_add_result_emote(index, emote_id)
+	results_emote_cooldown = GameConfig.RESULTS_EMOTE_COOLDOWN
+	results_elapsed = 0.0
+
+func _add_result_emote(index: int, emote_id: String) -> void:
+	if index < 0 or index >= results_characters.size(): return
+	var bubble := _result_emote_icon(emote_id)
+	bubble.size = Vector2.ONE * GameConfig.RESULTS_EMOTE_SIZE
+	bubble.position = results_characters[index].position + Vector2(24.0, -48.0)
+	hud_root.add_child(bubble)
+	results_bubbles.append({"node": bubble, "player": index, "time": GameConfig.RESULTS_EMOTE_SECONDS})
+
+func _update_result_emotes(delta: float) -> void:
+	for index in range(results_characters.size()): _update_result_character(index, "win" if index == 0 else ("hurt" if index == 3 else "idle"))
+	for index in range(results_bubbles.size() - 1, -1, -1):
+		var bubble: Dictionary = results_bubbles[index]
+		bubble.time = float(bubble.time) - delta
+		var char_index := int(bubble.player)
+		if char_index < results_characters.size(): (bubble.node as Control).position = results_characters[char_index].position + Vector2(24.0, -48.0)
+		if float(bubble.time) <= 0.0:
+			(bubble.node as Control).queue_free()
+			results_bubbles.remove_at(index)
 	for index in range(results_ranking.size()):
-		var player: Dictionary = results_ranking[index]
-		var pedestal := ColorRect.new()
-		var pedestal_height: int = [58, 44, 34, 28][index]
-		pedestal.position = Vector2(408 + index * 150, 315 - pedestal_height)
-		pedestal.size = Vector2(94, pedestal_height)
-		pedestal.color = player.color.darkened(0.35)
-		pedestal.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		root.add_child(pedestal)
-		var portrait := TextureRect.new()
-		portrait.position = Vector2(420 + index * 150, 130)
-		portrait.size = Vector2(70, 70)
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.texture = load("res://assets/ui/retrato_%s_%s.png" % [player.get("character", "mago"), player.get("sprite_color", "coral")])
-		root.add_child(portrait)
-		_label(root, "%d · %s" % [index + 1, player.name], Vector2(-185 + index * 150, 204), 19, player.color, false)
-		_label(root, str(player.score), Vector2(-185 + index * 150, 232), 26, Color.WHITE, true)
-	var award_lines := PackedStringArray()
-	for award_name in results_awards:
-		award_lines.append("%s: %s" % [award_name, results_awards[award_name]])
-	_label(root, "  ·  ".join(award_lines), Vector2(0, 328), 16, Color("b8a9d1"), false)
-	_label(root, "+%d XP   ·   Nivel %d" % [results_xp, Profile.level() + 1], Vector2(0, 386), 22, Color.WHITE, false)
-	_button(root, I18n.t("main_menu"), Vector2(0, 455), _build_menu)
-	_button(root, I18n.t("again"), Vector2(0, 519), func(): _begin_match(mode == "classic"))
+		if index < result_bot_emote_at.size() and result_bot_emote_at[index] >= 0.0 and results_elapsed >= result_bot_emote_at[index]:
+			var ids := ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
+			_add_result_emote(index, ids[rng.randi_range(0, ids.size() - 1)])
+			result_bot_emote_at[index] = results_elapsed + rng.randf_range(4.0, 8.0)
+
+func _add_unlock_card(root: Control, unlock: Dictionary) -> void:
+	var card := Panel.new()
+	card.position = Vector2(24.0, 505.0)
+	card.size = Vector2(230.0, 112.0)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("241838", 0.96)
+	style.border_color = GameConfig.GOLD
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	card.add_theme_stylebox_override("panel", style)
+	root.add_child(card)
+	var title := _hud_label(card, Vector2(8, 2), Vector2(214, 32), 17, HORIZONTAL_ALIGNMENT_CENTER)
+	title.text = I18n.t("unlock_new")
+	if String(unlock.type) == "frame":
+		var frame := TextureRect.new()
+		frame.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if String(unlock.id) == "calavera" else unlock.id))
+		frame.position = Vector2(80, 35)
+		frame.size = Vector2(68, 68)
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(frame)
+	elif String(unlock.type) == "emote":
+		var emote_icon := _result_emote_icon(String(unlock.id))
+		emote_icon.position = Vector2(82, 35)
+		emote_icon.size = Vector2(64, 64)
+		card.add_child(emote_icon)
+	else:
+		var trail_swatch := ColorRect.new()
+		trail_swatch.position = Vector2(102, 46)
+		trail_swatch.size = Vector2(24, 48)
+		trail_swatch.color = {"oro": GameConfig.GOLD, "escarcha": Color("7fe7ff"), "almas": Color("b06bff")}.get(String(unlock.id), Color.WHITE)
+		card.add_child(trail_swatch)
+	var name := _hud_label(card, Vector2(6, 75), Vector2(218, 30), 16, HORIZONTAL_ALIGNMENT_CENTER)
+	name.text = I18n.t("cosmetic_" + String(unlock.id))
 
 func _end_match_cleanup() -> void:
 	players.clear()
 	coins.clear()
 	chests.clear()
+	chest_fade_alpha.clear()
 	opened_chests.clear()
 	hazard_runtime.clear()
 	obstacle_rects.clear()
@@ -1013,16 +1749,35 @@ func _end_match_cleanup() -> void:
 	elapsed = 0.0
 	remaining = 90.0
 	countdown = 0.0
+	safe_zone_step = 0
+	safe_zone_warning_step = 0
+	fog_material = null
 	end_wait = 0.0
 	bots_dash_global_left = 0.0
 	score_name_labels.clear()
 	score_tag_labels.clear()
 	score_number_labels.clear()
 	score_portraits.clear()
+	score_frames.clear()
+	score_frame_skulls.clear()
 	score_crowns.clear()
 	score_values.clear()
 	score_change_times.clear()
 	queue_redraw()
+
+func _add_dash_trail(position: Vector2, player_color: Color) -> void:
+	var trail_id := String(Profile.cosmetics.get("trail", "color"))
+	var trail_color := player_color
+	if trail_id == "oro": trail_color = GameConfig.GOLD
+	elif trail_id == "escarcha": trail_color = Color("7fe7ff")
+	elif trail_id == "almas": trail_color = Color("b06bff")
+	dash_trails.append({"pos": position, "color": trail_color, "time": GameConfig.DASH_TRAIL_LIFETIME})
+
+func _update_dash_trails(delta: float) -> void:
+	dash_trail_emit = maxf(0.0, dash_trail_emit - delta)
+	for index in range(dash_trails.size() - 1, -1, -1):
+		dash_trails[index].time = float(dash_trails[index].time) - delta
+		if float(dash_trails[index].time) <= 0.0: dash_trails.remove_at(index)
 
 func _screen_backdrop() -> ColorRect:
 	var backdrop := ColorRect.new()
@@ -1032,7 +1787,7 @@ func _screen_backdrop() -> ColorRect:
 	return backdrop
 
 func _draw() -> void:
-	if state in ["menu", "results", "match_end"]:
+	if state in ["menu", "results", "match_end", "nickname"]:
 		draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
 		return
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
@@ -1042,6 +1797,11 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), Color("2b3a2a"))
 	_draw_arena_hazards()
+	for trail in dash_trails:
+		var alpha := clampf(float(trail.time) / GameConfig.DASH_TRAIL_LIFETIME, 0.0, 1.0)
+		var color: Color = trail.color
+		color.a = alpha * 0.72
+		draw_circle(trail.pos, GameConfig.DASH_TRAIL_RADIUS * alpha, color)
 	for coin in coins:
 		var pos: Vector2 = coin.pos
 		var phase := float(coin.get("phase", 0.0))
@@ -1049,12 +1809,13 @@ func _draw() -> void:
 		var coin_bounce := GameConfig.COIN_BOB_PIXELS * absf(sin(elapsed * GameConfig.COIN_BOB_SPEED + phase))
 		var coin_meta: Dictionary = item_metadata.get("doblon", {})
 		var coin_size := Vector2(int(coin_meta.get("frame_w", 64)), int(coin_meta.get("frame_h", 64)))
-		_draw_strip_frame(COIN_TEXTURE, coin_size, floori(elapsed * float(coin_meta.get("fps", 10.0)) + phase), pos - Vector2(0.0, coin_bounce), float(coin_meta.get("scale", 0.5)), int(coin_meta.get("frames", 8)))
-	for chest in chests:
+		_draw_strip_frame(COIN_TEXTURE, coin_size, floori(elapsed * float(coin_meta.get("fps", 10.0)) + phase), pos - Vector2(0.0, coin_bounce), float(coin_meta.get("scale", 0.5)), int(coin_meta.get("frames", 8)), Color(1.0, 1.0, 1.0, float(coin.get("fade_alpha", 1.0))))
+	for chest_index in range(chests.size()):
+		var chest: Vector2 = chests[chest_index]
 		var chest_meta: Dictionary = item_metadata.get("cofre", {})
 		var chest_size := Vector2(int(chest_meta.get("frame_w", 224)), int(chest_meta.get("frame_h", 256)))
 		var chest_bounce := GameConfig.CHEST_BOB_PIXELS * sin(elapsed * GameConfig.CHEST_BOB_SPEED)
-		_draw_strip_frame(CHEST_TEXTURE, chest_size, 0, chest - Vector2(0.0, chest_bounce), float(chest_meta.get("scale", 0.5)), int(chest_meta.get("frames", 6)))
+		_draw_strip_frame(CHEST_TEXTURE, chest_size, 0, chest - Vector2(0.0, chest_bounce), float(chest_meta.get("scale", 0.5)), int(chest_meta.get("frames", 6)), Color(1.0, 1.0, 1.0, chest_fade_alpha[chest_index]))
 	for chest in opened_chests:
 		var opened_meta: Dictionary = item_metadata.get("cofre", {})
 		var opened_size := Vector2(int(opened_meta.get("frame_w", 224)), int(opened_meta.get("frame_h", 256)))
@@ -1077,33 +1838,73 @@ func _draw() -> void:
 			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale))
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height))
 			draw_set_transform(OFFSET)
+		var name_color: Color = player.color if i == 0 else Color.WHITE
+		var name_text := (I18n.t("you") + " · " if i == 0 else "") + String(player.name)
+		var name_font: Font = player_name_font if player_name_font != null else ThemeDB.fallback_font
+		var name_size := GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE if i == 0 else GameConfig.PLAYER_NAME_FONT_SIZE
+		var name_position: Vector2 = pos + Vector2(-GameConfig.PLAYER_NAME_WIDTH * 0.5, GameConfig.PLAYER_NAME_Y)
+		draw_string_outline(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, GameConfig.PLAYER_NAME_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
+		draw_string(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, name_color)
+		if i == 0:
+			var arrow_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y - GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE - GameConfig.PLAYER_ARROW_NAME_GAP)
+			draw_colored_polygon(PackedVector2Array([arrow_center + Vector2(-GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(0.0, GameConfig.PLAYER_ARROW_TIP_LENGTH)]), name_color)
+			var aura_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_AURA_CENTER_Y)
+			var aura_alpha := GameConfig.PLAYER_AURA_REDUCED_ALPHA if Settings.reduce_motion else (GameConfig.PLAYER_AURA_MIN_ALPHA + GameConfig.PLAYER_AURA_ALPHA_RANGE * (sin(elapsed * GameConfig.PLAYER_AURA_PULSE_SPEED) * 0.5 + 0.5))
+			draw_arc(aura_center, GameConfig.PLAYER_AURA_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, Color(name_color, aura_alpha), GameConfig.PLAYER_AURA_WIDTH, true)
 		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
 		if i == 0 and player.combo > 1:
-			draw_string(ThemeDB.fallback_font, pos + Vector2(27, -16), "x%d · %d" % [Scoring.multiplier(player.combo, mode == "classic"), player.combo], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GameConfig.GOLD)
+			var badge_center: Vector2 = pos + GameConfig.COMBO_BADGE_OFFSET
+			draw_circle(badge_center, GameConfig.COMBO_BADGE_RADIUS, Color("241838", 0.92))
+			draw_arc(badge_center, GameConfig.COMBO_BADGE_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, GameConfig.GOLD, GameConfig.COMBO_BADGE_OUTLINE_WIDTH, true)
+			var badge_text_position := badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_OFFSET_Y)
+			var badge_text_width := GameConfig.COMBO_BADGE_RADIUS * GameConfig.COMBO_BADGE_DIAMETER_FACTOR
+			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo, mode == "classic"), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, Color.WHITE)
+			draw_string(ThemeDB.fallback_font, badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_BOTTOM_Y), str(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_COUNT_SIZE, GameConfig.GOLD)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
+	if safe_zone_warning_step > safe_zone_step:
+		var warning_rect := ZoneRules.safe_rect(safe_zone_step + 1)
+		var warning_alpha := 0.78 if Settings.reduce_motion else (0.55 + 0.45 * sin(elapsed * GameConfig.ZONE_WARNING_FLASH_SPEED))
+		draw_rect(warning_rect, Color(GameConfig.ZONE_WARNING_COLOR, warning_alpha), false, GameConfig.ZONE_WARNING_LINE_WIDTH)
 	if roll_time > 0.0 and roll_player >= 0 and roll_player < players.size():
 		var spell_meta: Dictionary = item_metadata.get("hechizos", {})
 		var spell_size := Vector2(int(spell_meta.get("frame_w", 128)), int(spell_meta.get("frame_h", 128)))
 		var roll_frame := posmod(floori(elapsed * 20.0), ITEMS.size())
 		_draw_strip_frame(SPELL_TEXTURE, spell_size, roll_frame, players[roll_player].pos + Vector2(0.0, -94.0), 0.5, ITEMS.size())
-	for effect in floating:
-		draw_string(ThemeDB.fallback_font, effect.pos, effect.text, HORIZONTAL_ALIGNMENT_CENTER, -1, 22, effect.color)
 	if mode == "voodoo" and remaining <= 15.0:
 		draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), Color(1.0, 0.72, 0.12, 0.035 + 0.025 * sin(elapsed * 8.0)), false, 7.0)
+	draw_set_transform(Vector2.ZERO)
+	for effect in floating:
+		var duration := float(effect.duration)
+		var age := duration - float(effect.time)
+		var pop := 1.0 if Settings.reduce_motion else (GameConfig.FLOAT_POP_SCALE if age <= 0.0 else (1.0 + (GameConfig.FLOAT_POP_SCALE - 1.0) * maxf(0.0, 1.0 - age / GameConfig.FLOAT_POP_SECONDS)))
+		var alpha := clampf(float(effect.time) / GameConfig.FLOAT_FADE_SECONDS, 0.0, 1.0)
+		var color := Color(effect.color, alpha)
+		if bool(effect.is_coin):
+			var points := int(String(effect.text).trim_prefix("+"))
+			var coin_font_size := GameConfig.FLOAT_COIN_BONUS_FONT_SIZE if points >= 3 else GameConfig.FLOAT_COIN_FONT_SIZE
+			var font := floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font
+			var text_position: Vector2 = effect.pos - Vector2(GameConfig.FLOAT_COIN_TEXT_WIDTH * 0.5, 0.0)
+			draw_string_outline(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_COIN_TEXT_WIDTH, roundi(coin_font_size * pop), GameConfig.FLOAT_COIN_OUTLINE_SIZE, Color(GameConfig.PLAYER_NAME_OUTLINE_COLOR, alpha))
+			draw_string(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_COIN_TEXT_WIDTH, roundi(coin_font_size * pop), color)
+		else:
+			var notice_font_size := GameConfig.FLOAT_NOTICE_LARGE_FONT_SIZE if String(effect.text) in [I18n.t("voodoo_combo"), I18n.t("frenzy")] else GameConfig.FLOAT_NOTICE_FONT_SIZE
+			var font := floating_notice_font if floating_notice_font != null else ThemeDB.fallback_font
+			var text_position: Vector2 = effect.pos - Vector2(GameConfig.FLOAT_NOTICE_TEXT_WIDTH * 0.5, 0.0)
+			draw_string_outline(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_NOTICE_TEXT_WIDTH, roundi(notice_font_size * pop), GameConfig.FLOAT_NOTICE_OUTLINE_SIZE, Color(GameConfig.PLAYER_NAME_OUTLINE_COLOR, alpha))
+			draw_string(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_NOTICE_TEXT_WIDTH, roundi(notice_font_size * pop), color)
 	if state == "countdown":
-		draw_set_transform(Vector2.ZERO)
 		var count_text := I18n.t("ready") if countdown < 1.0 else str(ceili(countdown))
 		draw_string(ThemeDB.fallback_font, Vector2(570, 370), count_text, HORIZONTAL_ALIGNMENT_CENTER, 160, 68, Color.WHITE)
 	else:
 		draw_set_transform(Vector2.ZERO)
 
-func _draw_strip_frame(texture: Texture2D, frame_size: Vector2, frame_index: int, center: Vector2, scale_factor: float, frame_count: int) -> void:
+func _draw_strip_frame(texture: Texture2D, frame_size: Vector2, frame_index: int, center: Vector2, scale_factor: float, frame_count: int, modulate: Color = Color.WHITE) -> void:
 	if texture == null or frame_count <= 0:
 		return
 	var frame := posmod(frame_index, frame_count)
 	var draw_size := frame_size * scale_factor
-	draw_texture_rect_region(texture, Rect2(center - draw_size * 0.5, draw_size), Rect2(frame * frame_size.x, 0.0, frame_size.x, frame_size.y))
+	draw_texture_rect_region(texture, Rect2(center - draw_size * 0.5, draw_size), Rect2(frame * frame_size.x, 0.0, frame_size.x, frame_size.y), modulate)
 
 func _draw_arena_hazards() -> void:
 	for hazard_index in range(arena.get("hazards", []).size()):
@@ -1118,10 +1919,16 @@ func _draw_arena_hazards() -> void:
 				if parts.size() >= 4:
 					_draw_hazard_sprite("pinchos", Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5), frame)
 		elif kind == "cinta":
-			for tile in hazard.get("tiles", []):
+			var belt_tiles: Array = hazard.get("tiles", [])
+			var belt_direction := _json_point(hazard.get("dir", [1.0, 0.0]))
+			for tile_index in range(belt_tiles.size()):
+				var tile: Variant = belt_tiles[tile_index]
 				var parts: Variant = tile if tile is Array else String(tile).split(" ", false)
 				if parts.size() >= 4:
-					_draw_hazard_sprite("cinta", Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5), floori(elapsed * 8.0))
+					var tile_center := Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5)
+					_draw_hazard_sprite("cinta", tile_center, floori(elapsed * 8.0), belt_direction.x < 0.0)
+					if tile_index == 0 or tile_index == belt_tiles.size() - 1:
+						_draw_hazard_sprite("cinta_rodillo", tile_center, floori(elapsed * 8.0))
 		elif kind == "portal":
 			var portal_sprite := String(hazard.get("sprite", "portal_cian"))
 			_draw_hazard_sprite(portal_sprite, _json_point(hazard.get("a", [])), floori(elapsed * 8.0))
@@ -1152,7 +1959,7 @@ func _draw_arena_hazards() -> void:
 			var position := _ghost_position(hazard)
 			_draw_hazard_sprite("fantasma", position, floori(elapsed * 8.0))
 
-func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 0) -> void:
+func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 0, flip_h: bool = false) -> void:
 	var info: Dictionary = arena.get("sprites", {}).get(sprite_id, {})
 	if info.is_empty():
 		return
@@ -1167,7 +1974,13 @@ func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 
 	var frame := posmod(frame_index, frame_count)
 	var scale_factor := float(info.get("scale", 0.5))
 	var frame_size := Vector2(frame_width, frame_height) * scale_factor
-	draw_texture_rect_region(texture, Rect2(center - frame_size * 0.5, frame_size), Rect2(frame * frame_width, 0, frame_width, frame_height))
+	var source := Rect2(frame * frame_width, 0, frame_width, frame_height)
+	if flip_h:
+		draw_set_transform(center + OFFSET, 0.0, Vector2(-1.0, 1.0))
+		draw_texture_rect_region(texture, Rect2(-frame_size.x * 0.5, -frame_size.y * 0.5, frame_size.x, frame_size.y), source)
+		draw_set_transform(OFFSET)
+	else:
+		draw_texture_rect_region(texture, Rect2(center - frame_size * 0.5, frame_size), source)
 
 func _json_point(value: Variant) -> Vector2:
 	if value is Array and value.size() >= 2:
@@ -1241,7 +2054,7 @@ func _draw_ray_beams(center: Vector2, angle: float) -> void:
 	var width := int(info.get("frame_w", 584))
 	var height := int(info.get("frame_h", 60))
 	for arm in range(2):
-		draw_set_transform(center, angle + float(arm) * PI, Vector2.ONE * float(info.get("scale", 0.5)))
+		draw_set_transform(center + OFFSET, angle + float(arm) * PI, Vector2.ONE * float(info.get("scale", 0.5)))
 		draw_texture_rect_region(texture, Rect2(6.0, -float(height) * 0.5, width, height), Rect2(0.0, 0.0, width, height))
 	draw_set_transform(OFFSET)
 
@@ -1258,6 +2071,8 @@ func _new_overlay() -> Control:
 	return hud_root
 
 func _clear_hud() -> void:
+	if menu_logo_tween != null and menu_logo_tween.is_running(): menu_logo_tween.kill()
+	menu_logo_tween = null
 	if is_instance_valid(hud): hud.queue_free()
 
 func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color, _bold: bool) -> Label:
@@ -1320,6 +2135,20 @@ func _get_obstacle_rects(obstacles: Array) -> Array[Rect2]:
 			rects.append(Rect2(Vector2(float(values[0]), float(values[1])), Vector2(float(values[2]), float(values[3]))))
 	return rects
 
+func _get_obstacle_hitboxes(obstacles: Array) -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for obstacle in obstacles:
+		var values: Array = obstacle.get("hitbox", obstacle.get("rect", []))
+		if values.size() >= 4:
+			rects.append(Rect2(Vector2(float(values[0]), float(values[1])), Vector2(float(values[2]), float(values[3]))))
+	return rects
+
+func _move_player(position: Vector2, motion: Vector2) -> Vector2:
+	var feet := position + Vector2(0.0, GameConfig.PLAYER_FOOT_OFFSET)
+	var moved_feet := ArenaPhysics.move_circle(feet, motion, GameConfig.PLAYER_FOOT_RADIUS, player_hitbox_rects)
+	var center := moved_feet - Vector2(0.0, GameConfig.PLAYER_FOOT_OFFSET)
+	return Vector2(clampf(center.x, GameConfig.PLAYER_RADIUS, GameConfig.ARENA_SIZE.x - GameConfig.PLAYER_RADIUS), clampf(center.y, GameConfig.PLAYER_RADIUS, GameConfig.ARENA_SIZE.y - GameConfig.PLAYER_RADIUS))
+
 func _separate_players() -> void:
 	for first_index in range(players.size()):
 		for second_index in range(first_index + 1, players.size()):
@@ -1328,7 +2157,7 @@ func _separate_players() -> void:
 			players[second_index].pos = separated[1]
 
 func _spawn_coin() -> void:
-	coins.append({"pos": _random_position(), "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
+	coins.append({"pos": _random_position_in_safe_zone(), "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 
 func _leader_index() -> int:
 	if players.is_empty(): return -1
@@ -1344,7 +2173,9 @@ func _score_order() -> Array[int]:
 	return indices
 
 func _on_floating_text(text: String, world_pos: Vector2, tint: Color) -> void:
-	floating.append({"text": text, "pos": world_pos, "color": tint, "time": 0.8})
+	var is_coin := text.begins_with("+")
+	var duration := GameConfig.FLOAT_COIN_SECONDS if is_coin else GameConfig.FLOAT_NOTICE_SECONDS
+	floating.append({"text": text, "pos": world_pos, "color": tint, "time": duration, "duration": duration, "is_coin": is_coin})
 
 func _on_shake(amount: float) -> void:
 	if not Settings.reduce_motion:
@@ -1354,5 +2185,6 @@ func _on_shake(amount: float) -> void:
 func _animate_floating(delta: float) -> void:
 	for i in range(floating.size() - 1, -1, -1):
 		floating[i].time -= delta
-		floating[i].pos.y -= 24.0 * delta
+		if not Settings.reduce_motion:
+			floating[i].pos.y -= GameConfig.FLOAT_RISE_PIXELS / float(floating[i].duration) * delta
 		if floating[i].time <= 0.0: floating.remove_at(i)
