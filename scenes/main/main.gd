@@ -40,6 +40,8 @@ var rng := RandomNumberGenerator.new()
 var hud: CanvasLayer
 var hud_root: Control
 var floating: Array[Dictionary] = []
+var dash_trails: Array[Dictionary] = []
+var dash_trail_emit := 0.0
 var roll_time := 0.0
 var roll_player := -1
 var roll_result := ""
@@ -55,6 +57,8 @@ var score_name_labels: Array[Label] = []
 var score_tag_labels: Array[Label] = []
 var score_number_labels: Array[Label] = []
 var score_portraits: Array[TextureRect] = []
+var score_frames: Array[TextureRect] = []
+var score_frame_skulls: Array[Label] = []
 var score_crowns: Array[TextureRect] = []
 var score_values: Array[int] = []
 var score_change_times: Array[int] = []
@@ -64,9 +68,14 @@ var results_elapsed := 0.0
 var results_ranking: Array[Dictionary] = []
 var results_awards: Dictionary = {}
 var results_xp := 0
+var results_characters: Array[TextureRect] = []
+var results_bubbles: Array[Dictionary] = []
+var results_emote_cooldown := 0.0
+var result_bot_emote_at: Array[float] = []
 var character_preview: TextureRect
 var character_preview_id := "mago"
 var character_idle := 0.0
+var locker_tab := "character"
 var spell_notice_time := 0.0
 var spell_notice_item := ""
 var last_input_controller := false
@@ -78,6 +87,7 @@ var nick_dialog_returns_to_characters := false
 var player_name_font: Font
 var floating_coin_font: Font
 var floating_notice_font: Font
+var menu_logo_tween: Tween
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
@@ -115,7 +125,9 @@ func _process(delta: float) -> void:
 		return
 	if state == "results":
 		results_elapsed += delta
-		if results_elapsed >= 10.0: _build_menu()
+		results_emote_cooldown = maxf(0.0, results_emote_cooldown - delta)
+		_update_result_emotes(delta)
+		if results_elapsed >= GameConfig.RESULTS_AUTO_MENU_SECONDS: _build_menu()
 		return
 	if state == "menu":
 		if not Settings.reduce_motion: character_idle += delta
@@ -139,6 +151,7 @@ func _process(delta: float) -> void:
 	if state == "playing" and Input.is_action_just_pressed("use_spell"):
 		_use_spell(0)
 	if state == "playing":
+		_update_dash_trails(delta)
 		spell_notice_time = maxf(0.0, spell_notice_time - delta)
 	if state == "countdown":
 		countdown -= delta
@@ -195,6 +208,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		last_input_controller = true
 	elif event is InputEventKey or event is InputEventMouseButton:
 		last_input_controller = false
+	if state == "results":
+		if event is InputEventKey and event.pressed and not event.echo:
+			results_elapsed = 0.0
+			if event.keycode >= KEY_1 and event.keycode <= KEY_4:
+				_launch_result_emote(int(event.keycode - KEY_1))
+				get_viewport().set_input_as_handled()
+		elif event is InputEventJoypadButton and event.pressed:
+			results_elapsed = 0.0
+			var dpad_emote := {JOY_BUTTON_DPAD_UP: 0, JOY_BUTTON_DPAD_RIGHT: 1, JOY_BUTTON_DPAD_DOWN: 2, JOY_BUTTON_DPAD_LEFT: 3}
+			if dpad_emote.has(event.button_index):
+				_launch_result_emote(int(dpad_emote[event.button_index]))
+				get_viewport().set_input_as_handled()
 	if state == "playing" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode in [KEY_SPACE, KEY_SHIFT]:
 			_start_dash(0)
@@ -368,6 +393,9 @@ func _update_player(index: int, delta: float) -> void:
 	if SpellRules.is_active(player, "sheep"): speed *= 0.6
 	var motion: Vector2
 	if player.dash_left > 0.0:
+		if index == 0 and dash_trail_emit <= 0.0:
+			_add_dash_trail(player.pos, player.color)
+			dash_trail_emit = GameConfig.DASH_TRAIL_INTERVAL
 		player.dash_left = maxf(0.0, player.dash_left - delta)
 		motion = player.dash_dir * speed * GameConfig.DASH_MULTIPLIER * delta
 	else:
@@ -450,6 +478,7 @@ func _start_dash(index: int) -> void:
 	var player := players[index]
 	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or SpellRules.is_active(player, "sheep"): return
 	player.dash_left = GameConfig.DASH_DURATION
+	if index == 0: _add_dash_trail(player.pos, player.color)
 	player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 	if player.vel.length() > 0.1: player.dash_dir = player.vel.normalized()
 	Sfx.play_tone(180.0, 0.12)
@@ -909,7 +938,7 @@ func _update_hud() -> void:
 	var leader := _leader_index() if not players.is_empty() else -1
 	for slot in range(score_name_labels.size()):
 		var active := slot < players.size()
-		for control in [score_name_labels[slot], score_tag_labels[slot], score_number_labels[slot], score_portraits[slot]]:
+		for control in [score_name_labels[slot], score_tag_labels[slot], score_number_labels[slot], score_portraits[slot], score_frames[slot], score_frame_skulls[slot]]:
 			control.visible = active
 		score_crowns[slot].visible = active and slot == leader
 		if not active: continue
@@ -921,6 +950,10 @@ func _update_hud() -> void:
 		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
 		var portrait_texture: Texture2D = load(portrait_path)
 		if portrait_texture != null: score_portraits[slot].texture = portrait_texture
+		var frame_id := String(Profile.cosmetics.get("frame", "madera")) if slot == 0 else "madera"
+		var frame_texture: Texture2D = load("res://assets/ui/marco_%s.png" % ("hueso" if frame_id == "calavera" else frame_id))
+		if frame_texture != null: score_frames[slot].texture = frame_texture
+		score_frame_skulls[slot].visible = slot == 0 and frame_id == "calavera"
 		var value := int(player.score)
 		if score_values[slot] != value:
 			score_values[slot] = value
@@ -983,10 +1016,10 @@ func _build_menu() -> void:
 	root.add_child(logo)
 	if not Settings.reduce_motion:
 		logo.position.y = -230
-		var logo_tween := create_tween()
-		logo_tween.tween_property(logo, "position:y", 14.0, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		logo_tween.set_loops()
+		menu_logo_tween = create_tween()
+		menu_logo_tween.tween_property(logo, "position:y", 14.0, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		menu_logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		menu_logo_tween.set_loops()
 	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
 	var actions: Array[Callable] = [func(): _build_arena_select(false), func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
 	for index in range(labels.size()):
@@ -996,7 +1029,6 @@ func _build_menu() -> void:
 			var tween := create_tween()
 			tween.tween_interval(index * 0.05)
 			tween.tween_property(button, "modulate:a", 1.0, 0.2)
-	_label(root, "Nivel %d · %d XP" % [Profile.level() + 1, Profile.xp], Vector2(-222, 666), 16, Color("b8a9d1"), false)
 	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
 
 func _build_arena_select(classic: bool) -> void:
@@ -1073,9 +1105,24 @@ func _select_arena(arena_id: String) -> void:
 	_begin_match(arena_select_classic, arena_id)
 
 func _build_characters() -> void:
+	_build_locker("character")
+
+func _build_locker(tab: String) -> void:
 	_clear_hud()
+	state = "locker"
+	locker_tab = tab
 	var root := _new_overlay()
-	_label(root, I18n.t("characters"), Vector2(0, 65), 42, GameConfig.GOLD, true)
+	_label(root, I18n.t("characters"), Vector2(0, 44), 42, GameConfig.GOLD, true)
+	var tab_ids := ["character", "frame", "trail", "emotes"]
+	var tab_keys := ["locker_character", "locker_frame", "locker_trail", "locker_emotes"]
+	for index in range(tab_ids.size()):
+		var tab_button := _button(root, I18n.t(tab_keys[index]), Vector2(0, 102), Callable(self, "_build_locker").bind(tab_ids[index]))
+		tab_button.position = Vector2(180.0 + index * 235.0, 102.0)
+		tab_button.size = Vector2(210.0, 46.0)
+	if tab != "character":
+		_build_cosmetic_tab(root, tab)
+		_button(root, I18n.t("menu"), Vector2(0, 610), _build_menu)
+		return
 	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
 	character_preview_id = Profile.character
 	character_preview = TextureRect.new()
@@ -1099,6 +1146,80 @@ func _build_characters() -> void:
 	next_button.size = Vector2(64, 54)
 	_button(root, I18n.t("menu"), Vector2(0, 565), _build_menu)
 	character_idle = 0.0
+
+func _build_cosmetic_tab(root: Control, tab: String) -> void:
+	var ids: Array[String] = []
+	var levels: Dictionary = {}
+	if tab == "frame":
+		ids = ["madera", "hueso", "calavera", "plata", "oro", "almas"]
+		levels = GameConfig.FRAME_UNLOCK_LEVELS
+	elif tab == "trail":
+		ids = ["color", "oro", "escarcha", "almas"]
+		levels = GameConfig.TRAIL_UNLOCK_LEVELS
+	else:
+		ids = ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
+		levels = GameConfig.EMOTE_UNLOCK_LEVELS
+	var equipped: Array = Profile.cosmetics.get("emotes", [])
+	for index in range(ids.size()):
+		var item_id := ids[index]
+		var col := index % 4
+		var row := index / 4
+		var card := Panel.new()
+		card.position = Vector2(122.0 + col * 264.0, 180.0 + row * 192.0)
+		card.size = Vector2(230.0, 166.0)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("241838")
+		style.border_color = GameConfig.GOLD if (Profile.cosmetics.get("frame", "madera") == item_id or Profile.cosmetics.get("trail", "color") == item_id or equipped.has(item_id)) else Color("5c496d")
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(8)
+		card.add_theme_stylebox_override("panel", style)
+		root.add_child(card)
+		var icon := TextureRect.new()
+		icon.position = Vector2(82.0, 10.0)
+		icon.size = Vector2(66.0, 66.0)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if tab == "frame":
+			icon.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if item_id == "calavera" else item_id))
+			card.add_child(icon)
+		elif tab == "emotes":
+			icon = _result_emote_icon(item_id)
+			icon.position = Vector2(82.0, 10.0)
+			icon.size = Vector2(66.0, 66.0)
+			card.add_child(icon)
+		else:
+			var swatch := ColorRect.new()
+			swatch.position = Vector2(100.0, 16.0)
+			swatch.size = Vector2(30.0, 52.0)
+			swatch.color = {"color": Color("d9a8ff"), "oro": GameConfig.GOLD, "escarcha": Color("7fe7ff"), "almas": Color("b06bff")}.get(item_id, Color.WHITE)
+			card.add_child(swatch)
+		var title := _hud_label(card, Vector2(4.0, 80.0), Vector2(222.0, 30.0), 17, HORIZONTAL_ALIGNMENT_CENTER)
+		title.text = I18n.t("cosmetic_" + item_id)
+		var unlocked := Profile.level() >= int(levels.get(item_id, 99))
+		var action_text := I18n.t("locker_equipped") if (Profile.cosmetics.get(tab, "") == item_id or equipped.has(item_id)) else I18n.t("locker_select")
+		if not unlocked: action_text = "🔒 " + (I18n.t("unlock_level") % int(levels.get(item_id, 1)))
+		var pick := _button(card, action_text, Vector2(0.0, 119.0), Callable(self, "_select_locker_item").bind(tab, item_id))
+		pick.position = Vector2(8.0, 118.0)
+		pick.size = Vector2(214.0, 40.0)
+
+func _select_locker_item(tab: String, item_id: String) -> void:
+	var levels: Dictionary = GameConfig.EMOTE_UNLOCK_LEVELS if tab == "emotes" else (GameConfig.FRAME_UNLOCK_LEVELS if tab == "frame" else GameConfig.TRAIL_UNLOCK_LEVELS)
+	if Profile.level() < int(levels.get(item_id, 99)): return
+	if tab == "emotes":
+		var emotes: Array = Profile.cosmetics.get("emotes", []).duplicate()
+		if emotes.has(item_id):
+			if emotes.size() > 1: emotes.erase(item_id)
+		else:
+			if emotes.size() >= 4: emotes.pop_front()
+			emotes.append(item_id)
+		for default_emote in ["risa", "enfado", "gg", "corazon"]:
+			if emotes.size() >= 4: break
+			if not emotes.has(default_emote): emotes.append(default_emote)
+		Profile.cosmetics.emotes = emotes
+	else:
+		Profile.cosmetics["frame" if tab == "frame" else "trail"] = item_id
+	Profile.save()
+	_build_locker(tab)
 
 func _build_nickname_dialog(return_to_characters: bool = false) -> void:
 	_clear_hud()
@@ -1238,6 +1359,8 @@ func _build_hud() -> void:
 	score_tag_labels.clear()
 	score_number_labels.clear()
 	score_portraits.clear()
+	score_frames.clear()
+	score_frame_skulls.clear()
 	score_crowns.clear()
 	score_values.clear()
 	score_change_times.clear()
@@ -1259,6 +1382,16 @@ func _build_hud() -> void:
 		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		portrait.texture = load("res://assets/ui/retrato_mago_coral.png")
 		root.add_child(portrait)
+		var frame := TextureRect.new()
+		frame.position = Vector2(card_x[slot] + 3.0, 10.0)
+		frame.size = Vector2(50.0, 50.0)
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(frame)
+		var skull_overlay := _hud_label(root, Vector2(card_x[slot] + 12.0, 23.0), Vector2(32.0, 28.0), 18, HORIZONTAL_ALIGNMENT_CENTER)
+		skull_overlay.text = "☠"
+		skull_overlay.visible = false
+		score_frame_skulls.append(skull_overlay)
 		var crown := TextureRect.new()
 		crown.position = Vector2(card_x[slot] + 11, 3)
 		crown.size = Vector2(34, 20)
@@ -1275,6 +1408,7 @@ func _build_hud() -> void:
 		score_tag_labels.append(tag_label)
 		score_number_labels.append(number)
 		score_portraits.append(portrait)
+		score_frames.append(frame)
 		score_crowns.append(crown)
 		score_values.append(-1)
 		score_change_times.append(0)
@@ -1398,34 +1532,205 @@ func _show_results() -> void:
 	_clear_hud()
 	state = "results"
 	results_elapsed = 0.0
+	results_characters.clear()
+	results_bubbles.clear()
+	results_emote_cooldown = 0.0
 	var root := _new_overlay()
-	root.add_child(_screen_backdrop())
-	_label(root, "%s  %s" % [I18n.t("winner"), String(results_ranking[0].get("name", ""))], Vector2(0, 36), 42, GameConfig.GOLD, true)
+	var backdrop := TextureRect.new()
+	backdrop.texture = load("res://assets/ui/resultados_fondo.png")
+	backdrop.size = Vector2(1280.0, 720.0)
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	var podium := TextureRect.new()
+	podium.texture = load("res://assets/ui/podio.png")
+	podium.position = Vector2(280.0, 413.0)
+	podium.size = Vector2(720.0, 267.0)
+	podium.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	podium.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(podium)
+	_label(root, I18n.t("winner_named") % String(results_ranking[0].get("name", "")), Vector2(0, 26), 44, GameConfig.GOLD, true)
+	var podium_rank_for_player: Array[int] = []
+	for place_index in range(results_ranking.size()):
+		var player: Dictionary = results_ranking[place_index]
+		var place := place_index + 1
+		var center: Vector2 = GameConfig.RESULTS_PODIUM_TOPS.get(place, Vector2(1100.0, 602.0))
+		var sprite := TextureRect.new()
+		sprite.name = "ResultCharacter%d" % place_index
+		sprite.position = center - Vector2(GameConfig.RESULTS_CHARACTER_SIZE.x * 0.5, GameConfig.RESULTS_CHARACTER_SIZE.y)
+		sprite.size = GameConfig.RESULTS_CHARACTER_SIZE
+		sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(sprite)
+		results_characters.append(sprite)
+		podium_rank_for_player.append(place_index)
+		_update_result_character(place_index, "win" if place == 1 else ("hurt" if place == 4 else "idle"))
+		var plaque_x := center.x - 96.0
+		if place == 4: plaque_x = 1000.0
+		var plaque := Panel.new()
+		plaque.position = Vector2(plaque_x, 590.0 if place < 4 else 555.0)
+		plaque.size = Vector2(192.0, 48.0)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("241838", 0.94)
+		style.border_color = Color("8a6b45")
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(8)
+		plaque.add_theme_stylebox_override("panel", style)
+		root.add_child(plaque)
+		var name_label := _hud_label(plaque, Vector2(8.0, 0.0), Vector2(120.0, 48.0), 17, HORIZONTAL_ALIGNMENT_LEFT)
+		name_label.text = String(player.get("name", ""))
+		var coin_icon := TextureRect.new()
+		var coin_atlas := AtlasTexture.new()
+		coin_atlas.atlas = COIN_TEXTURE
+		coin_atlas.region = Rect2(0.0, 0.0, 64.0, 64.0)
+		coin_icon.texture = coin_atlas
+		coin_icon.position = Vector2(128.0, 11.0)
+		coin_icon.size = Vector2(26.0, 26.0)
+		coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plaque.add_child(coin_icon)
+		var score_label := _hud_label(plaque, Vector2(151.0, 0.0), Vector2(34.0, 48.0), 18, HORIZONTAL_ALIGNMENT_RIGHT)
+		score_label.text = str(int(player.get("score", 0)))
+		score_label.add_theme_color_override("font_color", GameConfig.GOLD)
+		if place == 1:
+			var crown := TextureRect.new()
+			crown.texture = load("res://assets/characters/crown.png")
+			crown.position = center + Vector2(-24.0, -GameConfig.RESULTS_CHARACTER_SIZE.y - 30.0)
+			crown.size = Vector2(48.0, 32.0)
+			crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			root.add_child(crown)
+	if not Profile.new_unlocks.is_empty(): _add_unlock_card(root, Profile.new_unlocks[0])
+	_build_result_emote_bar(root)
+	var main_button := _button(root, I18n.t("main_menu"), Vector2(0.0, 600.0), _build_menu)
+	main_button.position = Vector2(920.0, 632.0)
+	main_button.size = Vector2(170.0, 54.0)
+	var again_button := _button(root, I18n.t("again"), Vector2(0.0, 600.0), func(): _begin_match(mode == "classic", selected_arena_id))
+	again_button.position = Vector2(1100.0, 632.0)
+	again_button.size = Vector2(150.0, 54.0)
+	main_button.grab_focus()
+	result_bot_emote_at.clear()
+	for player in results_ranking:
+		result_bot_emote_at.append(rng.randf_range(2.0, 10.0) if bool(player.get("is_bot", false)) else -1.0)
+	for index in range(results_characters.size()):
+		var character_node := results_characters[index]
+		var target_y := character_node.position.y
+		character_node.position.y = -150.0 - index * 35.0
+		if not Settings.reduce_motion:
+			var tween := create_tween()
+			tween.tween_interval(index * 0.3)
+			tween.tween_property(character_node, "position:y", target_y, 0.65).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		else:
+			character_node.position.y = target_y
+
+func _update_result_character(index: int, animation_name: String) -> void:
+	if index < 0 or index >= results_characters.size(): return
+	var player: Dictionary = results_ranking[index]
+	var sheet: Texture2D = character_sheets.get("%s_%s" % [player.get("character", "mago"), player.get("sprite_color", "coral")])
+	if sheet == null: return
+	var anim: Dictionary = character_metadata.get("animations", {}).get(animation_name, {"row": 0, "frames": 6, "fps": 6})
+	var frame_w := int(character_metadata.get("frame_w", 224))
+	var frame_h := int(character_metadata.get("frame_h", 256))
+	var frame := posmod(floori(results_elapsed * float(anim.get("fps", 6))), int(anim.get("frames", 1)))
+	var atlas := AtlasTexture.new()
+	atlas.atlas = sheet
+	atlas.region = Rect2(frame * frame_w, int(anim.get("row", 0)) * frame_h, frame_w, frame_h)
+	results_characters[index].texture = atlas
+
+func _build_result_emote_bar(root: Control) -> void:
+	var equipped: Array = Profile.cosmetics.get("emotes", ["risa", "enfado", "gg", "corazon"])
+	for index in range(4):
+		var emote_id := String(equipped[index]) if index < equipped.size() else "risa"
+		var icon := _result_emote_icon(emote_id)
+		icon.position = Vector2(20.0 + index * 66.0, GameConfig.RESULTS_EMOTE_BAR_Y)
+		icon.size = Vector2(48.0, 48.0)
+		root.add_child(icon)
+		var key := _hud_label(root, Vector2(20.0 + index * 66.0, 690.0), Vector2(48.0, 24.0), 16, HORIZONTAL_ALIGNMENT_CENTER)
+		key.text = str(index + 1)
+
+func _result_emote_icon(emote_id: String) -> TextureRect:
+	var icon := TextureRect.new()
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load("res://assets/ui/emotes.png")
+	var ids := ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
+	var frame := ids.find(emote_id)
+	if frame < 0: frame = 0
+	atlas.region = Rect2(frame * 128.0, 0.0, 128.0, 128.0)
+	icon.texture = atlas
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+func _launch_result_emote(index: int) -> void:
+	if index < 0 or index >= results_ranking.size() or results_emote_cooldown > 0.0: return
+	var equipped: Array = Profile.cosmetics.get("emotes", ["risa", "enfado", "gg", "corazon"])
+	if equipped.is_empty(): return
+	var emote_id := String(equipped[posmod(index, equipped.size())])
+	_add_result_emote(index, emote_id)
+	results_emote_cooldown = GameConfig.RESULTS_EMOTE_COOLDOWN
+	results_elapsed = 0.0
+
+func _add_result_emote(index: int, emote_id: String) -> void:
+	if index < 0 or index >= results_characters.size(): return
+	var bubble := _result_emote_icon(emote_id)
+	bubble.size = Vector2.ONE * GameConfig.RESULTS_EMOTE_SIZE
+	bubble.position = results_characters[index].position + Vector2(24.0, -48.0)
+	hud_root.add_child(bubble)
+	results_bubbles.append({"node": bubble, "player": index, "time": GameConfig.RESULTS_EMOTE_SECONDS})
+
+func _update_result_emotes(delta: float) -> void:
+	for index in range(results_characters.size()): _update_result_character(index, "win" if index == 0 else ("hurt" if index == 3 else "idle"))
+	for index in range(results_bubbles.size() - 1, -1, -1):
+		var bubble: Dictionary = results_bubbles[index]
+		bubble.time = float(bubble.time) - delta
+		var char_index := int(bubble.player)
+		if char_index < results_characters.size(): (bubble.node as Control).position = results_characters[char_index].position + Vector2(24.0, -48.0)
+		if float(bubble.time) <= 0.0:
+			(bubble.node as Control).queue_free()
+			results_bubbles.remove_at(index)
 	for index in range(results_ranking.size()):
-		var player: Dictionary = results_ranking[index]
-		var pedestal := ColorRect.new()
-		var pedestal_height: int = [58, 44, 34, 28][index]
-		pedestal.position = Vector2(408 + index * 150, 315 - pedestal_height)
-		pedestal.size = Vector2(94, pedestal_height)
-		pedestal.color = player.color.darkened(0.35)
-		pedestal.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		root.add_child(pedestal)
-		var portrait := TextureRect.new()
-		portrait.position = Vector2(420 + index * 150, 130)
-		portrait.size = Vector2(70, 70)
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.texture = load("res://assets/ui/retrato_%s_%s.png" % [player.get("character", "mago"), player.get("sprite_color", "coral")])
-		root.add_child(portrait)
-		_label(root, "%d · %s" % [index + 1, player.name], Vector2(-185 + index * 150, 204), 19, player.color, false)
-		_label(root, str(player.score), Vector2(-185 + index * 150, 232), 26, Color.WHITE, true)
-	var award_lines := PackedStringArray()
-	for award_name in results_awards:
-		award_lines.append("%s: %s" % [award_name, results_awards[award_name]])
-	_label(root, "  ·  ".join(award_lines), Vector2(0, 328), 16, Color("b8a9d1"), false)
-	_label(root, "+%d XP   ·   Nivel %d" % [results_xp, Profile.level() + 1], Vector2(0, 386), 22, Color.WHITE, false)
-	_button(root, I18n.t("main_menu"), Vector2(0, 455), _build_menu)
-	_button(root, I18n.t("again"), Vector2(0, 519), func(): _begin_match(mode == "classic", selected_arena_id))
+		if index < result_bot_emote_at.size() and result_bot_emote_at[index] >= 0.0 and results_elapsed >= result_bot_emote_at[index]:
+			var ids := ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
+			_add_result_emote(index, ids[rng.randi_range(0, ids.size() - 1)])
+			result_bot_emote_at[index] = results_elapsed + rng.randf_range(4.0, 8.0)
+
+func _add_unlock_card(root: Control, unlock: Dictionary) -> void:
+	var card := Panel.new()
+	card.position = Vector2(24.0, 505.0)
+	card.size = Vector2(230.0, 112.0)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("241838", 0.96)
+	style.border_color = GameConfig.GOLD
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	card.add_theme_stylebox_override("panel", style)
+	root.add_child(card)
+	var title := _hud_label(card, Vector2(8, 2), Vector2(214, 32), 17, HORIZONTAL_ALIGNMENT_CENTER)
+	title.text = I18n.t("unlock_new")
+	if String(unlock.type) == "frame":
+		var frame := TextureRect.new()
+		frame.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if String(unlock.id) == "calavera" else unlock.id))
+		frame.position = Vector2(80, 35)
+		frame.size = Vector2(68, 68)
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(frame)
+	elif String(unlock.type) == "emote":
+		var emote_icon := _result_emote_icon(String(unlock.id))
+		emote_icon.position = Vector2(82, 35)
+		emote_icon.size = Vector2(64, 64)
+		card.add_child(emote_icon)
+	else:
+		var trail_swatch := ColorRect.new()
+		trail_swatch.position = Vector2(102, 46)
+		trail_swatch.size = Vector2(24, 48)
+		trail_swatch.color = {"oro": GameConfig.GOLD, "escarcha": Color("7fe7ff"), "almas": Color("b06bff")}.get(String(unlock.id), Color.WHITE)
+		card.add_child(trail_swatch)
+	var name := _hud_label(card, Vector2(6, 75), Vector2(218, 30), 16, HORIZONTAL_ALIGNMENT_CENTER)
+	name.text = I18n.t("cosmetic_" + String(unlock.id))
 
 func _end_match_cleanup() -> void:
 	players.clear()
@@ -1453,10 +1758,26 @@ func _end_match_cleanup() -> void:
 	score_tag_labels.clear()
 	score_number_labels.clear()
 	score_portraits.clear()
+	score_frames.clear()
+	score_frame_skulls.clear()
 	score_crowns.clear()
 	score_values.clear()
 	score_change_times.clear()
 	queue_redraw()
+
+func _add_dash_trail(position: Vector2, player_color: Color) -> void:
+	var trail_id := String(Profile.cosmetics.get("trail", "color"))
+	var trail_color := player_color
+	if trail_id == "oro": trail_color = GameConfig.GOLD
+	elif trail_id == "escarcha": trail_color = Color("7fe7ff")
+	elif trail_id == "almas": trail_color = Color("b06bff")
+	dash_trails.append({"pos": position, "color": trail_color, "time": GameConfig.DASH_TRAIL_LIFETIME})
+
+func _update_dash_trails(delta: float) -> void:
+	dash_trail_emit = maxf(0.0, dash_trail_emit - delta)
+	for index in range(dash_trails.size() - 1, -1, -1):
+		dash_trails[index].time = float(dash_trails[index].time) - delta
+		if float(dash_trails[index].time) <= 0.0: dash_trails.remove_at(index)
 
 func _screen_backdrop() -> ColorRect:
 	var backdrop := ColorRect.new()
@@ -1476,6 +1797,11 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), Color("2b3a2a"))
 	_draw_arena_hazards()
+	for trail in dash_trails:
+		var alpha := clampf(float(trail.time) / GameConfig.DASH_TRAIL_LIFETIME, 0.0, 1.0)
+		var color: Color = trail.color
+		color.a = alpha * 0.72
+		draw_circle(trail.pos, GameConfig.DASH_TRAIL_RADIUS * alpha, color)
 	for coin in coins:
 		var pos: Vector2 = coin.pos
 		var phase := float(coin.get("phase", 0.0))
@@ -1745,6 +2071,8 @@ func _new_overlay() -> Control:
 	return hud_root
 
 func _clear_hud() -> void:
+	if menu_logo_tween != null and menu_logo_tween.is_running(): menu_logo_tween.kill()
+	menu_logo_tween = null
 	if is_instance_valid(hud): hud.queue_free()
 
 func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color, _bold: bool) -> Label:
