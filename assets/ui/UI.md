@@ -77,3 +77,12 @@ static func box(path: String) -> StyleBoxTexture:
 | `carta_<arena>.png` | 640×960 | Carta de cada arena para la votación, sin texto: el nombre va en la placa y la premisa en el pergamino |
 | `carta_brillo.png` | 760×1080 | Brillo de la carta ganadora y de la ruleta, centrado encima de la carta |
 | `emotes2.png` | 8 × 128×128 | Emotes nuevos: dado, jarra, rana, zzz, pregunta, jaja, pollo, grito |
+
+## Votación en las esquinas y medallas (fases 11 y 12)
+
+`fase12.json` tiene las posiciones de los cuadrantes y el orden de las medallas.
+
+| Archivo | Tamaño (px) | Uso |
+|---|---|---|
+| `cuadrante_marco.png`, `cuadrante_brillo.png` | 240×160 | Marco 9-slice (margen 40) de cada mapa en la votación; el de brillo es para la ruleta y el ganador |
+| `medallas.png` | 8 × 128×128 | Medallas en partida: primera sangre, venganza, remontada, robo maestro, racha, por los pelos, intocable, rey del combo |

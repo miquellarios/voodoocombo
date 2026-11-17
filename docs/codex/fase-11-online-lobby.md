@@ -3,7 +3,7 @@
 > **Para Codex.** Antes de esta fase tiene que estar terminada la fase 10.
 > Lee `docs/codex/plan-multijugador.md`, el plan del equipo: es la base de esta fase y sus reglas de seguridad y coste valen tal cual.
 > Aquí se concreta para VoodooCombo: no hay vida ni disparos; hay doblones, dash, hechizos y trampas.
-> Referencias visuales: `docs/media/lobby_mazmorra_referencia.png` (lobby) y `docs/media/votacion_referencia.png` (votación de arena).
+> Referencias visuales: `docs/media/lobby_mazmorra_referencia.png` (lobby) y `docs/media/votacion_esquinas_referencia.png` (votación de arena).
 
 ## Decisiones del equipo
 
@@ -140,40 +140,35 @@ Cuando todos los humanos están listos y hay al menos 2 jugadores (contando bots
 
 Se usa entero con teclado y mando.
 
-## 11e · Votación de arena con ruleta
+## 11e · Votación de arena: 4 mapas en las esquinas y ruleta
 
-Tiene que quedar como `docs/media/votacion_referencia.png`.
+Tiene que quedar como `docs/media/votacion_esquinas_referencia.png`.
 
-**Cartas:** `assets/ui/carta_<arena>.png` (640×960), sin texto. El código escribe encima:
-- el **nombre** en la placa de arriba (New Rocker);
-- la **premisa** en el pergamino (Baloo 2, `#3A2A20`).
+**Pantalla:** la pantalla se parte en 4 cuadrantes grandes, **un mapa en cada esquina**, en sentido horario: arriba a la izquierda la Ciénaga, arriba a la derecha la Cripta, abajo a la derecha el Taller y abajo a la izquierda la Biblioteca.
+- **Posiciones:** en `assets/ui/fase12.json` → `votacion.quads_1920`, en 1920×1080. En 1280×720 se multiplican por 2/3.
+- **En cada cuadrante:**
+  - la vista grande de la arena (`assets/ui/arena_<id>_mini.png`) con un degradado oscuro abajo;
+  - el **nombre** en New Rocker y debajo la **premisa** (2 líneas como mucho), con los textos de `fase11b.json`;
+  - los iconos de sus trampas en la esquina de fuera;
+  - los retratos de quien lo ha votado.
+  - Marco 9-slice `cuadrante_marco.png` (margen 40).
+- **En el centro**, un medallón redondo con "¡VOTAD!" y la cuenta atrás, y 4 flechitas apuntando a los cuadrantes.
 
-Las zonas exactas y los textos de las premisas están en `assets/ui/fase11b.json`:
+**Votar:**
+- Con las flechas o el stick vas pasando por los 4 cuadrantes (el que tienes elegido se ve un poco más claro) y confirmas con Espacio o A. También se puede hacer clic.
+- 10 s de tiempo. Se puede cambiar el voto hasta el final, y se acaba antes si todos han votado.
+- Los bots votan al azar en los primeros 3 s.
 
-| Arena | Premisa |
-|---|---|
-| Ciénaga | Aquí se hundió el tesoro de un rey avaro. El barro todavía tiene hambre… y las raíces, memoria. |
-| Cripta | Los muertos guardan sus doblones con celo. Pisa donde no brillan los pinchos y no despiertes al guardián. |
-| Taller | Un gnomo dejó todas sus máquinas encendidas y se fue de vacaciones. Lo que no explota, sale por la cinta. |
-| Biblioteca | Libros que muerden, portales que te escupen y un rayo que nunca duerme. Silencio, por favor. |
+**Ruleta (siempre que hay empate, o si nadie vota):**
+- La luz da vueltas por los cuadrantes empatados **en sentido horario**: el cuadrante encendido cambia a `cuadrante_brillo.png`, se aclara y suena un *tic*.
+- Empieza rápido (0,06 s por salto) y va frenando poco a poco durante unos 3,5 s, como una ruleta de verdad. Los dos últimos saltos dan un poco de suspense.
+- **El ganador:** el marco brilla latiendo, salen destellos, la vista crece un 4 %, el medallón muestra su nombre y suenan *ding* y fanfarria. Los otros tres cuadrantes se oscurecen.
+- Si un mapa gana por votos, sin empate, no hay ruleta: brilla directamente.
+- **El servidor** cuenta los votos, decide la ruleta con la semilla de la partida y manda a todos la lista de saltos, para que todos vean la misma animación.
 
-**Votación:**
-1. Salen las 4 cartas en fila con "¡VOTAD LA ARENA!" y una cuenta atrás de **10 s**.
-2. Cada jugador elige una con las flechas (o el ratón) y confirma.
-   - Su retrato aparece debajo de la carta que ha votado.
-   - Puede cambiar el voto hasta que acabe el tiempo.
-   - Los bots votan al azar en los primeros 3 s.
-3. Si todos han votado, se acaba antes.
-4. **Gana la más votada**: se ilumina con `carta_brillo.png`, crece un poco y suena una fanfarria.
-5. **Empate:** **ruleta de verdad** entre las cartas empatadas.
-   - Un foco de luz salta de carta en carta con un *tic*: rápido al principio y frenando poco a poco (ease-out) durante unos 3 s.
-   - La última carta se queda iluminada, con destellos, *ding* y fanfarria.
-   - Si nadie vota, la ruleta va entre las 4.
-6. **El servidor** cuenta los votos y decide la ruleta con la semilla de la partida, y manda a todos los clientes el orden de los saltos, para que todos vean la misma animación.
+**Contra bots:** el mismo sistema.
 
-**Contra bots:** el mismo sistema (tú votas y los bots también).
-
-**Fase 10f:** esta pantalla sustituye a la de ELIGE ARENA. Si la fase 10 ya está hecha, cambia aquella pantalla por esta.
+**Fase 10f:** esta pantalla sustituye a la de elegir arena. Las cartas (`carta_<arena>.png`) ya no se usan aquí; pueden servir para CÓMO SE JUEGA o la pantalla de carga.
 
 ## 11f · Partida en red
 

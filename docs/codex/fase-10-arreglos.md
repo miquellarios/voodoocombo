@@ -5,7 +5,7 @@
 > - `hud_v2_referencia.png`: partida con nombres, ranura nueva y la niebla cerrándose;
 > - `resultados_referencia.png`: podio con emotes.
 >
-> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11. Quitar el modo Clásico y los modos nuevos van en la fase 12: aquí no toques el Clásico.
+> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11. Quitar el modo Clásico y los modos nuevos van en la fase 13: aquí no toques el Clásico.
 
 ## Qué hemos visto al probar la versión 9
 
@@ -100,7 +100,7 @@
 ## 10f · Elegir el mapa
 
 - Después de JUGAR aparece la pantalla de votación de arena descrita en `docs/codex/fase-11-online-lobby.md`, bloque **11e**:
-  - las 4 cartas con su premisa (`assets/ui/carta_<arena>.png`);
+  - los 4 mapas, uno en cada esquina de la pantalla, con su premisa;
   - votas con las flechas y los bots también votan;
   - si hay empate, ruleta.
 - En esta fase solo hace falta para jugar contra bots; en la 11 se conecta con la red.

@@ -1,9 +1,9 @@
-# Fase 12 — Quitar el Clásico y dos modos nuevos
+# Fase 13 — Quitar el Clásico y dos modos nuevos
 
-> **Para Codex.** Antes tienen que estar terminadas las fases 10 y 11. Los modos funcionan contra bots y en red, porque van sobre `MatchSim`.
+> **Para Codex.** Antes tienen que estar terminadas las fases 10, 11 y 12 (dopamina). Los modos funcionan contra bots y en red, porque van sobre `MatchSim`.
 > En el lobby, el anfitrión elige el modo con las flechas ‹ ›.
 
-## 12a · Quitar el modo Clásico
+## 13a · Quitar el modo Clásico
 
 - Decisión del equipo: el Clásico desaparece del juego.
 - Quita:
@@ -18,7 +18,7 @@
 - **`docs/HISTORIA-IA.md`:** añade una entrada "Quitamos el modo Clásico". Qué decidimos: [que lo completen los humanos]. Por qué: [ídem]. Apunta también que la IA avisó de que es el requisito literal del enunciado.
 - El endpoint `/results` sigue diciendo el ganador de cada partida.
 
-## 12b · Modo Último en Pie (todos contra todos)
+## 13b · Modo Último en Pie (todos contra todos)
 
 Supervivencia: **no hay doblones**. Gana el último muñeco cosido.
 
@@ -50,7 +50,7 @@ Supervivencia: **no hay doblones**. Gana el último muñeco cosido.
   - la ronda acaba cuando queda uno;
   - quien gana 2 rondas gana la partida.
 
-## 12c · Modo Codicia 2v2 (por equipos)
+## 13c · Modo Codicia 2v2 (por equipos)
 
 Dos equipos de dos. Los doblones solo cuentan cuando los **guardas en el cofre de tu equipo**.
 
@@ -89,7 +89,7 @@ Dos equipos de dos. Los doblones solo cuentan cuando los **guardas en el cofre d
   - un golpe hace soltar todo lo que se lleva y nada del cofre;
   - con 20 doblones encima la velocidad es x0,6.
 
-## 12d · Selector de modo y explicaciones
+## 13d · Selector de modo y explicaciones
 
 - En el lobby, al cambiar de modo, sale una tarjeta corta con 3 líneas de reglas y su icono.
 - La pantalla de carga (10g) enseña las reglas del modo elegido en vez de las de VoodooCombo cuando toca.
