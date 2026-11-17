@@ -1,0 +1,80 @@
+{
+  "lobby_mazmorra": {
+    "file": "lobby_mazmorra.png",
+    "size": [
+      1920,
+      1080
+    ],
+    "pedestals_x": [
+      420,
+      780,
+      1140,
+      1500
+    ],
+    "pedestal_y": 760
+  },
+  "cartas": {
+    "file": "carta_<arena>.png",
+    "size": [
+      640,
+      960
+    ],
+    "zones": {
+      "name": [
+        46,
+        40,
+        548,
+        66
+      ],
+      "art": [
+        52,
+        126,
+        536,
+        418
+      ],
+      "premise": [
+        46,
+        572,
+        548,
+        250
+      ],
+      "traps": [
+        0,
+        838,
+        640,
+        80
+      ]
+    },
+    "premisas": {
+      "cienaga": "Aquí se hundió el tesoro de un rey avaro. El barro todavía tiene hambre… y las raíces, memoria.",
+      "cripta": "Los muertos guardan sus doblones con celo. Pisa donde no brillan los pinchos y no despiertes al guardián.",
+      "taller": "Un gnomo dejó todas sus máquinas encendidas y se fue de vacaciones. Lo que no explota, sale por la cinta.",
+      "biblioteca": "Libros que muerden, portales que te escupen y un rayo que nunca duerme. Silencio, por favor."
+    },
+    "note": "Carta sin texto: el nombre va en la placa de arriba (New Rocker) y la premisa en el pergamino (Baloo 2, cursiva o negrita, #3A2A20)."
+  },
+  "carta_brillo": {
+    "file": "carta_brillo.png",
+    "size": [
+      760,
+      1080
+    ],
+    "note": "Encima de la carta (centrado) cuando gana o cuando pasa la ruleta por ella."
+  },
+  "emotes2": {
+    "file": "emotes2.png",
+    "frame_w": 128,
+    "frame_h": 128,
+    "frames": 8,
+    "order": [
+      "dado",
+      "jarra",
+      "rana",
+      "zzz",
+      "pregunta",
+      "jaja",
+      "pollo",
+      "grito"
+    ]
+  }
+}

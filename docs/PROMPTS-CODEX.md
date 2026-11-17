@@ -186,3 +186,6 @@ Arregla la causa, no el síntoma. Si el fallo está en core/, añade un test. An
 - Interpolación de snapshots.
 - La generación simétrica de la arena.
 - El endpoint HTTP con `TCPServer`.
+
+
+> **Nota (fases 10-11):** la letra ya no es New Rocker / Lilita One / Baloo 2. Ahora es Cinzel Bold + Oswald ("Brasa minimal"); ver `AGENTS.md` §7 y `docs/codex/fase-11-online-lobby-dopamina-modos.md`, bloque 11j.

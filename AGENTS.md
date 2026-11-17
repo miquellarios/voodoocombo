@@ -22,7 +22,7 @@ Si una funcionalidad añade reglas que no se entienden en 5 segundos, no entra.
 - **Motor:** Godot 4 + GDScript con tipos estáticos. Lee `config/features` de `project.godot` para saber la versión y usa solo APIs de esa versión.
 - **Renderer:** Compatibility. **Lienzo:** 1280×720. **Ventana inicial:** 1920×1080, redimensionable; stretch `canvas_items`, aspect `keep`.
 - **Assets:** solo los del proyecto.
-  - `assets/fonts/`: New Rocker, Lilita One y Baloo 2 (licencia OFL). Si faltan, se usa la fuente por defecto sin errores.
+  - `assets/fonts/`: Cinzel y Oswald (licencia OFL). Si faltan, se usa la fuente por defecto sin errores.
   - `assets/characters/`: sprites de los personajes, generados por Claude. Cómo usarlos: `assets/characters/SPRITES.md`.
   - `assets/arenas/`: fondos, mapa (`arenas.json`) y sprites de las trampas, generados por Claude. Cómo usarlos: `assets/arenas/ARENAS.md`.
   - Doblones, cofres, iconos de hechizos, partículas y sonidos se generan por código (`_draw()`, `AudioStreamWAV`).
@@ -237,13 +237,15 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
 ## 7. Identidad visual (fantasía oscura)
 
-- **Regla general:** fondo casi negro con niebla y velas. Solo lo importante va saturado: personajes, doblones dorados y trampas avisando.
+- **Regla general:** fondo casi negro con niebla y velas. Poco dorado y nada de marrón en la interfaz: hueso y una sola brasa naranja. Solo lo importante va saturado: personajes, doblones y trampas avisando.
 - **Paleta:**
 
   | Uso | Color |
   |---|---|
   | Fondo | `#0B0710` |
-  | Sombra de títulos | `#5C1018` (rojo sangre) |
+  | Acento (brasa) | `#FF6A2B` |
+  | Texto principal (hueso) | `#EFE7DA` |
+  | Perder | `#FF3B3B` |
   | Doblón | `#FFD23F`, con brillo `#FFF6C2` |
   | Hueso | `#E8DCC4` |
   | Escarcha | `#7FE7FF` |
@@ -264,11 +266,20 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
   - Animaciones: idle, walk, dash, hurt y win.
   - En el HUD se muestra el nombre del personaje junto a "J1"-"J4".
-- **Tipografía:**
-  - **New Rocker:** logo, títulos, banners ("¡FRENESÍ!", "¡VOODOO COMBO!") y palabras grandes. Relleno hueso (`#F4ECDA` → `#A8977A`) u oro viejo (`#FFE7A0` → `#8A5A12`), con contorno `#0B0710` y sombra roja sangre.
-  - **Lilita One:** números (marcador, tiempo, "+N", cuenta atrás).
-  - **Baloo 2:** el resto del texto. Mínimo 18 px.
-- **Logo:** "VOODOO" en hueso y "COMBO" en oro viejo, con un alfiler clavado en la última O.
+- **Estilo de letra: "Brasa minimal".** Plano, sin degradados ni biseles: el impacto lo dan el movimiento y una sola brasa de acento.
+  - **Cinzel Bold**, espaciada (+12 % entre letras): logo, títulos, botones del menú, carteles ("¡FRENESÍ!", "¡VOODOO COMBO!") y nombres de arena. En hueso `#EFE7DA`, y en brasa `#FF6A2B` con un resplandor suave lo que tiene que destacar.
+  - **Oswald Bold**, plana y con contorno oscuro de 6-8 px: todo lo que salta en la partida ("+N", "-N", "¡ROBO!", "x3", "¡ZAS!"), los números del marcador y el tiempo.
+  - **Oswald Medium:** el resto del texto. Mínimo 18 px.
+  - **Colores del texto en partida:**
+
+    | Texto | Color |
+    |---|---|
+    | Ganar doblones normales | Hueso `#EFE7DA` |
+    | Bonus, combo y robo | Brasa `#FF6A2B` |
+    | Perder doblones o costuras | Rojo `#FF3B3B` |
+    | Escarcha y trampas de hielo | Cian `#7FE7FF` |
+
+- **Logo:** `assets/ui/logo_brasa.png`. "VOODOO" en hueso y "COMBO" en brasa con resplandor, una línea de brasa debajo y un alfiler fino clavado en la última O.
 - **HUD:** solo 3 elementos fijos.
   1. Jugadores con su personaje y su puntuación (la corona en el líder).
   2. Tiempo en grande arriba, en el centro.

@@ -1,0 +1,71 @@
+{
+  "cuadrante_marco": {
+    "file": "cuadrante_marco.png",
+    "size": [
+      240,
+      160
+    ],
+    "margin": 40,
+    "note": "Marco 9-slice de cada mapa en la votación."
+  },
+  "cuadrante_brillo": {
+    "file": "cuadrante_brillo.png",
+    "size": [
+      240,
+      160
+    ],
+    "margin": 40,
+    "note": "Marco encendido: ruleta y ganador."
+  },
+  "votacion": {
+    "quads_1920": [
+      [
+        20,
+        20,
+        930,
+        510
+      ],
+      [
+        970,
+        20,
+        930,
+        510
+      ],
+      [
+        970,
+        550,
+        930,
+        510
+      ],
+      [
+        20,
+        550,
+        930,
+        510
+      ]
+    ],
+    "order": [
+      "cienaga",
+      "cripta",
+      "taller",
+      "biblioteca"
+    ],
+    "note": "Sentido horario: arriba-izq, arriba-der, abajo-der, abajo-izq. En 1280×720 multiplicar por 2/3."
+  },
+  "medallas": {
+    "file": "medallas.png",
+    "frame_w": 128,
+    "frame_h": 128,
+    "frames": 8,
+    "order": [
+      "primera_sangre",
+      "venganza",
+      "remontada",
+      "robo_maestro",
+      "racha",
+      "por_los_pelos",
+      "intocable",
+      "rey_combo"
+    ]
+  }
+}
