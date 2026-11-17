@@ -62,7 +62,7 @@ res://
   | `taller` | Taller Gnómico | Cintas, Vapor, Barril explosivo |
   | `biblioteca` | Biblioteca Arcana | Portales, Rayo arcano |
 
-- **Elección:** cada partida elige una arena al azar con la semilla, sin repetir la anterior. En el modo práctica se puede elegir.
+- **Elección:** después de elegir modo, se selecciona una de las cuatro arenas o aleatoria. La arena preferida se guarda en el perfil; aleatoria usa la semilla y evita repetir la anterior.
 - **Mapa:** obstáculos, trampas y salidas salen de `arenas.json`. El layout es simétrico, así que todas las salidas son igual de justas.
 - **Salidas:** se elige al azar uno de los `spawn_sets` y se reparte al azar entre los jugadores.
 - **Al empezar:** cada jugador ve "¡Eres el Jugador N!" con una flecha sobre su personaje durante 3 s.

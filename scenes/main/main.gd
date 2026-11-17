@@ -10,6 +10,7 @@ const SPELL_SLOT_TEXTURE := preload("res://assets/ui/hechizo_ranura.png")
 const SPELL_GLOW_TEXTURE := preload("res://assets/ui/hechizo_brillo.png")
 const SPELL_KEY_E_TEXTURE := preload("res://assets/ui/tecla_e.png")
 const SPELL_KEY_B_TEXTURE := preload("res://assets/ui/tecla_b.png")
+const TRAP_ICONS_TEXTURE := preload("res://assets/ui/trampas_iconos.png")
 const BIOME_COLORS := [[Color("2b3a2a"), Color("243223")], [Color("33402a"), Color("2b3723")], [Color("2a3a4a"), Color("233241")], [Color("3a2a2a"), Color("322323")]]
 
 var state := "menu"
@@ -20,6 +21,8 @@ var countdown := 0.0
 var seed_value := 0
 var arena: Dictionary = {}
 var previous_arena_id := ""
+var selected_arena_id := ""
+var arena_select_classic := false
 var obstacle_rects: Array[Rect2] = []
 var player_hitbox_rects: Array[Rect2] = []
 var hazard_runtime: Array[Dictionary] = []
@@ -63,6 +66,7 @@ var last_input_controller := false
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
+	previous_arena_id = Profile.last_arena_id
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
 		character_metadata = metadata
@@ -157,13 +161,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif state == "paused" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		state = "playing"
 		_build_hud()
+	elif state == "arena_select" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_build_menu()
 
-func _begin_match(classic: bool = false) -> void:
+func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 	mode = "classic" if classic else "voodoo"
 	seed_value = int(Time.get_unix_time_from_system()) + randi()
 	rng.seed = seed_value
-	arena = ArenaGen.generate(seed_value, previous_arena_id, "", classic)
+	arena = ArenaGen.generate(seed_value, previous_arena_id, arena_id, classic)
 	previous_arena_id = String(arena.get("map_id", ""))
+	Profile.last_arena_id = previous_arena_id
+	selected_arena_id = previous_arena_id
+	Profile.save()
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
 	player_hitbox_rects = _get_obstacle_hitboxes(arena.get("obstacles", []))
 	_initialize_hazard_runtime()
@@ -778,7 +787,7 @@ func _build_menu() -> void:
 		logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		logo_tween.set_loops()
 	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
-	var actions: Array[Callable] = [func(): _begin_match(false), func(): _begin_match(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
+	var actions: Array[Callable] = [func(): _build_arena_select(false), func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
 	for index in range(labels.size()):
 		var button := _button(root, labels[index], Vector2(0, 302 + index * 59), actions[index])
 		if not Settings.reduce_motion:
@@ -788,6 +797,77 @@ func _build_menu() -> void:
 			tween.tween_property(button, "modulate:a", 1.0, 0.2)
 	_label(root, "Nivel %d · %d XP" % [Profile.level() + 1, Profile.xp], Vector2(-222, 666), 16, Color("b8a9d1"), false)
 	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
+
+func _build_arena_select(classic: bool) -> void:
+	_clear_hud()
+	arena_select_classic = classic
+	state = "arena_select"
+	var root := _new_overlay()
+	var backdrop := _screen_backdrop()
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	_label(root, I18n.t("choose_arena"), Vector2(0, GameConfig.ARENA_SELECT_TITLE_Y), GameConfig.ARENA_SELECT_TITLE_SIZE, GameConfig.GOLD, true)
+	var preferred_button: Button
+	for index in range(GameConfig.ARENA_IDS.size()):
+		var arena_id: String = GameConfig.ARENA_IDS[index]
+		var card := Panel.new()
+		card.position = Vector2(GameConfig.ARENA_CARD_X + index * (GameConfig.ARENA_CARD_SIZE.x + GameConfig.ARENA_CARD_GAP), GameConfig.ARENA_CARD_Y)
+		card.size = GameConfig.ARENA_CARD_SIZE
+		var card_style := StyleBoxFlat.new()
+		card_style.bg_color = Color("241838")
+		card_style.border_color = Color("8A6B45")
+		card_style.set_border_width_all(2)
+		card_style.set_corner_radius_all(10)
+		card.add_theme_stylebox_override("panel", card_style)
+		card.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_select_arena(arena_id)
+		)
+		root.add_child(card)
+		var thumbnail := TextureRect.new()
+		thumbnail.texture = load("res://assets/ui/arena_%s_mini.png" % arena_id)
+		thumbnail.position = Vector2.ONE * GameConfig.ARENA_THUMB_MARGIN
+		thumbnail.size = GameConfig.ARENA_THUMB_SIZE
+		thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		thumbnail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(thumbnail)
+		var arena_name := _hud_label(card, Vector2(8, GameConfig.ARENA_NAME_Y), GameConfig.ARENA_NAME_SIZE, GameConfig.ARENA_NAME_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+		arena_name.text = I18n.t("arena_" + arena_id)
+		arena_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for icon_order in range(GameConfig.ARENA_TRAP_ICONS[arena_id].size()):
+			var icon := TextureRect.new()
+			var icon_atlas := AtlasTexture.new()
+			icon_atlas.atlas = TRAP_ICONS_TEXTURE
+			icon_atlas.region = Rect2(float(GameConfig.ARENA_TRAP_ICONS[arena_id][icon_order]) * GameConfig.ARENA_ICON_FRAME_SIZE, 0.0, GameConfig.ARENA_ICON_FRAME_SIZE, GameConfig.ARENA_ICON_FRAME_SIZE)
+			icon.texture = icon_atlas
+			icon.position = Vector2(GameConfig.ARENA_ICON_START.x + icon_order * GameConfig.ARENA_ICON_GAP, GameConfig.ARENA_ICON_START.y)
+			icon.size = Vector2.ONE * GameConfig.ARENA_ICON_SIZE
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(icon)
+		var select := Button.new()
+		select.text = I18n.t("play")
+		select.position = Vector2(GameConfig.ARENA_BUTTON_MARGIN, GameConfig.ARENA_BUTTON_Y)
+		select.size = GameConfig.ARENA_BUTTON_SIZE
+		select.focus_mode = Control.FOCUS_ALL
+		select.pressed.connect(_select_arena.bind(arena_id))
+		card.add_child(select)
+		if Profile.preferred_arena_id == arena_id:
+			preferred_button = select
+	var random_button := _button(root, I18n.t("random_arena"), Vector2(0, 520), func(): _select_arena(""))
+	random_button.size = GameConfig.ARENA_RANDOM_BUTTON_SIZE
+	random_button.position = GameConfig.ARENA_RANDOM_BUTTON_POSITION
+	if preferred_button != null:
+		preferred_button.grab_focus()
+	_button(root, I18n.t("menu"), Vector2(0, GameConfig.ARENA_MENU_BUTTON_Y), _build_menu)
+
+func _select_arena(arena_id: String) -> void:
+	selected_arena_id = arena_id
+	Profile.preferred_arena_id = arena_id if not arena_id.is_empty() else "random"
+	Profile.save()
+	_begin_match(arena_select_classic, arena_id)
 
 func _build_characters() -> void:
 	_clear_hud()
@@ -1077,7 +1157,7 @@ func _show_results() -> void:
 	_label(root, "  ·  ".join(award_lines), Vector2(0, 328), 16, Color("b8a9d1"), false)
 	_label(root, "+%d XP   ·   Nivel %d" % [results_xp, Profile.level() + 1], Vector2(0, 386), 22, Color.WHITE, false)
 	_button(root, I18n.t("main_menu"), Vector2(0, 455), _build_menu)
-	_button(root, I18n.t("again"), Vector2(0, 519), func(): _begin_match(mode == "classic"))
+	_button(root, I18n.t("again"), Vector2(0, 519), func(): _begin_match(mode == "classic", selected_arena_id))
 
 func _end_match_cleanup() -> void:
 	players.clear()

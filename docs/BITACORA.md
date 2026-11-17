@@ -164,3 +164,9 @@ Formato de cada entrada:
 - Decisiones: No cambié las posiciones del JSON porque coinciden con la imagen de referencia.
 - Problemas encontrados y cómo se resolvieron: Ninguno; carga headless del editor y suite core pasan.
 - Qué tienen que probar los humanos: Confirmar que el daño del rayo coincide con el haz visible en Biblioteca y que ambas cintas del Taller muestran flechas y rodillos en la dirección del empuje.
+
+### Fase 10f — Elección de arena (17/11/2026)
+- Qué se ha hecho: Tras seleccionar VoodooCombo o Clásico se muestran cuatro tarjetas con miniatura, nombre traducido e iconos de trampas, además de ALEATORIA. Ratón, foco de teclado/mando y Esc funcionan. Se guarda la selección preferida y la última arena en el perfil; `ArenaGen` aplica la seleccionada o elige aleatoriamente evitando la anterior.
+- Decisiones: La opción aleatoria se conserva como preferencia, y la última arena concreta se guarda por separado para no repetirla.
+- Problemas encontrados y cómo se resolvieron: Ninguno; se copiaron las miniaturas e iconos del kit y pasan tests de selección explícita y aleatoria.
+- Qué tienen que probar los humanos: Elegir las cuatro tarjetas y aleatoria en ambos modos, volver con Esc, verificar los iconos, y reiniciar para confirmar que recuerda la preferencia y que aleatoria no repite el mapa anterior.

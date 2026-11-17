@@ -46,11 +46,14 @@ func _test_drop_limits() -> void:
 	_check(Scoring.dropped_coins(20, false, true) == 8, "ring drop")
 
 func _test_arena() -> void:
+	for arena_id in GameConfig.ARENA_IDS:
+		_check(ArenaGen.generate(41, "", arena_id).map_id == arena_id, "explicit arena selection: " + arena_id)
 	for seed_value in range(1, 30):
 		var arena := ArenaGen.generate(seed_value)
 		_check(arena.biome == posmod(seed_value, 4), "biome from seed")
 		_check(ArenaGen.is_arena_connected(arena.blocked), "arena connectivity")
 		_check(arena.coins.size() == GameConfig.STARTING_COINS, "Voodoo starts with 30 coins")
+		_check(ArenaGen.generate(seed_value, arena.map_id).map_id != arena.map_id, "random arena avoids the previous map")
 		_check(ArenaGen.generate(seed_value, "", "", true).coins.size() == GameConfig.CLASSIC_STARTING_COINS, "Classic starts with 50 coins")
 		for cell in arena.blocked:
 			_check(arena.blocked.has(Vector2i(29 - cell.x, cell.y)), "horizontal obstacle symmetry")
