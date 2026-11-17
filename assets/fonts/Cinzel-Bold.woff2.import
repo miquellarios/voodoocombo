@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://hclpnbl242td"
-path="res://.godot/imported/Baloo2-Bold.woff2-b771daa00428457f9e23409df2e40aac.fontdata"
+uid="uid://cvhhpoal4vnis"
+path="res://.godot/imported/Cinzel-Bold.woff2-09b2ce17db6d9f88f73cc3690113e55f.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Baloo2-Bold.woff2"
-dest_files=["res://.godot/imported/Baloo2-Bold.woff2-b771daa00428457f9e23409df2e40aac.fontdata"]
+source_file="res://assets/fonts/Cinzel-Bold.woff2"
+dest_files=["res://.godot/imported/Cinzel-Bold.woff2-09b2ce17db6d9f88f73cc3690113e55f.fontdata"]
 
 [params]
 

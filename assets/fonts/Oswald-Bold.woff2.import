@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://ci48xhqg1snfn"
-path="res://.godot/imported/Baloo2-Regular.woff2-5a5eed96f037abba8de97a4db4705809.fontdata"
+uid="uid://dumx20s4v7q07"
+path="res://.godot/imported/Oswald-Bold.woff2-82e62e2aa4da573274549f3d2e27cb37.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/Baloo2-Regular.woff2"
-dest_files=["res://.godot/imported/Baloo2-Regular.woff2-5a5eed96f037abba8de97a4db4705809.fontdata"]
+source_file="res://assets/fonts/Oswald-Bold.woff2"
+dest_files=["res://.godot/imported/Oswald-Bold.woff2-82e62e2aa4da573274549f3d2e27cb37.fontdata"]
 
 [params]
 

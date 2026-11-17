@@ -92,9 +92,9 @@ var menu_logo_tween: Tween
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
 	Settings.apply_display()
-	player_name_font = load("res://assets/fonts/Baloo2-Regular.woff2") as Font
-	floating_coin_font = load("res://assets/fonts/LilitaOne-Regular.woff2") as Font
-	floating_notice_font = load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	player_name_font = ThemeBuilder.font("Oswald-Medium.woff2")
+	floating_coin_font = ThemeBuilder.font("Oswald-Bold.woff2")
+	floating_notice_font = ThemeBuilder.font("Cinzel-Bold.woff2")
 	previous_arena_id = Profile.last_arena_id
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
@@ -283,7 +283,7 @@ func _build_loading() -> void:
 	root.add_child(backdrop)
 	root.move_child(backdrop, 0)
 	var title := _label(root, I18n.t("arena_" + String(arena.map_id)), Vector2(0.0, GameConfig.LOADING_TITLE_Y), GameConfig.LOADING_TITLE_SIZE, GameConfig.GOLD, true)
-	var title_font := load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	var title_font := ThemeBuilder.font("Cinzel-Bold.woff2")
 	if title_font != null: title.add_theme_font_override("font", title_font)
 	var thumbnail := TextureRect.new()
 	thumbnail.texture = load(_arena_thumbnail_path(String(arena.map_id)))
@@ -956,14 +956,10 @@ func _update_hud() -> void:
 		score_frame_skulls[slot].visible = slot == 0 and frame_id == "calavera"
 		var value := int(player.score)
 		if score_values[slot] != value:
+			var previous_value := maxi(0, score_values[slot])
 			score_values[slot] = value
 			score_change_times[slot] = Time.get_ticks_msec()
-		var age := Time.get_ticks_msec() - score_change_times[slot]
-		var pop := 1.0 + (0.24 * (1.0 - float(age) / 170.0) if age < 170 and not Settings.reduce_motion else 0.0)
-		score_number_labels[slot].scale = Vector2.ONE * pop
-		score_number_labels[slot].pivot_offset = score_number_labels[slot].size * 0.5
-		score_number_labels[slot].text = str(value)
-		score_number_labels[slot].add_theme_color_override("font_color", GameConfig.GOLD if age < 170 else Color.WHITE)
+			_animate_score(score_number_labels[slot], previous_value, value)
 	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
 	var spell_name := hud_root.get_node_or_null("SpellName") as Label
 	var spell_glow := hud_root.get_node_or_null("SpellGlow") as TextureRect
@@ -1007,7 +1003,7 @@ func _build_menu() -> void:
 	root.move_child(background, 0)
 	var logo := TextureRect.new()
 	logo.name = "MenuLogo"
-	logo.texture = load("res://assets/ui/logo.png")
+	logo.texture = load("res://assets/ui/logo_brasa.png")
 	logo.position = Vector2(360, 14)
 	logo.size = Vector2(560, 253)
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1418,7 +1414,7 @@ func _build_hud() -> void:
 	timer.size = Vector2(132, 58)
 	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer.add_theme_font_size_override("font_size", roundi(44 * Settings.ui_scale))
-	var clock_font := load("res://assets/fonts/LilitaOne-Regular.woff2") as Font
+	var clock_font := ThemeBuilder.font("Oswald-Bold.woff2")
 	if clock_font != null: timer.add_theme_font_override("font", clock_font)
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
@@ -1498,8 +1494,8 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 	label.horizontal_alignment = alignment
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", roundi(font_size * Settings.ui_scale))
-	var font_path := "res://assets/fonts/LilitaOne-Regular.woff2" if font_size >= 30 else "res://assets/fonts/Baloo2-Regular.woff2"
-	var hud_font := load(font_path) as Font
+	var font_path := "res://assets/fonts/Oswald-Bold.woff2" if font_size >= 30 else "res://assets/fonts/Oswald-Medium.woff2"
+	var hud_font := ThemeBuilder.font(font_path.get_file())
 	if hud_font != null: label.add_theme_font_override("font", hud_font)
 	root.add_child(label)
 	return label
@@ -1733,6 +1729,7 @@ func _add_unlock_card(root: Control, unlock: Dictionary) -> void:
 	name.text = I18n.t("cosmetic_" + String(unlock.id))
 
 func _end_match_cleanup() -> void:
+	Fx.clear_text()
 	players.clear()
 	coins.clear()
 	chests.clear()
@@ -2082,10 +2079,10 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 	label.size = Vector2(800, 52)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", roundi(size * Settings.ui_scale))
-	var label_font_path := "res://assets/fonts/LilitaOne-Regular.woff2" if _bold else "res://assets/fonts/Baloo2-Regular.woff2"
-	var label_font := load(label_font_path) as Font
+	var label_font_path := "res://assets/fonts/Oswald-Bold.woff2" if _bold else "res://assets/fonts/Oswald-Medium.woff2"
+	var label_font := ThemeBuilder.title_font(roundi(size * Settings.ui_scale)) if _bold else ThemeBuilder.font("Oswald-Medium.woff2")
 	if label_font != null: label.add_theme_font_override("font", label_font)
-	label.add_theme_color_override("font_color", tint)
+	label.add_theme_color_override("font_color", GameConfig.BONE_TEXT if tint == GameConfig.GOLD else tint)
 	label.add_theme_color_override("font_shadow_color", Color("160e22"))
 	label.add_theme_constant_override("shadow_offset_x", 2)
 	label.add_theme_constant_override("shadow_offset_y", 3)
@@ -2094,11 +2091,12 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 
 func _button(root: Control, text: String, offset: Vector2, action: Callable) -> Button:
 	var button := Button.new()
+	button.set_script(preload("res://ui/widgets/ember_button.gd"))
 	button.text = text
 	button.position = Vector2(470, 0) + offset
 	button.size = Vector2(340, 54)
 	button.add_theme_font_size_override("font_size", roundi(26 * Settings.ui_scale))
-	var menu_font := load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	var menu_font := ThemeBuilder.title_font(roundi(26 * Settings.ui_scale), true)
 	if menu_font != null: button.add_theme_font_override("font", menu_font)
 	button.focus_mode = Control.FOCUS_ALL
 	button.pressed.connect(func(): Sfx.play_tone(300.0, 0.07); action.call())
@@ -2173,9 +2171,27 @@ func _score_order() -> Array[int]:
 	return indices
 
 func _on_floating_text(text: String, world_pos: Vector2, tint: Color) -> void:
-	var is_coin := text.begins_with("+")
-	var duration := GameConfig.FLOAT_COIN_SECONDS if is_coin else GameConfig.FLOAT_NOTICE_SECONDS
-	floating.append({"text": text, "pos": world_pos, "color": tint, "time": duration, "duration": duration, "is_coin": is_coin})
+	Fx.render_pop(text, world_pos, Color("7fe7ff") if text == I18n.t("trap_zap") else tint)
+
+func _animate_score(label: Label, old_value: int, value: int) -> void:
+	if label.has_meta("score_tween"):
+		(label.get_meta("score_tween") as Tween).kill()
+	var origin: Vector2 = label.get_meta("score_origin", label.position)
+	label.set_meta("score_origin", origin)
+	label.position = origin
+	label.pivot_offset = label.size * 0.5
+	label.scale = Vector2.ONE
+	var tint := GameConfig.LOSS_TEXT if value < old_value else GameConfig.EMBER
+	label.add_theme_color_override("font_color", GameConfig.BONE_TEXT if tint == GameConfig.GOLD else tint)
+	var tween := label.create_tween().set_parallel(true)
+	label.set_meta("score_tween", tween)
+	tween.tween_method(func(display_value: float): label.text = str(roundi(display_value)), float(old_value), float(value), 0.3)
+	tween.tween_method(func(color: Color): label.add_theme_color_override("font_color", color), tint, GameConfig.BONE_TEXT, 0.35)
+	if not Settings.reduce_motion:
+		label.scale = Vector2.ONE * 1.24
+		tween.tween_property(label, "scale", Vector2.ONE, 0.17)
+		if value < old_value:
+			tween.tween_method(func(t: float): label.position.x = origin.x + sin(t * TAU * 4.0) * 3.0 * (1.0 - t), 0.0, 1.0, 0.2)
 
 func _on_shake(amount: float) -> void:
 	if not Settings.reduce_motion:

@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://bvsjo42jo6bkl"
-path="res://.godot/imported/NewRocker-Regular.woff2-360ada5c29fb256461579b1152dc9707.fontdata"
+uid="uid://dsumfnqje5lwa"
+path="res://.godot/imported/Cinzel-Regular.woff2-f7c4ac2697a4e7f8402e127f36e7ae89.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/NewRocker-Regular.woff2"
-dest_files=["res://.godot/imported/NewRocker-Regular.woff2-360ada5c29fb256461579b1152dc9707.fontdata"]
+source_file="res://assets/fonts/Cinzel-Regular.woff2"
+dest_files=["res://.godot/imported/Cinzel-Regular.woff2-f7c4ac2697a4e7f8402e127f36e7ae89.fontdata"]
 
 [params]
 

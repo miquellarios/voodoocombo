@@ -3,6 +3,67 @@ extends Node
 signal floating_text(text: String, position: Vector2, tint: Color)
 signal shake(amount: float)
 
+var text_layer: CanvasLayer
+
+func render_pop(text: String, position: Vector2, tint: Color) -> void:
+	if not is_instance_valid(text_layer):
+		text_layer = CanvasLayer.new()
+		text_layer.layer = 20
+		add_child(text_layer)
+	var numeric := text.begins_with("+") or text.begins_with("-")
+	var loss := text.begins_with("-")
+	var banner := text in [I18n.t("frenzy"), I18n.t("voodoo_combo")]
+	var label := Label.new()
+	label.text = text
+	var font_size := GameConfig.FLOAT_NOTICE_LARGE_FONT_SIZE if banner else (GameConfig.FLOAT_COIN_FONT_SIZE if numeric else GameConfig.FLOAT_NOTICE_FONT_SIZE)
+	label.add_theme_font_override("font", ThemeBuilder.title_font(font_size) if banner else ThemeBuilder.font("Oswald-Bold.woff2"))
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_constant_override("outline_size", GameConfig.FLOAT_NOTICE_OUTLINE_SIZE if banner else GameConfig.FLOAT_COIN_OUTLINE_SIZE)
+	label.add_theme_color_override("font_outline_color", Color("0b0710"))
+	var color := tint
+	if numeric: color = GameConfig.LOSS_TEXT if loss else (GameConfig.BONE_TEXT if int(text) == 1 else GameConfig.EMBER)
+	if banner: color = GameConfig.EMBER
+	label.add_theme_color_override("font_color", color)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size = Vector2(GameConfig.FLOAT_NOTICE_TEXT_WIDTH, font_size * 2)
+	label.position = position - label.size * 0.5
+	label.pivot_offset = label.size * 0.5
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_layer.add_child(label)
+	var duration := GameConfig.FLOAT_COIN_SECONDS if numeric else GameConfig.FLOAT_NOTICE_SECONDS
+	var tween := label.create_tween().set_parallel(true)
+	if not Settings.reduce_motion:
+		label.scale = Vector2.ONE * (2.4 if banner else 1.8)
+		tween.tween_property(label, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(label, "position:y", label.position.y + (20.0 if loss else -50.0), duration)
+		if loss:
+			var origin_x := label.position.x
+			tween.tween_method(func(t: float): label.position.x = origin_x + sin(t * TAU * 4.0) * 3.0 * (1.0 - t), 0.0, 1.0, 0.2)
+		elif numeric and int(text) > 1:
+			label.rotation = deg_to_rad(6.0 if int(text) % 2 == 0 else -6.0)
+			tween.tween_property(label, "rotation", 0.0, 0.15)
+		if banner:
+			var line := ColorRect.new()
+			line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			line.color = GameConfig.EMBER
+			line.position = Vector2(0.0, font_size * 1.4)
+			line.size = Vector2(0.0, 2.0)
+			label.add_child(line)
+			tween.tween_property(line, "size:x", label.size.x, 0.3)
+			var pulse := label.create_tween()
+			pulse.tween_interval(0.15)
+			for _beat in range(2):
+				pulse.tween_property(label, "scale", Vector2.ONE * 1.08, 0.15)
+				pulse.tween_property(label, "scale", Vector2.ONE, 0.15)
+		tween.tween_property(label, "scale", Vector2.ONE * 0.6, 0.25).set_delay(duration - 0.25)
+	tween.tween_property(label, "modulate:a", 0.0, 0.25).set_delay(duration - 0.25)
+	tween.chain().tween_callback(label.queue_free)
+
+func clear_text() -> void:
+	if is_instance_valid(text_layer):
+		text_layer.queue_free()
+		text_layer = null
+
 func pop(text: String, position: Vector2, tint: Color = Color.WHITE) -> void:
 	floating_text.emit(text, position, tint)
 

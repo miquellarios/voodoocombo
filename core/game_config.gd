@@ -2,6 +2,11 @@ class_name GameConfig
 extends RefCounted
 
 const ARENA_SIZE := Vector2(1200.0, 600.0)
+const EMBER := Color("ff6a2b")
+const BONE_TEXT := Color("efe7da")
+const LOSS_TEXT := Color("ff3b3b")
+const TITLE_TRACKING := 0.12
+const BUTTON_TRACKING := 0.22
 const GRID_SIZE := Vector2i(30, 15)
 const CELL_SIZE := 40.0
 const PLAYER_SPEED := 260.0
@@ -112,9 +117,9 @@ const FLOAT_NOTICE_LARGE_FONT_SIZE := 64
 const FLOAT_NOTICE_OUTLINE_SIZE := 8
 const FLOAT_COIN_TEXT_WIDTH := 120.0
 const FLOAT_NOTICE_TEXT_WIDTH := 640.0
-const FLOAT_COLOR_BASE := Color("ffffff")
-const FLOAT_COLOR_FRENZY := Color("ff9f1c")
-const FLOAT_COLOR_VOODOO := Color("ff4fd8")
+const FLOAT_COLOR_BASE := Color("efe7da")
+const FLOAT_COLOR_FRENZY := Color("ff6a2b")
+const FLOAT_COLOR_VOODOO := Color("ff6a2b")
 const COMBO_BADGE_RADIUS := 22.0
 const COMBO_BADGE_TEXT_SIZE := 18
 const COMBO_BADGE_COUNT_SIZE := 16
