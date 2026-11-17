@@ -3,10 +3,12 @@ extends Node
 var player: AudioStreamPlayer
 
 func _ready() -> void:
+	if "--server" in OS.get_cmdline_user_args() or OS.has_feature("dedicated_server"): return
 	player = AudioStreamPlayer.new()
 	add_child(player)
 
 func play_tone(frequency: float = 660.0, duration: float = 0.08, loudness: float = 0.14) -> void:
+	if not is_instance_valid(player): return
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = 22050

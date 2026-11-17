@@ -219,3 +219,9 @@ Formato de cada entrada:
 - Problemas encontrados: Python del PATH era un acceso de WindowsApps no ejecutable; se realizó la extracción con las herramientas de edición disponibles. La prueba de integración muestra el aviso de ObjectDB al cerrar; no aparecen errores de ejecución en la partida.
 - Verificación: Dos simulaciones de 90 s con cuatro bots por arena comparan estado y eventos. Test de escena local comprueba que la vista avanza MatchSim y que modificar un snapshot no modifica el modelo.
 - Qué deben probar los humanos: Una partida de VoodooCombo y Clásico en cada arena; cofres y siete hechizos, trampas, combos, zona, pausa, podio y revancha. Comparar la sensación con la fase 10 antes de probar la red.
+
+### Fase 11c — Arranque dedicado
+- Boot decide entre vista y servidor antes de cargar las texturas; Sfx no crea audio en el servidor. Net conserva todas las RPC y la conexión ENet (32 peers); server_main dispone del reloj de 30 Hz para las salas.
+- API contrastada con la documentación oficial Godot 4.7 de ENet y multijugador de alto nivel. Logs fechados de conexión y desconexión.
+- Verificación: importación headless y servidor UDP 17777 con dos procesos cliente de tests/test_network_client.gd; ambos completan ping/pong y salen correctamente.
+- Humanos: arrancar con --headless -- --server --port 7777 y comprobar conexiones desde el segundo PC. Las salas se implementan en 11d.

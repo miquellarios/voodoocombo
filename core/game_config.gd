@@ -1,6 +1,15 @@
 class_name GameConfig
 extends RefCounted
 
+# Red autoritativa.
+const NET_PORT := 7777
+const NET_MAX_PEERS := 32
+const NET_MAX_ROOMS := 8
+const NET_TICK := 1.0 / 30.0
+const NET_SNAPSHOT_TICK := 1.0 / 20.0
+const NET_MAX_FRAME := 0.25
+const NET_VERSION := "0.1.11"
+
 const ARENA_SIZE := Vector2(1200.0, 600.0)
 const EMBER := Color("ff6a2b")
 const BONE_TEXT := Color("efe7da")
