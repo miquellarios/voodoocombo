@@ -74,7 +74,7 @@ func leave_room() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func lobby_action(action: String, data: Dictionary = {}) -> void:
-	if action.length() <= 24: _receive(action, data)
+	if action in ["ready", "bots", "mode", "cosmetics", "vote", "social", "rematch"]: _receive(action, data)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 1)
 func submit_input(seq: int, move: Vector2, dash: bool, spell: bool) -> void:

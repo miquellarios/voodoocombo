@@ -5,6 +5,7 @@ var rooms: Dictionary = directory.rooms
 var rate_limits: Dictionary = {}
 var vote_publish := 0.0
 var accumulator := 0.0
+var session_xp: Dictionary = {}
 
 func _ready() -> void:
 	Net.request_received.connect(_request)
@@ -53,6 +54,10 @@ func _process(delta: float) -> void:
 
 func _request(sender: int, action: String, data: Dictionary) -> void:
 	if sender <= 1 or var_to_bytes(data).size() > GameConfig.RPC_MAX_BYTES or not _allow(sender, action): return
+	var level := mini(GameConfig.PROFILE_MAX_LEVEL, int(session_xp.get(sender, 0)) / GameConfig.PROFILE_XP_PER_LEVEL + 1)
+	if not RpcRules.valid(action, data, level):
+		if action in ["create", "join", "cosmetics"]: Net.room_error.rpc_id(sender, "cosmetics")
+		return
 	var room := directory.for_peer(sender)
 	match action:
 		"ping": Net.pong.rpc_id(sender, int(data.stamp))
@@ -182,10 +187,14 @@ func _depart(sender: int) -> void:
 			else: _step_match(room)
 		_publish(room)
 	directory.attempts.erase(sender)
+	for key: String in rate_limits.keys():
+		if key.begins_with(str(sender) + ":"): rate_limits.erase(key)
 
 func _save_result(room: Dictionary, event: Dictionary) -> void:
 	var ranking: Array[Dictionary] = []
 	for player: Dictionary in event.ranking:
+		var id := int(player.peer_id)
+		session_xp[id] = int(session_xp.get(id, 0)) + 50 + int(player.max_combo)
 		ranking.append({"name": player.name, "score": player.score, "max_combo": player.max_combo, "peer_id": player.peer_id})
 	if ranking.is_empty(): return
 	var record := {"date": Time.get_datetime_string_from_system(), "room": room.code, "mode": room.mode, "winner": ranking[0].name, "ranking": ranking, "awards": event.awards}

@@ -261,3 +261,8 @@ Formato de cada entrada:
 - Presets Windows, Linux ARM64 y x86_64 dedicados; scripts de arranque, servicio systemd y guía Oracle/LAN. Ajustes de servidor editables y persistentes, sin inventar una IP Oracle.
 - Documentación oficial de Godot 4.7 y Always Free consultada. El despliegue externo corresponde a los humanos; no se han creado recursos. No hay plantillas de exportación instaladas en las rutas comprobadas; los presets quedan preparados y la exportación binaria pendiente de disponer de ellas.
 - Test de vista online pasa. Humanos: instalar plantillas coincidentes, exportar, probar en Linux y desde dos redes; seguir docs/DESPLIEGUE.md y verificar cuota gratuita.
+
+### Fase 11j — Validación y límites
+- RPC con lista cerrada, esquema de tipos, límite de tamaño/frecuencia, movimientos finitos y cosméticos existentes y desbloqueados según XP calculada por el servidor. El perfil local no autoriza cosméticos online: sin cuentas autenticadas, la progresión online se conserva durante la conexión; no se confía en una XP enviada por el cliente.
+- Test de esquemas y cosméticos pasa; prueba ENet de cinco procesos pasa sin errores. Se mantienen remitentes reales y autoridad de servidor en todos los eventos.
+- Humanos: probar nombres de control, versión diferente, cosméticos bloqueados y spam desde un cliente de desarrollo; verificar que otros jugadores continúan.
