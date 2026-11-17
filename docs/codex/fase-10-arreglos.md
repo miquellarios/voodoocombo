@@ -5,7 +5,7 @@
 > - `hud_v2_referencia.png`: partida con nombres, ranura nueva y la niebla cerrándose;
 > - `resultados_referencia.png`: podio con emotes.
 >
-> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11.
+> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11. Quitar el modo Clásico y los modos nuevos van en la fase 12: aquí no toques el Clásico.
 
 ## Qué hemos visto al probar la versión 9
 
@@ -43,13 +43,11 @@
   | 5-11 | x2 | "¡Combo!" |
   | 12 o más | x3 | "¡VOODOO COMBO!" |
 
-- En el modo Clásico cada doblón sigue valiendo 1.
 - **Menos doblones en VoodooCombo:**
   - 30 al empezar;
   - si quedan menos de 12, aparece uno cada 1,0 s;
   - en el Frenesí, hasta mantener unos 18.
-  - El Clásico se queda con sus 50 (es lo que pide el enunciado).
-- Actualiza §4.3 y §4.6 de `AGENTS.md`.
+- Actualiza §4.3 de `AGENTS.md`.
 - **Tests:** `coin_value` da 1, 2, 3, 4 y 5 en los casos límite, y nunca más de 5.
 
 ## 10b · Las trampas quitan un porcentaje
@@ -101,7 +99,7 @@
 
 ## 10f · Elegir el mapa
 
-- Después de JUGAR (y de MODO CLÁSICO) aparece la pantalla **ELIGE ARENA**:
+- Después de JUGAR aparece la pantalla **ELIGE ARENA**:
   - 4 tarjetas con `assets/ui/arena_<id>_mini.png`, el nombre de la arena y los iconos de sus trampas (`trampas_iconos.png`);
   - una quinta tarjeta, **ALEATORIA**, que elige al azar sin repetir la anterior.
 - Se maneja con teclado, ratón y mando. Esc vuelve al menú.
@@ -144,8 +142,7 @@
 
 ## 10j · La zona se cierra (contra el campeo)
 
-- **VoodooCombo:** en los segundos 45, 35 y 25 que quedan, la zona segura se encoge un paso.
-- **Clásico:** igual, en los segundos 120, 90 y 60 que quedan.
+- En los segundos 45, 35 y 25 que quedan, la zona segura se encoge un paso.
 - **Cada paso** quita 2 casillas por cada lado en horizontal y 1 en vertical. Al final queda una zona de 18×9 casillas en el centro.
 - **Aviso:** 3 s antes de cada paso, el borde nuevo parpadea en `#B06BFF`, suena un aviso y sale "¡LA NIEBLA SE CIERRA!".
 - **Fuera de la zona:**

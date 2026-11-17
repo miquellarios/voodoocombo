@@ -58,3 +58,11 @@ static func box(path: String) -> StyleBoxTexture:
 |---|---|---|
 | `arena_<id>_mini.png` | 960×540 | Vista de cada arena con sus trampas (`cienaga`, `cripta`, `taller`, `biblioteca`), para ELIGE ARENA y la pantalla de carga |
 | `trampas_iconos.png` | 9 × 128×128 | Un icono por trampa: lodo, raíces, pinchos, fantasma, cinta, vapor, barril, portal, rayo. Dibujar a 48-64 px |
+
+## Lobby y modos (fases 11 y 12)
+
+| Archivo | Tamaño (px) | Uso |
+|---|---|---|
+| `lobby_fondo.png` | 1920×1080 | Escenario del lobby con 4 peanas en x = 420, 780, 1140 y 1500 (y = 760). Tu personaje va en la segunda |
+| `costuras.png` | 2 × 64×64 | Vidas de Último en Pie: 0 entera, 1 rota. Dibujar a 24-32 px |
+| `../items/cofre_equipo_coral.png`, `../items/cofre_equipo_azul.png` | 2 × 320×320 | Cofre de cada equipo en Codicia 2v2 (frame 1 al guardar). Escala 0,5 |
