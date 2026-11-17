@@ -26,8 +26,14 @@ func _check(condition: bool, label: String) -> void:
 
 func _test_scoring() -> void:
 	_check(Scoring.multiplier(4) == 1 and Scoring.multiplier(5) == 2, "combo x2 threshold")
-	_check(Scoring.multiplier(10) == 3 and Scoring.multiplier(20) == 4, "combo x3/x4 thresholds")
-	_check(Scoring.coin_value(5, true, true) == 8, "frenzy and ring value")
+	_check(Scoring.multiplier(11) == 2 and Scoring.multiplier(12) == 3 and Scoring.multiplier(20) == 3, "combo x3 threshold and cap")
+	_check(Scoring.coin_value(0, false, false) == 1, "base coin value")
+	_check(Scoring.coin_value(5, false, false) == 2, "combo bonus value")
+	_check(Scoring.coin_value(12, false, false) == 3, "high combo value")
+	_check(Scoring.coin_value(5, true, false) == 3, "frenzy adds one point")
+	_check(Scoring.coin_value(5, false, true) == 3, "ring adds one point")
+	_check(Scoring.coin_value(12, true, true) == 5, "maximum coin value is five")
+	_check(Scoring.coin_value(99, true, true) <= 5, "coin value never exceeds five")
 	_check(Scoring.coin_value(20, false, false, true) == 1, "classic coin value")
 	_check(Scoring.next_combo(7, 1.49) == 8 and Scoring.next_combo(7, 1.5) == 1, "combo timer")
 
@@ -42,7 +48,8 @@ func _test_arena() -> void:
 		var arena := ArenaGen.generate(seed_value)
 		_check(arena.biome == posmod(seed_value, 4), "biome from seed")
 		_check(ArenaGen.is_arena_connected(arena.blocked), "arena connectivity")
-		_check(arena.coins.size() == 50, "50 starting coins")
+		_check(arena.coins.size() == GameConfig.STARTING_COINS, "Voodoo starts with 30 coins")
+		_check(ArenaGen.generate(seed_value, "", "", true).coins.size() == GameConfig.CLASSIC_STARTING_COINS, "Classic starts with 50 coins")
 		for cell in arena.blocked:
 			_check(arena.blocked.has(Vector2i(29 - cell.x, cell.y)), "horizontal obstacle symmetry")
 			_check(arena.blocked.has(Vector2i(cell.x, 14 - cell.y)), "vertical obstacle symmetry")

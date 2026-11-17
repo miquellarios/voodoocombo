@@ -134,3 +134,9 @@ Formato de cada entrada:
 - Decisiones: Se conserva el runtime de consola que usa el lanzador en el ZIP y se omite el ejecutable GUI de 181 MB, que el lanzador no utiliza. El tema asigna New Rocker a botones, Lilita One a títulos y cifras, y Baloo 2 al texto general.
 - Problemas encontrados y cómo se resolvieron: El escaneo de Godot sigue avisando de un segundo `project.godot` dentro de `voodoocombo/`; se deja fuera de los commits porque es un proyecto anidado ajeno al checkout activo. La primera comprobación tras integrar las fuentes encontró que Godot no infería como entero la altura del podio; se tipó explícitamente y las comprobaciones posteriores quedaron limpias.
 - Qué tienen que probar los humanos: Navegar el menú solo con teclado y solo con mando; elegir cada personaje y reiniciar para verificar el perfil; jugar tres partidas seguidas y comprobar que tras el resultado o al salir de pausa vuelve un menú limpio; probar todas las trampas en las cuatro arenas, el HUD a escalas 100/125/150 % y los bots contra muros/esquinas durante dos minutos.
+
+### Fase 10a — Puntos y reposición (17/11/2026)
+- Qué se ha hecho: Combo x1/x2/x3 con umbrales 5 y 12; Frenesí y Anillo añaden un punto cada uno, hasta 5. VoodooCombo empieza con 30 monedas y repone bajo 12 a ritmo de 1/s, hasta 18 en Frenesí; Clásico conserva 50 y no repone. Actualizados la generación y los tests de ambos modos.
+- Decisiones: `ArenaGen.generate()` recibe un indicador de modo y un `arena_id` opcional preparado para la selección de mapas del bloque 10f.
+- Problemas encontrados y cómo se resolvieron: Ninguno; pasaron los tests core y el smoke test del proyecto.
+- Qué tienen que probar los humanos: Confirmar que una partida VoodooCombo termina normalmente entre 60 y 150 puntos, que Clásico sigue empezando con 50 y que el Frenesí no permite superar 5 puntos por doblón.

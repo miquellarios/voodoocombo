@@ -106,7 +106,7 @@ func _process(delta: float) -> void:
 		frenzy_notified = true
 		Fx.pop("¡FRENESÍ!", Vector2(640, 150), GameConfig.GOLD)
 		Sfx.play_tone(520.0, 0.35)
-	var coin_target := 30 if remaining <= GameConfig.FRENZY_SECONDS else GameConfig.COIN_RESPAWN_THRESHOLD
+	var coin_target := GameConfig.FRENZY_COIN_TARGET if remaining <= GameConfig.FRENZY_SECONDS else GameConfig.COIN_RESPAWN_THRESHOLD
 	if mode == "voodoo" and int(elapsed / GameConfig.COIN_RESPAWN_INTERVAL) != int((elapsed - delta) / GameConfig.COIN_RESPAWN_INTERVAL) and coins.size() < coin_target:
 		_spawn_coin()
 	for coin in coins:
@@ -150,7 +150,7 @@ func _begin_match(classic: bool = false) -> void:
 	mode = "classic" if classic else "voodoo"
 	seed_value = int(Time.get_unix_time_from_system()) + randi()
 	rng.seed = seed_value
-	arena = ArenaGen.generate(seed_value, previous_arena_id)
+	arena = ArenaGen.generate(seed_value, previous_arena_id, "", classic)
 	previous_arena_id = String(arena.get("map_id", ""))
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
 	_initialize_hazard_runtime()
@@ -307,12 +307,12 @@ func _update_pickups() -> void:
 			else:
 				player.combo = Scoring.next_combo(player.combo, elapsed - player.last_pickup)
 				player.max_combo = maxi(player.max_combo, player.combo)
-				value = Scoring.coin_value(player.combo, remaining <= 15.0, player.item == "ring", false)
+				value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, player.item == "ring", false)
 				player.coins += value
 				player.score = player.coins
 				player.last_pickup = elapsed
-				if player.combo in [5, 10, 20]:
-					var text := "¡Combo!" if player.combo == 5 else ("¡Vudú!" if player.combo == 10 else "¡VOODOO COMBO!")
+				if player.combo in [5, 12]:
+					var text := I18n.t("combo") if player.combo == 5 else I18n.t("voodoo_combo")
 					Fx.pop(text, player.pos + OFFSET + Vector2(0, -44), GameConfig.GOLD)
 					Sfx.play_tone(500.0 + player.combo * 14.0, 0.18)
 			Fx.pop("+%d" % (player.score if mode == "classic" else value), player.pos + OFFSET, GameConfig.GOLD)

@@ -81,17 +81,16 @@ res://
 - **Doblones sueltos:** saltan a una distancia de 60-140 px. La víctima no puede recogerlos durante los primeros 0,6 s.
 
 ### 4.3 Doblones y combo
-- **Al empezar:** la partida arranca con **50 doblones** repartidos por la arena, a 35 px como mínimo entre ellos y de los obstáculos.
-- **Reposición:** si quedan menos de 18, se repone uno cada 0,5 s (en Frenesí, hasta mantener unos 30). En modo Clásico no se reponen.
-- **Valor de cada doblón:** 1 × multiplicador de combo × 2 si es Frenesí × 2 si llevas el Anillo.
+- **Al empezar:** VoodooCombo arranca con **30 doblones** repartidos por la arena, a 35 px como mínimo entre ellos y de los obstáculos.
+- **Reposición:** si quedan menos de 12, aparece uno cada 1,0 s (en Frenesí, hasta mantener unos 18). Clásico arranca con 50 y no repone.
+- **Valor de cada doblón:** multiplicador de combo +1 si es Frenesí +1 si llevas el Anillo (máximo 5). Clásico siempre vale 1.
 - **Combo:**
   - Sube en +1 por cada doblón recogido con menos de 1,5 s desde el anterior.
   - Se pierde al pasar 1,5 s sin recoger o al recibir un golpe.
 - **Multiplicador según el combo:**
   - 0-4: x1
-  - 5-9: x2, con el aviso "¡Combo!"
-  - 10-19: x3, con el aviso "¡Vudú!"
-  - 20 o más: x4, con el aviso **"¡VOODOO COMBO!"**
+  - 5-11: x2, con el aviso "¡Combo!"
+  - 12 o más: x3, con el aviso **"¡VOODOO COMBO!"**
 
 ### 4.4 Cofres y hechizos
 - **Cofres:** aparece uno cada 8 s en una casilla libre al azar, con un máximo de 2 a la vez.
@@ -144,9 +143,9 @@ res://
 
 | | VoodooCombo (por defecto) | Clásico (enunciado) |
 |---|---|---|
-| Doblones | 50 al empezar y reaparecen | 50 al empezar y no reaparecen |
+| Doblones | 30 al empezar; repone bajo 12 (Frenesí: 18) | 50 al empezar y no reaparecen |
 | Objetivo | Tener más doblones a los 90 s (60/90/120 a elegir) | **El primero en recoger 15 gana al instante**. Si a los 3 min nadie llega, gana quien tenga más |
-| Combo | Con multiplicador x1–x4 | Solo visual: cada doblón vale 1 |
+| Combo | Con multiplicador x1–x3; Frenesí y Anillo suman +1 cada uno | Solo visual: cada doblón vale 1 |
 | Frenesí | Sí | No |
 | Dash y robo | Sí | Sí |
 | Cofres y hechizos | Sí | Sí, menos el Anillo |

@@ -4,16 +4,16 @@ extends RefCounted
 static func multiplier(combo: int, classic: bool = false) -> int:
 	if classic:
 		return 1
-	if combo >= 20:
-		return 4
-	if combo >= 10:
+	if combo >= 12:
 		return 3
 	if combo >= 5:
 		return 2
 	return 1
 
 static func coin_value(combo: int, frenzy: bool, ring: bool, classic: bool = false) -> int:
-	return multiplier(combo, classic) * (2 if frenzy and not classic else 1) * (2 if ring and not classic else 1)
+	if classic:
+		return 1
+	return mini(5, multiplier(combo) + int(frenzy) + int(ring))
 
 static func dropped_coins(coins: int, crowned: bool, ring: bool) -> int:
 	if coins <= 0:
