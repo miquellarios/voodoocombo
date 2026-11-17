@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_nickname_rules()
 	_test_safe_zone()
 	_test_ranking()
+	_test_match_sim()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
 		quit(0)
@@ -191,3 +192,32 @@ func _test_safe_zone() -> void:
 func _test_ranking() -> void:
 	var players: Array[Dictionary] = [{"name": "A", "score": 10, "max_combo": 4}, {"name": "B", "score": 10, "max_combo": 9}]
 	_check(MatchRanking.rank(players)[0].name == "B", "combo tie-break")
+
+func _test_match_sim() -> void:
+	var config := {
+		"seed": 9182,
+		"mode": "voodoo",
+		"duration": 90.0,
+		"players": [
+			{"name": "A", "is_bot": true, "pos": Vector2(80.0, 80.0)},
+			{"name": "B", "is_bot": true, "pos": Vector2(1120.0, 80.0)},
+			{"name": "C", "is_bot": true, "pos": Vector2(80.0, 520.0)},
+			{"name": "D", "is_bot": true, "pos": Vector2(1120.0, 520.0)}
+		],
+		"coins": [Vector2(120.0, 80.0), Vector2(1080.0, 80.0), Vector2(120.0, 520.0), Vector2(1080.0, 520.0)]
+	}
+	for arena_id in GameConfig.ARENA_IDS:
+		config["arena_id"] = arena_id
+		var first := _run_match_sim(config)
+		var second := _run_match_sim(config)
+		_check(first == second, "90-second MatchSim with four bots is deterministic: " + arena_id)
+		_check(bool(first["finished"]) and float(first["remaining"]) == 0.0, "MatchSim completes a 90-second round: " + arena_id)
+
+func _run_match_sim(config: Dictionary) -> Dictionary:
+	var sim := MatchSim.new()
+	sim.setup(config)
+	var inputs: Array[Dictionary] = []
+	for _frame in range(2700): sim.step(1.0 / 30.0, inputs)
+	var result: Dictionary = sim.snapshot()
+	result["events"] = sim.pop_events()
+	return result
