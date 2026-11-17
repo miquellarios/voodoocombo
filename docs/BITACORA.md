@@ -182,3 +182,9 @@ Formato de cada entrada:
 - Decisiones: La validación vive en `NicknameRules` para poder probarla como lógica pura. El nick se guarda en el mismo `Profile` que se usa para el marcador.
 - Problemas encontrados y cómo se resolvieron: La primera versión del test intentó acceder al autoload `Profile` desde el test `SceneTree` y no compiló; se extrajo la regla a `NicknameRules` y los tests core pasan.
 - Qué tienen que probar los humanos: Crear un perfil nuevo, probar nombres de 2, 3 y 13 caracteres y espacios externos; cambiar el nick desde PERSONAJES y comprobar sobre la arena colores, contornos, flecha, aro y nombres de bots.
+
+### Fase 10i — Textos flotantes legibles (17/11/2026)
+- Qué se ha hecho: Los doblones usan Lilita One de 30/36 px con contorno de 6 px; avisos de combo y trampas usan New Rocker de 44/64 px con contorno de 8 px. Duran 1,2/1,6 s, suben 40 px y se desvanecen al final. Los avisos de combo aparecen centrados arriba y el jugador local muestra multiplicador y racha en un círculo.
+- Decisiones: El color de «+N» sigue el nivel de combo (blanco, naranja, rosa); reducir movimiento elimina el ascenso y el pop.
+- Problemas encontrados y cómo se resolvieron: Ninguno; suite core, smoke y carga headless pasan.
+- Qué tienen que probar los humanos: Recoger doblones con multiplicadores x1/x2/x3, confirmar tamaños/colores/contorno/duración, y activar avisos de trampa y combos con «Reducir movimiento» encendido y apagado.

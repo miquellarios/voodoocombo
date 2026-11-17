@@ -219,6 +219,8 @@ Todas las trampas que dañan quitan el 15 % de los doblones (mínimo 2, máximo 
 
 Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por los autoloads `Fx` y `Sfx` y respeta el ajuste "Reducir movimiento".
 
+- Los textos flotantes de doblones usan Lilita One con contorno y duran 1,2 s; combo/trampa usan New Rocker con contorno y duran 1,6 s. Suben 40 px y se desvanecen en los últimos 0,3 s. El multiplicador y el combo actual se muestran juntos en un círculo junto al jugador local.
+
 | Evento | Qué tiene que pasar |
 |---|---|
 | Recoger | Texto "+N" que salta, 6 chispas, *pop* del marcador y un *cling* que sube un semitono por cada paso de combo |

@@ -70,10 +70,14 @@ var nick_line_edit: LineEdit
 var nick_error_label: Label
 var nick_dialog_returns_to_characters := false
 var player_name_font: Font
+var floating_coin_font: Font
+var floating_notice_font: Font
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
 	player_name_font = load("res://assets/fonts/Baloo2-Regular.woff2") as Font
+	floating_coin_font = load("res://assets/fonts/LilitaOne-Regular.woff2") as Font
+	floating_notice_font = load("res://assets/fonts/NewRocker-Regular.woff2") as Font
 	previous_arena_id = Profile.last_arena_id
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
@@ -145,7 +149,7 @@ func _process(delta: float) -> void:
 	remaining = maxf(0.0, remaining - delta)
 	if not frenzy_notified and mode == "voodoo" and remaining <= 15.0:
 		frenzy_notified = true
-		Fx.pop("¡FRENESÍ!", Vector2(640, 150), GameConfig.GOLD)
+		Fx.pop(I18n.t("frenzy"), Vector2(640, 150), GameConfig.GOLD)
 		Sfx.play_tone(520.0, 0.35)
 	var coin_target := GameConfig.FRENZY_COIN_TARGET if remaining <= GameConfig.FRENZY_SECONDS else GameConfig.COIN_RESPAWN_THRESHOLD
 	if mode == "voodoo" and int(elapsed / GameConfig.COIN_RESPAWN_INTERVAL) != int((elapsed - delta) / GameConfig.COIN_RESPAWN_INTERVAL) and coins.size() < coin_target:
@@ -449,9 +453,11 @@ func _update_pickups() -> void:
 				player.last_pickup = elapsed
 				if player.combo in [5, 12]:
 					var text := I18n.t("combo") if player.combo == 5 else I18n.t("voodoo_combo")
-					Fx.pop(text, player.pos + OFFSET + Vector2(0, -44), GameConfig.GOLD)
+					Fx.pop(text, GameConfig.COMBO_NOTICE_POSITION, GameConfig.GOLD)
 					Sfx.play_tone(500.0 + player.combo * 14.0, 0.18)
-			Fx.pop("+%d" % (player.score if mode == "classic" else value), player.pos + OFFSET, GameConfig.GOLD)
+			var combo_multiplier := Scoring.multiplier(player.combo, mode == "classic")
+			var pickup_color := GameConfig.FLOAT_COLOR_VOODOO if combo_multiplier >= 3 else (GameConfig.FLOAT_COLOR_FRENZY if combo_multiplier == 2 else GameConfig.FLOAT_COLOR_BASE)
+			Fx.pop("+%d" % (1 if mode == "classic" else value), player.pos + OFFSET, pickup_color)
 			Sfx.play_tone(600.0 + player.combo * 18.0, 0.09)
 			coins.remove_at(c)
 			if mode == "classic" and player.coins >= GameConfig.CLASSIC_TARGET:
@@ -741,7 +747,7 @@ func _update_roll(delta: float) -> void:
 		if roll_player == 0:
 			spell_notice_item = roll_result
 			spell_notice_time = GameConfig.SPELL_NOTICE_SECONDS
-		Fx.pop(roll_result.to_upper(), players[roll_player].pos + OFFSET + Vector2(0, -52), GameConfig.GOLD)
+		Fx.pop(I18n.t("spell_" + roll_result), players[roll_player].pos + OFFSET + Vector2(0, -52), GameConfig.GOLD)
 		Sfx.play_tone(880.0, 0.16)
 
 func _use_spell_for_bot(index: int) -> void:
@@ -1402,7 +1408,7 @@ func _draw() -> void:
 		var name_text := (I18n.t("you") + " · " if i == 0 else "") + String(player.name)
 		var name_font: Font = player_name_font if player_name_font != null else ThemeDB.fallback_font
 		var name_size := GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE if i == 0 else GameConfig.PLAYER_NAME_FONT_SIZE
-		var name_position: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y)
+		var name_position: Vector2 = pos + Vector2(-GameConfig.PLAYER_NAME_WIDTH * 0.5, GameConfig.PLAYER_NAME_Y)
 		draw_string_outline(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, GameConfig.PLAYER_NAME_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
 		draw_string(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, name_color)
 		if i == 0:
@@ -1413,7 +1419,13 @@ func _draw() -> void:
 			draw_arc(aura_center, GameConfig.PLAYER_AURA_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, Color(name_color, aura_alpha), GameConfig.PLAYER_AURA_WIDTH, true)
 		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
 		if i == 0 and player.combo > 1:
-			draw_string(ThemeDB.fallback_font, pos + Vector2(27, -16), "x%d · %d" % [Scoring.multiplier(player.combo, mode == "classic"), player.combo], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GameConfig.GOLD)
+			var badge_center: Vector2 = pos + GameConfig.COMBO_BADGE_OFFSET
+			draw_circle(badge_center, GameConfig.COMBO_BADGE_RADIUS, Color("241838", 0.92))
+			draw_arc(badge_center, GameConfig.COMBO_BADGE_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, GameConfig.GOLD, GameConfig.COMBO_BADGE_OUTLINE_WIDTH, true)
+			var badge_text_position := badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_OFFSET_Y)
+			var badge_text_width := GameConfig.COMBO_BADGE_RADIUS * GameConfig.COMBO_BADGE_DIAMETER_FACTOR
+			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo, mode == "classic"), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, Color.WHITE)
+			draw_string(ThemeDB.fallback_font, badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_BOTTOM_Y), str(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_COUNT_SIZE, GameConfig.GOLD)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
 	if roll_time > 0.0 and roll_player >= 0 and roll_player < players.size():
@@ -1421,12 +1433,29 @@ func _draw() -> void:
 		var spell_size := Vector2(int(spell_meta.get("frame_w", 128)), int(spell_meta.get("frame_h", 128)))
 		var roll_frame := posmod(floori(elapsed * 20.0), ITEMS.size())
 		_draw_strip_frame(SPELL_TEXTURE, spell_size, roll_frame, players[roll_player].pos + Vector2(0.0, -94.0), 0.5, ITEMS.size())
-	for effect in floating:
-		draw_string(ThemeDB.fallback_font, effect.pos, effect.text, HORIZONTAL_ALIGNMENT_CENTER, -1, 22, effect.color)
 	if mode == "voodoo" and remaining <= 15.0:
 		draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), Color(1.0, 0.72, 0.12, 0.035 + 0.025 * sin(elapsed * 8.0)), false, 7.0)
+	draw_set_transform(Vector2.ZERO)
+	for effect in floating:
+		var duration := float(effect.duration)
+		var age := duration - float(effect.time)
+		var pop := 1.0 if Settings.reduce_motion else (GameConfig.FLOAT_POP_SCALE if age <= 0.0 else (1.0 + (GameConfig.FLOAT_POP_SCALE - 1.0) * maxf(0.0, 1.0 - age / GameConfig.FLOAT_POP_SECONDS)))
+		var alpha := clampf(float(effect.time) / GameConfig.FLOAT_FADE_SECONDS, 0.0, 1.0)
+		var color := Color(effect.color, alpha)
+		if bool(effect.is_coin):
+			var points := int(String(effect.text).trim_prefix("+"))
+			var coin_font_size := GameConfig.FLOAT_COIN_BONUS_FONT_SIZE if points >= 3 else GameConfig.FLOAT_COIN_FONT_SIZE
+			var font := floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font
+			var text_position: Vector2 = effect.pos - Vector2(GameConfig.FLOAT_COIN_TEXT_WIDTH * 0.5, 0.0)
+			draw_string_outline(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_COIN_TEXT_WIDTH, roundi(coin_font_size * pop), GameConfig.FLOAT_COIN_OUTLINE_SIZE, Color(GameConfig.PLAYER_NAME_OUTLINE_COLOR, alpha))
+			draw_string(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_COIN_TEXT_WIDTH, roundi(coin_font_size * pop), color)
+		else:
+			var notice_font_size := GameConfig.FLOAT_NOTICE_LARGE_FONT_SIZE if String(effect.text) in [I18n.t("voodoo_combo"), I18n.t("frenzy")] else GameConfig.FLOAT_NOTICE_FONT_SIZE
+			var font := floating_notice_font if floating_notice_font != null else ThemeDB.fallback_font
+			var text_position: Vector2 = effect.pos - Vector2(GameConfig.FLOAT_NOTICE_TEXT_WIDTH * 0.5, 0.0)
+			draw_string_outline(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_NOTICE_TEXT_WIDTH, roundi(notice_font_size * pop), GameConfig.FLOAT_NOTICE_OUTLINE_SIZE, Color(GameConfig.PLAYER_NAME_OUTLINE_COLOR, alpha))
+			draw_string(font, text_position, effect.text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.FLOAT_NOTICE_TEXT_WIDTH, roundi(notice_font_size * pop), color)
 	if state == "countdown":
-		draw_set_transform(Vector2.ZERO)
 		var count_text := I18n.t("ready") if countdown < 1.0 else str(ceili(countdown))
 		draw_string(ThemeDB.fallback_font, Vector2(570, 370), count_text, HORIZONTAL_ALIGNMENT_CENTER, 160, 68, Color.WHITE)
 	else:
@@ -1704,7 +1733,9 @@ func _score_order() -> Array[int]:
 	return indices
 
 func _on_floating_text(text: String, world_pos: Vector2, tint: Color) -> void:
-	floating.append({"text": text, "pos": world_pos, "color": tint, "time": 0.8})
+	var is_coin := text.begins_with("+")
+	var duration := GameConfig.FLOAT_COIN_SECONDS if is_coin else GameConfig.FLOAT_NOTICE_SECONDS
+	floating.append({"text": text, "pos": world_pos, "color": tint, "time": duration, "duration": duration, "is_coin": is_coin})
 
 func _on_shake(amount: float) -> void:
 	if not Settings.reduce_motion:
@@ -1714,5 +1745,6 @@ func _on_shake(amount: float) -> void:
 func _animate_floating(delta: float) -> void:
 	for i in range(floating.size() - 1, -1, -1):
 		floating[i].time -= delta
-		floating[i].pos.y -= 24.0 * delta
+		if not Settings.reduce_motion:
+			floating[i].pos.y -= GameConfig.FLOAT_RISE_PIXELS / float(floating[i].duration) * delta
 		if floating[i].time <= 0.0: floating.remove_at(i)
