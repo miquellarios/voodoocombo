@@ -11,6 +11,8 @@ const SPELL_GLOW_TEXTURE := preload("res://assets/ui/hechizo_brillo.png")
 const SPELL_KEY_E_TEXTURE := preload("res://assets/ui/tecla_e.png")
 const SPELL_KEY_B_TEXTURE := preload("res://assets/ui/tecla_b.png")
 const TRAP_ICONS_TEXTURE := preload("res://assets/ui/trampas_iconos.png")
+const SAFE_ZONE_FOG_TEXTURE := preload("res://assets/ui/zona_niebla.png")
+const SAFE_ZONE_FOG_SHADER := preload("res://assets/ui/safe_zone_fog.gdshader")
 const BIOME_COLORS := [[Color("2b3a2a"), Color("243223")], [Color("33402a"), Color("2b3723")], [Color("2a3a4a"), Color("233241")], [Color("3a2a2a"), Color("322323")]]
 
 var state := "menu"
@@ -23,6 +25,10 @@ var arena: Dictionary = {}
 var previous_arena_id := ""
 var selected_arena_id := ""
 var arena_select_classic := false
+var safe_zone_step := 0
+var safe_zone_warning_step := 0
+var fog_material: ShaderMaterial
+var chest_fade_alpha: Array[float] = []
 var obstacle_rects: Array[Rect2] = []
 var player_hitbox_rects: Array[Rect2] = []
 var hazard_runtime: Array[Dictionary] = []
@@ -162,13 +168,15 @@ func _process(delta: float) -> void:
 		public_players.append({"name": player.name, "score": player.score, "combo": player.combo})
 	HttpEndpoint.set_status({"mode": mode, "time": remaining, "players": public_players})
 	if int(elapsed / 8.0) != int((elapsed - delta) / 8.0) and chests.size() < 2:
-		chests.append(_random_position())
+		chests.append(_random_position_in_safe_zone())
+		chest_fade_alpha.append(1.0)
 	_update_player(0, delta)
 	for i in range(1, players.size()):
 		_update_bot(i, delta)
 	_update_arena_hazards(delta)
 	_update_dash_hits()
 	_separate_players()
+	_update_safe_zone(delta)
 	_update_pickups()
 	_update_roll(delta)
 	_update_hud()
@@ -214,6 +222,7 @@ func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 	players.clear()
 	coins.clear()
 	chests.clear()
+	chest_fade_alpha.clear()
 	opened_chests.clear()
 	floating.clear()
 	var names := [Profile.nick, "Mordisquitos", "Conde Costura", "Dama del Pantano"]
@@ -224,11 +233,13 @@ func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 		var sheet_key := "%s_%s" % [characters[i], sprite_colors[i]]
 		if not character_sheets.has(sheet_key):
 			character_sheets[sheet_key] = load("res://assets/characters/%s.png" % sheet_key)
-		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1})
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1, "zone_drain_left": GameConfig.ZONE_DRAIN_INTERVAL})
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 	elapsed = 0.0
 	remaining = GameConfig.CLASSIC_SECONDS if mode == "classic" else GameConfig.MATCH_SECONDS
+	safe_zone_step = 0
+	safe_zone_warning_step = 0
 	frenzy_notified = false
 	_build_loading()
 
@@ -347,7 +358,8 @@ func _update_player(index: int, delta: float) -> void:
 		return
 	if direction != Vector2.ZERO:
 		player.dash_dir = direction
-	var speed := GameConfig.PLAYER_SPEED * (1.6 if SpellRules.is_active(player, "boots") else 1.0) * _terrain_speed(player.pos)
+	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
+	var speed := GameConfig.PLAYER_SPEED * (1.6 if SpellRules.is_active(player, "boots") else 1.0) * _terrain_speed(player.pos) * zone_speed
 	if SpellRules.is_active(player, "sheep"): speed *= 0.6
 	var motion: Vector2
 	if player.dash_left > 0.0:
@@ -394,6 +406,10 @@ func _update_bot(index: int, delta: float) -> void:
 		for chest in chests:
 			chest_positions.append(chest)
 	var direction := BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
+	if not ZoneRules.is_inside(player.pos, safe_zone_step):
+		coin_positions = [ZoneRules.safe_rect(safe_zone_step).get_center()]
+		chest_positions.clear()
+		direction = BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
 	player.bot_action_left = float(player.bot_action_left) - delta
 	if player.bot_action_left <= 0.0:
 		player.bot_action_left = rng.randf_range(GameConfig.BOT_DECISION_MIN_SECONDS, GameConfig.BOT_DECISION_MAX_SECONDS)
@@ -408,7 +424,8 @@ func _update_bot(index: int, delta: float) -> void:
 			player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 			bots_dash_global_left = GameConfig.BOT_TEAM_DASH_INTERVAL
 		player.bot_dash_target = -1
-	var speed_scale := (0.6 if SpellRules.is_active(player, "sheep") else (1.6 if SpellRules.is_active(player, "boots") else 1.0)) * _terrain_speed(player.pos)
+	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
+	var speed_scale := (0.6 if SpellRules.is_active(player, "sheep") else (1.6 if SpellRules.is_active(player, "boots") else 1.0)) * _terrain_speed(player.pos) * zone_speed
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
@@ -468,6 +485,7 @@ func _update_pickups() -> void:
 				opened_chests.append({"pos": chests[chest_i], "elapsed": 0.0})
 				_start_roll(i)
 				chests.remove_at(chest_i)
+				chest_fade_alpha.remove_at(chest_i)
 				break
 		if player.combo > 0 and elapsed - player.last_pickup > GameConfig.COMBO_WINDOW:
 			player.combo = 0
@@ -505,6 +523,63 @@ func _update_dash_hits() -> void:
 				players[i].bot_repath_left = 0.0
 			players[i].dash_left = 0.0
 			break
+
+func _update_safe_zone(delta: float) -> void:
+	var thresholds: Array = GameConfig.CLASSIC_ZONE_TIMES if mode == "classic" else GameConfig.VOODOO_ZONE_TIMES
+	for step_index in range(thresholds.size()):
+		var step := step_index + 1
+		var threshold := float(thresholds[step_index])
+		if safe_zone_warning_step < step and remaining <= threshold + GameConfig.ZONE_WARNING_SECONDS:
+			safe_zone_warning_step = step
+			Fx.pop(I18n.t("zone_warning"), GameConfig.ZONE_WARNING_POSITION, GameConfig.ZONE_WARNING_COLOR)
+			Sfx.play_tone(GameConfig.ZONE_WARNING_TONE_HZ, GameConfig.ZONE_WARNING_TONE_SECONDS)
+		if safe_zone_step < step and remaining <= threshold:
+			safe_zone_step = step
+	var safe_rect := ZoneRules.safe_rect(safe_zone_step)
+	for coin in coins:
+		if not safe_rect.has_point(coin.pos):
+			coin.pos = _random_position_in_safe_zone()
+			coin.fade_left = GameConfig.ZONE_COIN_FADE_SECONDS
+			coin.fade_alpha = 0.0
+		elif float(coin.get("fade_left", 0.0)) > 0.0:
+			coin.fade_left = maxf(0.0, float(coin.fade_left) - delta)
+			coin.fade_alpha = 1.0 - float(coin.fade_left) / GameConfig.ZONE_COIN_FADE_SECONDS
+	for chest_index in range(chests.size()):
+		if not safe_rect.has_point(chests[chest_index]):
+			chests[chest_index] = _random_position_in_safe_zone()
+			chest_fade_alpha[chest_index] = 0.0
+		elif chest_fade_alpha[chest_index] < 1.0:
+			chest_fade_alpha[chest_index] = minf(1.0, chest_fade_alpha[chest_index] + delta / GameConfig.ZONE_COIN_FADE_SECONDS)
+	for index in range(players.size()):
+		var player: Dictionary = players[index]
+		if safe_rect.has_point(player.pos):
+			player.zone_drain_left = GameConfig.ZONE_DRAIN_INTERVAL
+			continue
+		var drain := ZoneRules.advance_drain(float(player.zone_drain_left), delta, GameConfig.ZONE_DRAIN_INTERVAL)
+		player.zone_drain_left = float(drain.remaining)
+		for _tick in range(int(drain.ticks)):
+			if int(player.coins) <= 0: continue
+			player.coins -= 1
+			player.score = player.coins
+			Fx.pop("-1", player.pos + OFFSET, GameConfig.ZONE_DRAIN_COLOR)
+	if fog_material != null:
+		var screen_rect := Vector4(OFFSET.x + safe_rect.position.x, OFFSET.y + safe_rect.position.y, OFFSET.x + safe_rect.end.x, OFFSET.y + safe_rect.end.y)
+		fog_material.set_shader_parameter("safe_bounds", screen_rect)
+		fog_material.set_shader_parameter("scroll_time", 0.0 if Settings.reduce_motion else elapsed * GameConfig.ZONE_FOG_SCROLL_SPEED)
+
+func _random_position_in_safe_zone() -> Vector2:
+	var safe_rect := ZoneRules.safe_rect(safe_zone_step)
+	var margin := GameConfig.ZONE_PICKUP_MARGIN
+	for _attempt in range(GameConfig.ZONE_RANDOM_ATTEMPTS):
+		var candidate := Vector2(rng.randf_range(safe_rect.position.x + margin, safe_rect.end.x - margin), rng.randf_range(safe_rect.position.y + margin, safe_rect.end.y - margin))
+		if not _coin_position_is_clear(candidate): continue
+		var near_coin := false
+		for coin in coins:
+			if candidate.distance_to(coin.pos) < GameConfig.ZONE_COIN_SEPARATION:
+				near_coin = true
+				break
+		if not near_coin: return candidate
+	return safe_rect.get_center()
 
 func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum: int, maximum: int, stun_seconds: float, text_key: String = "trap_zap") -> Dictionary:
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
@@ -1131,6 +1206,21 @@ func _build_hud() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	if state == "menu": return
+	if state in ["playing", "countdown"]:
+		var fog_rect := ColorRect.new()
+		fog_rect.position = Vector2.ZERO
+		fog_rect.size = Vector2(1280.0, 720.0)
+		fog_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fog_rect.z_index = -1
+		fog_material = ShaderMaterial.new()
+		fog_material.shader = SAFE_ZONE_FOG_SHADER
+		fog_material.set_shader_parameter("fog_texture", SAFE_ZONE_FOG_TEXTURE)
+		fog_material.set_shader_parameter("logical_size", Vector2(1280.0, 720.0))
+		fog_material.set_shader_parameter("tile_size", GameConfig.ZONE_FOG_TILE_SIZE)
+		fog_material.set_shader_parameter("fog_alpha", GameConfig.ZONE_FOG_ALPHA)
+		fog_material.set_shader_parameter("scroll_y_ratio", GameConfig.ZONE_FOG_SCROLL_Y_RATIO)
+		fog_rect.material = fog_material
+		root.add_child(fog_rect)
 	score_name_labels.clear()
 	score_tag_labels.clear()
 	score_number_labels.clear()
@@ -1328,6 +1418,7 @@ func _end_match_cleanup() -> void:
 	players.clear()
 	coins.clear()
 	chests.clear()
+	chest_fade_alpha.clear()
 	opened_chests.clear()
 	hazard_runtime.clear()
 	obstacle_rects.clear()
@@ -1340,6 +1431,9 @@ func _end_match_cleanup() -> void:
 	elapsed = 0.0
 	remaining = 90.0
 	countdown = 0.0
+	safe_zone_step = 0
+	safe_zone_warning_step = 0
+	fog_material = null
 	end_wait = 0.0
 	bots_dash_global_left = 0.0
 	score_name_labels.clear()
@@ -1376,12 +1470,13 @@ func _draw() -> void:
 		var coin_bounce := GameConfig.COIN_BOB_PIXELS * absf(sin(elapsed * GameConfig.COIN_BOB_SPEED + phase))
 		var coin_meta: Dictionary = item_metadata.get("doblon", {})
 		var coin_size := Vector2(int(coin_meta.get("frame_w", 64)), int(coin_meta.get("frame_h", 64)))
-		_draw_strip_frame(COIN_TEXTURE, coin_size, floori(elapsed * float(coin_meta.get("fps", 10.0)) + phase), pos - Vector2(0.0, coin_bounce), float(coin_meta.get("scale", 0.5)), int(coin_meta.get("frames", 8)))
-	for chest in chests:
+		_draw_strip_frame(COIN_TEXTURE, coin_size, floori(elapsed * float(coin_meta.get("fps", 10.0)) + phase), pos - Vector2(0.0, coin_bounce), float(coin_meta.get("scale", 0.5)), int(coin_meta.get("frames", 8)), Color(1.0, 1.0, 1.0, float(coin.get("fade_alpha", 1.0))))
+	for chest_index in range(chests.size()):
+		var chest: Vector2 = chests[chest_index]
 		var chest_meta: Dictionary = item_metadata.get("cofre", {})
 		var chest_size := Vector2(int(chest_meta.get("frame_w", 224)), int(chest_meta.get("frame_h", 256)))
 		var chest_bounce := GameConfig.CHEST_BOB_PIXELS * sin(elapsed * GameConfig.CHEST_BOB_SPEED)
-		_draw_strip_frame(CHEST_TEXTURE, chest_size, 0, chest - Vector2(0.0, chest_bounce), float(chest_meta.get("scale", 0.5)), int(chest_meta.get("frames", 6)))
+		_draw_strip_frame(CHEST_TEXTURE, chest_size, 0, chest - Vector2(0.0, chest_bounce), float(chest_meta.get("scale", 0.5)), int(chest_meta.get("frames", 6)), Color(1.0, 1.0, 1.0, chest_fade_alpha[chest_index]))
 	for chest in opened_chests:
 		var opened_meta: Dictionary = item_metadata.get("cofre", {})
 		var opened_size := Vector2(int(opened_meta.get("frame_w", 224)), int(opened_meta.get("frame_h", 256)))
@@ -1428,6 +1523,10 @@ func _draw() -> void:
 			draw_string(ThemeDB.fallback_font, badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_BOTTOM_Y), str(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_COUNT_SIZE, GameConfig.GOLD)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
+	if safe_zone_warning_step > safe_zone_step:
+		var warning_rect := ZoneRules.safe_rect(safe_zone_step + 1)
+		var warning_alpha := 0.78 if Settings.reduce_motion else (0.55 + 0.45 * sin(elapsed * GameConfig.ZONE_WARNING_FLASH_SPEED))
+		draw_rect(warning_rect, Color(GameConfig.ZONE_WARNING_COLOR, warning_alpha), false, GameConfig.ZONE_WARNING_LINE_WIDTH)
 	if roll_time > 0.0 and roll_player >= 0 and roll_player < players.size():
 		var spell_meta: Dictionary = item_metadata.get("hechizos", {})
 		var spell_size := Vector2(int(spell_meta.get("frame_w", 128)), int(spell_meta.get("frame_h", 128)))
@@ -1461,12 +1560,12 @@ func _draw() -> void:
 	else:
 		draw_set_transform(Vector2.ZERO)
 
-func _draw_strip_frame(texture: Texture2D, frame_size: Vector2, frame_index: int, center: Vector2, scale_factor: float, frame_count: int) -> void:
+func _draw_strip_frame(texture: Texture2D, frame_size: Vector2, frame_index: int, center: Vector2, scale_factor: float, frame_count: int, modulate: Color = Color.WHITE) -> void:
 	if texture == null or frame_count <= 0:
 		return
 	var frame := posmod(frame_index, frame_count)
 	var draw_size := frame_size * scale_factor
-	draw_texture_rect_region(texture, Rect2(center - draw_size * 0.5, draw_size), Rect2(frame * frame_size.x, 0.0, frame_size.x, frame_size.y))
+	draw_texture_rect_region(texture, Rect2(center - draw_size * 0.5, draw_size), Rect2(frame * frame_size.x, 0.0, frame_size.x, frame_size.y), modulate)
 
 func _draw_arena_hazards() -> void:
 	for hazard_index in range(arena.get("hazards", []).size()):
@@ -1717,7 +1816,7 @@ func _separate_players() -> void:
 			players[second_index].pos = separated[1]
 
 func _spawn_coin() -> void:
-	coins.append({"pos": _random_position(), "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
+	coins.append({"pos": _random_position_in_safe_zone(), "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 
 func _leader_index() -> int:
 	if players.is_empty(): return -1

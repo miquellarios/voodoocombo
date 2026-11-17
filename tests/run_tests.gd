@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_items()
 	_test_spell_rules()
 	_test_nickname_rules()
+	_test_safe_zone()
 	_test_ranking()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
@@ -180,6 +181,12 @@ func _test_spell_rules() -> void:
 func _test_nickname_rules() -> void:
 	_check(NicknameRules.is_valid(" Ada ") and NicknameRules.normalize(" Ada ") == "Ada", "nickname trims outside spaces")
 	_check(not NicknameRules.is_valid("AB") and not NicknameRules.is_valid("ABCDEFGHIJKLM"), "nickname length is limited to 3-12 characters")
+
+func _test_safe_zone() -> void:
+	_check(ZoneRules.safe_rect(GameConfig.ZONE_MAX_STEPS).size == Vector2(GameConfig.ZONE_FINAL_GRID_SIZE) * GameConfig.CELL_SIZE, "safe zone reaches 18 by 9 cells")
+	_check(ZoneRules.step_for_remaining(25.0, false) == 3 and ZoneRules.step_for_remaining(60.0, true) == 3, "zone uses mode-specific closing times")
+	var drain := ZoneRules.advance_drain(GameConfig.ZONE_DRAIN_INTERVAL, 3.0, GameConfig.ZONE_DRAIN_INTERVAL)
+	_check(int(drain.ticks) == 4, "outside player loses four coins in three seconds")
 
 func _test_ranking() -> void:
 	var players: Array[Dictionary] = [{"name": "A", "score": 10, "max_combo": 4}, {"name": "B", "score": 10, "max_combo": 9}]

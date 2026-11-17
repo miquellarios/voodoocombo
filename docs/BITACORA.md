@@ -188,3 +188,9 @@ Formato de cada entrada:
 - Decisiones: El color de «+N» sigue el nivel de combo (blanco, naranja, rosa); reducir movimiento elimina el ascenso y el pop.
 - Problemas encontrados y cómo se resolvieron: Ninguno; suite core, smoke y carga headless pasan.
 - Qué tienen que probar los humanos: Recoger doblones con multiplicadores x1/x2/x3, confirmar tamaños/colores/contorno/duración, y activar avisos de trampa y combos con «Reducir movimiento» encendido y apagado.
+
+### Fase 10j — Cierre de la zona segura (17/11/2026)
+- Qué se ha hecho: La zona se encoge según el reloj de cada modo y termina en 18×9 casillas. Tres segundos antes se anuncia con borde morado y sonido. Fuera, los jugadores van al 70 % y pierden un doblón cada 0,75 s; monedas y cofres exteriores se reubican dentro con fundido. Los bots que quedan fuera buscan volver al centro. La niebla usa la textura del kit y se detiene con Reducir movimiento.
+- Decisiones: Las reapariciones nuevas de cofres y monedas también usan la zona actual. Se usa `ZoneRules` para la geometría y el temporizador de pérdida.
+- Problemas encontrados y cómo se resolvieron: La primera prueba de escena reveló un `return` no válido dentro del fragment shader; se cambió por una rama `if/else`. La escena real pudo crear el HUD y aplicar el tercer paso sin error de shader.
+- Qué tienen que probar los humanos: Probar los tres avisos y encogimientos en ambos modos, medir 18×9 al final, dejar un jugador fuera 3 s (4 doblones menos), y comprobar reubicación de cofres/monedas, movimiento de niebla y bots que regresan.

@@ -128,6 +128,7 @@ res://
 - **Duración:** 90 s (el anfitrión puede elegir 60, 90 o 120).
 - **Corona:** la lleva el líder en cada momento.
 - **Frenesí:** en los últimos 15 s.
+- **Zona segura:** VoodooCombo se encoge con 45/35/25 s restantes; Clásico, con 120/90/60. Cada paso quita dos columnas por lado y una fila arriba/abajo; el final mide 18×9 casillas. Tres segundos antes avisa. Fuera de la zona hay niebla, velocidad ×0,7 y pérdida de 1 doblón cada 0,75 s; doblones y cofres vuelven dentro.
 - **Final:** gana quien tenga más doblones. En caso de empate, gana quien tenga el combo máximo más alto.
 - **Premios** (se calculan en `ranking.gd` y, si se puede, cada jugador recibe uno):
 

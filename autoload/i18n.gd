@@ -9,6 +9,7 @@ var strings := {
 
 func _init() -> void:
 	strings.es.merge({
+		"zone_warning": "¡LA NIEBLA SE CIERRA!",
 		"frenzy": "¡FRENESÍ!",
 		"name_title": "¿Cómo te llamas?",
 		"name_hint": "De 3 a 12 caracteres",
@@ -39,6 +40,7 @@ func _init() -> void:
 		"loading_tip_10": "Recoge los doblones cerca del centro antes de que acabe la partida."
 	}, true)
 	strings.ca.merge({
+		"zone_warning": "LA BOIRA ES TANCA!",
 		"frenzy": "FRENESÍ!",
 		"name_title": "Com et dius?",
 		"name_hint": "De 3 a 12 caràcters",
@@ -69,6 +71,7 @@ func _init() -> void:
 		"loading_tip_10": "Recull els doblons prop del centre abans que s'acabi la partida."
 	}, true)
 	strings.en.merge({
+		"zone_warning": "THE FOG IS CLOSING!",
 		"frenzy": "FRENZY!",
 		"name_title": "What's your name?",
 		"name_hint": "3 to 12 characters",
