@@ -81,6 +81,7 @@ var floating_notice_font: Font
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
+	Settings.apply_display()
 	player_name_font = load("res://assets/fonts/Baloo2-Regular.woff2") as Font
 	floating_coin_font = load("res://assets/fonts/LilitaOne-Regular.woff2") as Font
 	floating_notice_font = load("res://assets/fonts/NewRocker-Regular.woff2") as Font
@@ -186,6 +187,10 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == GameConfig.SETTINGS_F11_KEY:
+		Settings.toggle_fullscreen()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		last_input_controller = true
 	elif event is InputEventKey or event is InputEventMouseButton:
@@ -1181,19 +1186,27 @@ func _build_settings() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	_label(root, I18n.t("settings"), Vector2(0, 130), 44, GameConfig.GOLD, true)
-	_button(root, "Reducir movimiento: %s" % ("Sí" if Settings.reduce_motion else "No"), Vector2(0, 235), func():
+	_button(root, "%s: %s" % [I18n.t("settings_reduce_motion"), I18n.t("settings_yes") if Settings.reduce_motion else I18n.t("settings_no")], Vector2(0, 215), func():
 		Settings.reduce_motion = not Settings.reduce_motion
 		Settings.save()
 		_build_settings())
-	_button(root, "Escala UI: %d%%" % int(Settings.ui_scale * 100.0), Vector2(0, 300), func():
+	_button(root, "%s: %d%%" % [I18n.t("settings_ui_scale"), int(Settings.ui_scale * 100.0)], Vector2(0, 275), func():
 		Settings.ui_scale = 1.0 if Settings.ui_scale >= 1.5 else Settings.ui_scale + 0.25
 		Settings.save()
 		_build_settings())
-	_button(root, "Idioma: %s" % I18n.language, Vector2(0, 365), func():
+	var display_mode := I18n.t("settings_fullscreen") if Settings.window_fullscreen else I18n.t("settings_windowed")
+	_button(root, "%s: %s" % [I18n.t("settings_display_mode"), display_mode], Vector2(0, GameConfig.SETTINGS_DISPLAY_MODE_Y), func():
+		Settings.toggle_fullscreen()
+		_build_settings())
+	var window_size: Vector2i = GameConfig.WINDOW_SIZE_OPTIONS[Settings.window_size_index]
+	_button(root, "%s: %d×%d" % [I18n.t("settings_window_size"), window_size.x, window_size.y], Vector2(0, GameConfig.SETTINGS_WINDOW_SIZE_Y), func():
+		Settings.cycle_window_size()
+		_build_settings())
+	_button(root, "%s: %s" % [I18n.t("settings_language"), I18n.language], Vector2(0, GameConfig.SETTINGS_LANGUAGE_Y), func():
 		I18n.set_language("ca" if I18n.language == "es" else ("en" if I18n.language == "ca" else "es"))
 		Settings.save()
 		_build_settings())
-	_button(root, I18n.t("menu"), Vector2(0, 440), _build_menu)
+	_button(root, I18n.t("menu"), Vector2(0, GameConfig.SETTINGS_MENU_Y), _build_menu)
 
 func _build_pause() -> void:
 	_clear_hud()

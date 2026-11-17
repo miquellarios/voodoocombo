@@ -4,6 +4,8 @@ var reduce_motion := false
 var ui_scale := 1.0
 var music_volume := 0.7
 var sfx_volume := 0.8
+var window_fullscreen := false
+var window_size_index := GameConfig.DEFAULT_WINDOW_SIZE_INDEX
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -12,6 +14,8 @@ func _ready() -> void:
 		ui_scale = config.get_value("accessibility", "ui_scale", 1.0)
 		music_volume = config.get_value("audio", "music", 0.7)
 		sfx_volume = config.get_value("audio", "sfx", 0.8)
+		window_fullscreen = bool(config.get_value("display", "fullscreen", window_fullscreen))
+		window_size_index = clampi(int(config.get_value("display", "window_size_index", window_size_index)), 0, GameConfig.WINDOW_SIZE_OPTIONS.size() - 1)
 		I18n.set_language(str(config.get_value("general", "language", "es")))
 
 func save() -> void:
@@ -21,4 +25,24 @@ func save() -> void:
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "sfx", sfx_volume)
 	config.set_value("general", "language", I18n.language)
+	config.set_value("display", "fullscreen", window_fullscreen)
+	config.set_value("display", "window_size_index", window_size_index)
 	config.save("user://settings.cfg")
+
+func apply_display() -> void:
+	if window_fullscreen:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		var size: Vector2i = GameConfig.WINDOW_SIZE_OPTIONS[window_size_index]
+		DisplayServer.window_set_size(size)
+
+func toggle_fullscreen() -> void:
+	window_fullscreen = not window_fullscreen
+	apply_display()
+	save()
+
+func cycle_window_size() -> void:
+	window_size_index = posmod(window_size_index + 1, GameConfig.WINDOW_SIZE_OPTIONS.size())
+	apply_display()
+	save()

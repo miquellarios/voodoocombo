@@ -20,7 +20,7 @@ Si una funcionalidad añade reglas que no se entienden en 5 segundos, no entra.
 ## 2. Reglas técnicas
 
 - **Motor:** Godot 4 + GDScript con tipos estáticos. Lee `config/features` de `project.godot` para saber la versión y usa solo APIs de esa versión.
-- **Renderer:** Compatibility. **Ventana:** 1280×720, stretch `canvas_items`, aspect `expand`.
+- **Renderer:** Compatibility. **Lienzo:** 1280×720. **Ventana inicial:** 1920×1080, redimensionable; stretch `canvas_items`, aspect `keep`.
 - **Assets:** solo los del proyecto.
   - `assets/fonts/`: New Rocker, Lilita One y Baloo 2 (licencia OFL). Si faltan, se usa la fuente por defecto sin errores.
   - `assets/characters/`: sprites de los personajes, generados por Claude. Cómo usarlos: `assets/characters/SPRITES.md`.
@@ -290,6 +290,7 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 - **Menús:** se usan del todo con teclado y mando, con foco visible.
 - **Nunca solo color:** formas ● ▲ ■ ◆ e iconos.
 - **Ajustes:** reducir movimiento, escala de UI 100/125/150 %, volumen de música y de efectos, idioma.
+- **Pantalla:** ventana o pantalla completa (F11); tamaño 1280×720, 1600×900 o 1920×1080, guardado en ajustes.
 
 ## 9. Cómo trabajar
 

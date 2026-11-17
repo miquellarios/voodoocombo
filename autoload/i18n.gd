@@ -9,6 +9,15 @@ var strings := {
 
 func _init() -> void:
 	strings.es.merge({
+		"settings_reduce_motion": "Reducir movimiento",
+		"settings_yes": "Sí",
+		"settings_no": "No",
+		"settings_ui_scale": "Escala UI",
+		"settings_language": "Idioma",
+		"settings_display_mode": "Pantalla",
+		"settings_windowed": "Ventana",
+		"settings_fullscreen": "Pantalla completa",
+		"settings_window_size": "Tamaño de ventana",
 		"zone_warning": "¡LA NIEBLA SE CIERRA!",
 		"frenzy": "¡FRENESÍ!",
 		"name_title": "¿Cómo te llamas?",
@@ -40,6 +49,15 @@ func _init() -> void:
 		"loading_tip_10": "Recoge los doblones cerca del centro antes de que acabe la partida."
 	}, true)
 	strings.ca.merge({
+		"settings_reduce_motion": "Reduir moviment",
+		"settings_yes": "Sí",
+		"settings_no": "No",
+		"settings_ui_scale": "Escala UI",
+		"settings_language": "Idioma",
+		"settings_display_mode": "Pantalla",
+		"settings_windowed": "Finestra",
+		"settings_fullscreen": "Pantalla completa",
+		"settings_window_size": "Mida de la finestra",
 		"zone_warning": "LA BOIRA ES TANCA!",
 		"frenzy": "FRENESÍ!",
 		"name_title": "Com et dius?",
@@ -71,6 +89,15 @@ func _init() -> void:
 		"loading_tip_10": "Recull els doblons prop del centre abans que s'acabi la partida."
 	}, true)
 	strings.en.merge({
+		"settings_reduce_motion": "Reduce motion",
+		"settings_yes": "On",
+		"settings_no": "Off",
+		"settings_ui_scale": "UI scale",
+		"settings_language": "Language",
+		"settings_display_mode": "Display",
+		"settings_windowed": "Windowed",
+		"settings_fullscreen": "Fullscreen",
+		"settings_window_size": "Window size",
 		"zone_warning": "THE FOG IS CLOSING!",
 		"frenzy": "FRENZY!",
 		"name_title": "What's your name?",

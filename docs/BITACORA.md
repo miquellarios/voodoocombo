@@ -194,3 +194,9 @@ Formato de cada entrada:
 - Decisiones: Las reapariciones nuevas de cofres y monedas también usan la zona actual. Se usa `ZoneRules` para la geometría y el temporizador de pérdida.
 - Problemas encontrados y cómo se resolvieron: La primera prueba de escena reveló un `return` no válido dentro del fragment shader; se cambió por una rama `if/else`. La escena real pudo crear el HUD y aplicar el tercer paso sin error de shader.
 - Qué tienen que probar los humanos: Probar los tres avisos y encogimientos en ambos modos, medir 18×9 al final, dejar un jugador fuera 3 s (4 doblones menos), y comprobar reubicación de cofres/monedas, movimiento de niebla y bots que regresan.
+
+### Fase 10k — Ventana ajustable (17/11/2026)
+- Qué se ha hecho: El lienzo continúa en 1280×720; la ventana abre a 1920×1080, se puede redimensionar y usa `canvas_items` con aspecto `keep`. AJUSTES permite ventana/pantalla completa y los tres tamaños previstos. F11 alterna pantalla completa; se guardan ambas opciones.
+- Decisiones: Al cambiar resolución en pantalla completa se actualiza la preferencia guardada; se aplica al volver a modo ventana.
+- Problemas encontrados y cómo se resolvieron: Ninguno; carga del editor, tests core y arranque headless pasan.
+- Qué tienen que probar los humanos: Abrir a 1920×1080, redimensionar, probar los tres tamaños, alternar pantalla completa desde AJUSTES y F11 y reiniciar para comprobar persistencia y proporciones.
