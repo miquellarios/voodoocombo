@@ -11,6 +11,7 @@ func _initialize() -> void:
 	_test_bot_dash_rate()
 	_test_hazard_rules()
 	_test_items()
+	_test_spell_rules()
 	_test_ranking()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
@@ -152,6 +153,16 @@ func _test_items() -> void:
 	_check(ItemTable.probabilities_sum("middle", true) == 97, "classic excludes ring weights")
 	for _i in range(100):
 		_check(ItemTable.roll("first", rng, true) != "ring", "classic excludes ring")
+
+func _test_spell_rules() -> void:
+	var held := {"item": "boots", "item_time": 0.0}
+	_check(SpellRules.can_activate(held) and not SpellRules.is_active(held, "boots"), "picked-up spell waits for activation")
+	var active := SpellRules.activate(held)
+	_check(is_equal_approx(float(active.item_time), GameConfig.SPELL_BOOTS_SECONDS), "activating boots starts its duration")
+	_check(not SpellRules.can_activate(active) and SpellRules.is_active(active, "boots"), "active spell cannot be activated twice")
+	_check(SpellRules.duration("pin") == 0.0 and SpellRules.duration("frost") == 0.0, "instant spells have no duration")
+	var inactive_cloak := HazardRules.resolve_hit({"coins": 10, "score": 10, "item": "cloak", "item_time": 0.0, "invuln": 0.0, "combo": 1, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
+	_check(inactive_cloak.applied, "held cloak does not block before activation")
 
 func _test_ranking() -> void:
 	var players: Array[Dictionary] = [{"name": "A", "score": 10, "max_combo": 4}, {"name": "B", "score": 10, "max_combo": 9}]

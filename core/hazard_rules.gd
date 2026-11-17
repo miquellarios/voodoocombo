@@ -40,7 +40,7 @@ static func resolve_hit(victim: Dictionary, fraction: float, minimum: int, maxim
 	var changed: Dictionary = victim.duplicate(true)
 	if float(changed.get("invuln", 0.0)) > 0.0:
 		return {"applied": false, "blocked": false, "dropped": 0, "victim": changed}
-	if String(changed.get("item", "")) == "cloak":
+	if SpellRules.is_active(changed, "cloak"):
 		changed.item = ""
 		changed.item_time = 0.0
 		return {"applied": false, "blocked": true, "dropped": 0, "victim": changed}

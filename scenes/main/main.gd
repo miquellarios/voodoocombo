@@ -6,6 +6,10 @@ const COIN_TEXTURE := preload("res://assets/items/doblon.png")
 const COIN_SHADOW_TEXTURE := preload("res://assets/items/doblon_sombra.png")
 const CHEST_TEXTURE := preload("res://assets/items/cofre.png")
 const SPELL_TEXTURE := preload("res://assets/items/hechizos.png")
+const SPELL_SLOT_TEXTURE := preload("res://assets/ui/hechizo_ranura.png")
+const SPELL_GLOW_TEXTURE := preload("res://assets/ui/hechizo_brillo.png")
+const SPELL_KEY_E_TEXTURE := preload("res://assets/ui/tecla_e.png")
+const SPELL_KEY_B_TEXTURE := preload("res://assets/ui/tecla_b.png")
 const BIOME_COLORS := [[Color("2b3a2a"), Color("243223")], [Color("33402a"), Color("2b3723")], [Color("2a3a4a"), Color("233241")], [Color("3a2a2a"), Color("322323")]]
 
 var state := "menu"
@@ -52,6 +56,9 @@ var results_xp := 0
 var character_preview: TextureRect
 var character_preview_id := "mago"
 var character_idle := 0.0
+var spell_notice_time := 0.0
+var spell_notice_item := ""
+var last_input_controller := false
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
@@ -88,6 +95,8 @@ func _process(delta: float) -> void:
 		_start_dash(0)
 	if state == "playing" and Input.is_action_just_pressed("use_spell"):
 		_use_spell(0)
+	if state == "playing":
+		spell_notice_time = maxf(0.0, spell_notice_time - delta)
 	if state == "countdown":
 		countdown -= delta
 		if countdown <= 0.0:
@@ -133,11 +142,13 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		last_input_controller = true
+	elif event is InputEventKey or event is InputEventMouseButton:
+		last_input_controller = false
 	if state == "playing" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode in [KEY_SPACE, KEY_SHIFT]:
 			_start_dash(0)
-		elif event.keycode in [KEY_E, KEY_ENTER, KEY_KP_ENTER]:
-			_use_spell(0)
 		elif event.keycode == KEY_ESCAPE:
 			state = "paused"
 			_build_pause()
@@ -206,8 +217,8 @@ func _update_player(index: int, delta: float) -> void:
 		return
 	if direction != Vector2.ZERO:
 		player.dash_dir = direction
-	var speed := GameConfig.PLAYER_SPEED * (1.6 if player.item == "boots" else 1.0) * _terrain_speed(player.pos)
-	if player.item == "sheep": speed *= 0.6
+	var speed := GameConfig.PLAYER_SPEED * (1.6 if SpellRules.is_active(player, "boots") else 1.0) * _terrain_speed(player.pos)
+	if SpellRules.is_active(player, "sheep"): speed *= 0.6
 	var motion: Vector2
 	if player.dash_left > 0.0:
 		player.dash_left = maxf(0.0, player.dash_left - delta)
@@ -219,9 +230,9 @@ func _update_player(index: int, delta: float) -> void:
 	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
 	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
 		player.dash_left = 0.0
-	if player.item == "magnet":
+	if SpellRules.is_active(player, "magnet"):
 		for coin in coins:
-			if player.pos.distance_to(coin.pos) < 220.0:
+			if player.pos.distance_to(coin.pos) < GameConfig.SPELL_MAGNET_RADIUS:
 				coin.pos = coin.pos.move_toward(player.pos, 260.0 * delta)
 
 func _update_bot(index: int, delta: float) -> void:
@@ -256,6 +267,7 @@ func _update_bot(index: int, delta: float) -> void:
 	player.bot_action_left = float(player.bot_action_left) - delta
 	if player.bot_action_left <= 0.0:
 		player.bot_action_left = rng.randf_range(GameConfig.BOT_DECISION_MIN_SECONDS, GameConfig.BOT_DECISION_MAX_SECONDS)
+		_use_spell_for_bot(index)
 		player.bot_dash_target = BotBrain.choose_dash_target(player, players, index, obstacle_rects, rng) if bots_dash_global_left <= 0.0 else -1
 	if bots_dash_global_left <= 0.0 and player.dash_cd <= 0.0 and int(player.bot_dash_target) >= 0 and player.dash_lock <= 0.0:
 		var target_index := int(player.bot_dash_target)
@@ -263,10 +275,10 @@ func _update_bot(index: int, delta: float) -> void:
 			direction = (players[target_index].pos - player.pos).normalized()
 			player.dash_dir = direction
 			player.dash_left = GameConfig.DASH_DURATION
-			player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
+			player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 			bots_dash_global_left = GameConfig.BOT_TEAM_DASH_INTERVAL
 		player.bot_dash_target = -1
-	var speed_scale := (0.6 if player.item == "sheep" else (1.6 if player.item == "boots" else 1.0)) * _terrain_speed(player.pos)
+	var speed_scale := (0.6 if SpellRules.is_active(player, "sheep") else (1.6 if SpellRules.is_active(player, "boots") else 1.0)) * _terrain_speed(player.pos)
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
@@ -277,25 +289,23 @@ func _update_bot(index: int, delta: float) -> void:
 	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
 		player.dash_left = 0.0
 	if player.dash_left > 0.0: player.dash_left = maxf(0.0, player.dash_left - delta)
-	if player.item != "" and rng.randf() < delta * 0.4:
-		_use_spell_for_bot(index)
-	if player.item == "magnet":
+	if SpellRules.is_active(player, "magnet"):
 		for coin in coins:
-			if player.pos.distance_to(coin.pos) < 220.0:
+			if player.pos.distance_to(coin.pos) < GameConfig.SPELL_MAGNET_RADIUS:
 				coin.pos = coin.pos.move_toward(player.pos, 260.0 * delta)
 
 func _start_dash(index: int) -> void:
 	var player := players[index]
-	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or player.item == "sheep": return
+	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or SpellRules.is_active(player, "sheep"): return
 	player.dash_left = GameConfig.DASH_DURATION
-	player.dash_cd = 0.5 if player.item == "boots" else GameConfig.DASH_COOLDOWN
+	player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 	if player.vel.length() > 0.1: player.dash_dir = player.vel.normalized()
 	Sfx.play_tone(180.0, 0.12)
 
 func _update_pickups() -> void:
 	for i in range(players.size()):
 		var player := players[i]
-		if player.item == "sheep": continue
+		if SpellRules.is_active(player, "sheep"): continue
 		for c in range(coins.size() - 1, -1, -1):
 			var coin: Dictionary = coins[c]
 			if player.pos.distance_to(coin.pos) > 28.0 or (coin.owner == i and coin.lock > 0.0): continue
@@ -307,7 +317,7 @@ func _update_pickups() -> void:
 			else:
 				player.combo = Scoring.next_combo(player.combo, elapsed - player.last_pickup)
 				player.max_combo = maxi(player.max_combo, player.combo)
-				value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, player.item == "ring", false)
+				value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, SpellRules.is_active(player, "ring"), false)
 				player.coins += value
 				player.score = player.coins
 				player.last_pickup = elapsed
@@ -350,7 +360,7 @@ func _update_dash_hits() -> void:
 				Fx.hit()
 				Sfx.play_tone(210.0, 0.12)
 				break
-			var fraction := GameConfig.RING_HIT_DROP_FRACTION if players[j].item == "ring" else (GameConfig.CROWN_HIT_DROP_FRACTION if j == _leader_index() else GameConfig.HIT_DROP_FRACTION)
+			var fraction := GameConfig.RING_HIT_DROP_FRACTION if SpellRules.is_active(players[j], "ring") else (GameConfig.CROWN_HIT_DROP_FRACTION if j == _leader_index() else GameConfig.HIT_DROP_FRACTION)
 			var result := _apply_hit(j, i, fraction, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
 			if not result.applied:
 				players[i].dash_left = 0.0
@@ -601,73 +611,82 @@ func _update_roll(delta: float) -> void:
 	roll_time -= delta
 	if roll_time <= 0.0 and roll_player >= 0:
 		players[roll_player].item = roll_result
-		players[roll_player].item_time = 8.0 if roll_result == "cloak" else (6.0 if roll_result == "ring" else (5.0 if roll_result == "magnet" else 4.0))
+		players[roll_player].item_time = 0.0
+		if roll_player == 0:
+			spell_notice_item = roll_result
+			spell_notice_time = GameConfig.SPELL_NOTICE_SECONDS
 		Fx.pop(roll_result.to_upper(), players[roll_player].pos + OFFSET + Vector2(0, -52), GameConfig.GOLD)
 		Sfx.play_tone(880.0, 0.16)
 
 func _use_spell_for_bot(index: int) -> void:
-	var player := players[index]
-	if player.item == "" or player.item in ["cloak", "boots", "magnet", "ring"]: return
-	if player.item == "frost":
-		for j in range(players.size()):
-			if j != index and player.pos.distance_to(players[j].pos) < 180.0:
-				if players[j].item == "cloak": players[j].item = ""
-				else: players[j].stun = 1.5
-		player.item = ""
-	elif player.item == "sheep":
-		var leader := _leader_index()
-		if leader != index:
-			if players[leader].item == "cloak":
-				players[leader].item = ""
-			else:
-				players[leader].item = "sheep"
-				players[leader].item_time = 3.0
-				players[leader].sheep += 1
-			player.item = ""
-	elif player.item == "pin":
-		var target := -1
-		var best := 900.0
-		for j in range(players.size()):
-			if j != index and player.pos.distance_to(players[j].pos) < best:
-				best = player.pos.distance_to(players[j].pos)
-				target = j
-		if target >= 0:
-			player.dash_dir = (players[target].pos - player.pos).normalized()
-			player.dash_left = GameConfig.DASH_DURATION
-			player.dash_cd = GameConfig.DASH_COOLDOWN
-			player.item = ""
+	var player: Dictionary = players[index]
+	if not SpellRules.can_activate(player): return
+	var item := String(player.item)
+	if SpellRules.duration(item) > 0.0:
+		var useful := item in ["cloak", "boots", "ring"]
+		if item == "magnet":
+			for coin in coins:
+				if player.pos.distance_to(coin.pos) <= GameConfig.SPELL_MAGNET_RADIUS: useful = true; break
+		if useful: player.item_time = SpellRules.duration(item)
+	elif _spell_is_useful(index, item):
+		_cast_instant_spell(index)
 
-func _use_spell(index: int) -> void:
-	if players.is_empty() or players[index].item == "": return
-	var player := players[index]
-	match player.item:
-		"cloak", "boots", "magnet", "ring": return
+func _spell_is_useful(index: int, item: String) -> bool:
+	var player: Dictionary = players[index]
+	if item == "frost":
+		for j in range(players.size()):
+			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_FROST_RADIUS: return true
+	if item == "sheep": return _leader_index() != index
+	if item == "pin":
+		for j in range(players.size()):
+			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_PIN_RANGE: return true
+	return false
+
+func _cast_instant_spell(index: int) -> void:
+	var player: Dictionary = players[index]
+	match String(player.item):
 		"frost":
 			for j in range(players.size()):
-				if j != index and player.pos.distance_to(players[j].pos) <= 180.0:
-					if players[j].item == "cloak": players[j].item = ""
-					else: players[j].stun = 1.5
+				if j == index or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
+				if SpellRules.is_active(players[j], "cloak"):
+					players[j].item = ""
+					players[j].item_time = 0.0
+				else: players[j].stun = GameConfig.SPELL_FROST_SECONDS
 		"sheep":
 			var leader := _leader_index()
 			if leader != index:
-				if players[leader].item == "cloak": players[leader].item = ""
+				if SpellRules.is_active(players[leader], "cloak"):
+					players[leader].item = ""
+					players[leader].item_time = 0.0
 				else:
 					players[leader].item = "sheep"
-					players[leader].item_time = 3.0
+					players[leader].item_time = GameConfig.SPELL_SHEEP_SECONDS
 					players[leader].sheep += 1
 		"pin":
 			var target := -1
-			var best := INF
+			var best := GameConfig.SPELL_PIN_RANGE * GameConfig.SPELL_PIN_RANGE
 			for j in range(players.size()):
 				if j != index and player.pos.distance_squared_to(players[j].pos) < best:
 					best = player.pos.distance_squared_to(players[j].pos)
 					target = j
-			if target >= 0 and best < 900.0 * 900.0:
-				players[target].pos = player.pos.move_toward(players[target].pos, 60.0)
-				players[target].dash_left = GameConfig.DASH_DURATION
+			if target >= 0:
+				var outcome := _apply_hit(target, index, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS)
+				if outcome.applied:
+					players[target].pos += player.pos.direction_to(players[target].pos) * GameConfig.SPELL_PIN_PUSH_DISTANCE
 	player.item = ""
+	player.item_time = 0.0
+	spell_notice_time = 0.0
 	Sfx.play_tone(720.0, 0.2)
 
+func _use_spell(index: int) -> void:
+	if players.is_empty() or index >= players.size() or not SpellRules.can_activate(players[index]): return
+	var item := String(players[index].item)
+	if SpellRules.duration(item) > 0.0:
+		players[index] = SpellRules.activate(players[index])
+		spell_notice_time = 0.0
+		Sfx.play_tone(720.0, 0.2)
+	elif _spell_is_useful(index, item):
+		_cast_instant_spell(index)
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
 	var time_label := hud_root.get_node_or_null("Timer") as Label
@@ -702,12 +721,31 @@ func _update_hud() -> void:
 		score_number_labels[slot].add_theme_color_override("font_color", GameConfig.GOLD if age < 170 else Color.WHITE)
 	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
 	var spell_name := hud_root.get_node_or_null("SpellName") as Label
+	var spell_glow := hud_root.get_node_or_null("SpellGlow") as TextureRect
+	var spell_key := hud_root.get_node_or_null("SpellKey") as TextureRect
 	if spell_icon and not players.is_empty():
 		var spell_index := ITEMS.find(String(players[0].item))
 		spell_icon.visible = spell_index >= 0
 		spell_icon.texture = spell_atlases[spell_index] if spell_index >= 0 else null
+		if spell_glow:
+			spell_glow.visible = spell_index >= 0
+			spell_glow.modulate.a = 0.65 + 0.25 * sin(Time.get_ticks_msec() / 180.0) if not Settings.reduce_motion else 0.8
+		if spell_key: spell_key.texture = SPELL_KEY_B_TEXTURE if last_input_controller else SPELL_KEY_E_TEXTURE
 	if spell_name and not players.is_empty():
-		spell_name.text = String(players[0].item).to_upper() if not String(players[0].item).is_empty() else I18n.t("spell")
+		var item := String(players[0].item)
+		var is_active := float(players[0].item_time) > 0.0
+		spell_name.text = (I18n.t("spell_" + item) + "  %.1f" % float(players[0].item_time)) if is_active else (I18n.t("spell_" + item) if not item.is_empty() else I18n.t("spell"))
+		spell_name.modulate.a = 1.0 if SpellRules.can_activate(players[0]) else 0.72
+	var notice := hud_root.get_node_or_null("SpellNotice") as Control
+	if notice:
+		notice.visible = spell_notice_time > 0.0
+		var notice_icon := hud_root.get_node_or_null("SpellNoticeIcon") as TextureRect
+		var notice_name := hud_root.get_node_or_null("SpellNoticeName") as Label
+		var notice_text := hud_root.get_node_or_null("SpellNoticeText") as Label
+		var notice_index := ITEMS.find(spell_notice_item)
+		if notice_icon and notice_index >= 0: notice_icon.texture = spell_atlases[notice_index]
+		if notice_name: notice_name.text = I18n.t("spell_" + spell_notice_item)
+		if notice_text: notice_text.text = I18n.t("spell_desc_" + spell_notice_item)
 
 func _build_menu() -> void:
 	_clear_hud()
@@ -901,24 +939,66 @@ func _build_hud() -> void:
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
 	var slot_texture := TextureRect.new()
-	slot_texture.texture = load("res://assets/ui/ranura.png")
+	slot_texture.name = "SpellSlot"
+	slot_texture.texture = SPELL_SLOT_TEXTURE
 	slot_texture.position = Vector2(12, 626)
 	slot_texture.size = Vector2(80, 80)
 	slot_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	slot_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	root.add_child(slot_texture)
+	var glow := TextureRect.new()
+	glow.name = "SpellGlow"
+	glow.texture = SPELL_GLOW_TEXTURE
+	glow.position = Vector2(12, 626)
+	glow.size = Vector2(80, 80)
+	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glow.visible = false
+	root.add_child(glow)
 	var spell_icon := TextureRect.new()
 	spell_icon.name = "SpellIcon"
-	spell_icon.position = Vector2(28, 642)
-	spell_icon.size = Vector2(48, 48)
+	spell_icon.position = Vector2(31, 645)
+	spell_icon.size = Vector2(42, 42)
 	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	spell_icon.visible = false
 	root.add_child(spell_icon)
-	var spell_key := _hud_label(root, Vector2(65, 675), Vector2(34, 26), 18, HORIZONTAL_ALIGNMENT_CENTER)
-	spell_key.text = "E"
-	var spell_name := _hud_label(root, Vector2(99, 651), Vector2(170, 30), 17, HORIZONTAL_ALIGNMENT_LEFT)
+	var spell_key := TextureRect.new()
+	spell_key.name = "SpellKey"
+	spell_key.texture = SPELL_KEY_E_TEXTURE
+	spell_key.position = Vector2(65, 675)
+	spell_key.size = Vector2(26, 26)
+	spell_key.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	spell_key.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	spell_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(spell_key)
+	var spell_name := _hud_label(root, Vector2(101, 651), Vector2(180, 34), 17, HORIZONTAL_ALIGNMENT_LEFT)
 	spell_name.name = "SpellName"
+	var notice := Panel.new()
+	notice.name = "SpellNotice"
+	notice.position = Vector2(18, 526)
+	notice.size = Vector2(330, 86)
+	var notice_style := StyleBoxFlat.new()
+	notice_style.bg_color = Color("241838")
+	notice_style.border_color = GameConfig.GOLD
+	notice_style.set_border_width_all(2)
+	notice_style.set_corner_radius_all(8)
+	notice.add_theme_stylebox_override("panel", notice_style)
+	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	notice.visible = false
+	root.add_child(notice)
+	var notice_icon := TextureRect.new()
+	notice_icon.name = "SpellNoticeIcon"
+	notice_icon.position = Vector2(10, 12)
+	notice_icon.size = Vector2(58, 58)
+	notice_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	notice_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	notice.add_child(notice_icon)
+	var notice_name := _hud_label(notice, Vector2(76, 8), Vector2(238, 31), 20, HORIZONTAL_ALIGNMENT_LEFT)
+	notice_name.name = "SpellNoticeName"
+	var notice_text := _hud_label(notice, Vector2(76, 42), Vector2(238, 34), 15, HORIZONTAL_ALIGNMENT_LEFT)
+	notice_text.name = "SpellNoticeText"
 	var pause := Button.new()
 	pause.text = "Ⅱ"
 	pause.position = Vector2(1200, 648)

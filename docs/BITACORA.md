@@ -146,3 +146,9 @@ Formato de cada entrada:
 - Decisiones: El redondeo porcentual sigue usando techo, igual que los golpes de dash; el resultado nunca supera las monedas que lleva el jugador.
 - Problemas encontrados y cómo se resolvieron: Ninguno; Godot cargó los scripts y pasó la suite core.
 - Qué tienen que probar los humanos: En cada trampa, comprobar pérdidas de 15 % (0, 1, 10, 40 y 200 monedas: 0, 1, 2, 6 y 10), abanico, bloqueo de 0,6 s y diferencias con el dash de otro jugador.
+
+### Fase 10c — Activación de hechizos (17/11/2026)
+- Qué se ha hecho: Los cofres guardan el hechizo y E/B activa la ranura. Los efectos temporales empiezan al activarlos; los instantáneos requieren un objetivo. Los bots activan efectos útiles durante sus decisiones. Añadidos el aro de la ranura, el brillo, las teclas E/B y una tarjeta con nombre y descripción traducidos.
+- Decisiones: Capa, botas, imán y anillo duran 8/4/5/6 s desde la activación; oveja conserva sus 3 s y los instantáneos se consumen al lanzarse.
+- Problemas encontrados y cómo se resolvieron: Ninguno en los tests core; la carga headless del editor y los tests pasan.
+- Qué tienen que probar los humanos: Abrir cofres, guardar varios tipos de hechizo, activar con E y B, comprobar duración/caducidad, escudo y resultados contra rivales; verificar que la tarjeta desaparece a los 2 s y que los bots usan hechizos con sentido.

@@ -109,6 +109,7 @@ res://
 | `ring` | Anillo de Poder | Durante 6 s los doblones valen doble. Si te golpean mientras lo llevas, sueltas el 40 % |
 
 - **Capa Élfica bloquea:** dash, alfiler, escarcha y oveja.
+- **Uso:** los cofres guardan un hechizo sin activarlo. E o B activan la ranura; cada duración empieza en ese momento. Un hechizo activo o guardado impide abrir otro cofre.
 - **Probabilidad de cada hechizo según tu posición** (%; con 2 jugadores solo existen las columnas "Primero" y "Último"):
 
 | Hechizo | Primero | En medio | Último |
@@ -279,7 +280,7 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
   |---|---|---|
   | Mover | WASD o flechas | Stick izquierdo |
   | Dash | Espacio o Shift | A |
-  | Hechizo | E o Enter | B |
+| Hechizo | E | B |
   | Pausa / menú | Esc | Start |
 
 - **Menús:** se usan del todo con teclado y mando, con foco visible.
