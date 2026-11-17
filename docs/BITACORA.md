@@ -140,3 +140,9 @@ Formato de cada entrada:
 - Decisiones: `ArenaGen.generate()` recibe un indicador de modo y un `arena_id` opcional preparado para la selección de mapas del bloque 10f.
 - Problemas encontrados y cómo se resolvieron: Ninguno; pasaron los tests core y el smoke test del proyecto.
 - Qué tienen que probar los humanos: Confirmar que una partida VoodooCombo termina normalmente entre 60 y 150 puntos, que Clásico sigue empezando con 50 y que el Frenesí no permite superar 5 puntos por doblón.
+
+### Fase 10b — Daño porcentual de trampas (17/11/2026)
+- Qué se ha hecho: Las raíces, pinchos, fantasma, vapor, barril y rayo usan el mismo `apply_hit`: quitan 15 % de doblones, con mínimo 2 y máximo 10, sueltan las monedas en abanico con bloqueo de recogida 0,6 s y conservan aturdimiento/empuje. Los golpes de dash entre jugadores mantienen sus porcentajes. Actualizados `AGENTS.md`, `ARENAS.md` y tests de límites.
+- Decisiones: El redondeo porcentual sigue usando techo, igual que los golpes de dash; el resultado nunca supera las monedas que lleva el jugador.
+- Problemas encontrados y cómo se resolvieron: Ninguno; Godot cargó los scripts y pasó la suite core.
+- Qué tienen que probar los humanos: En cada trampa, comprobar pérdidas de 15 % (0, 1, 10, 40 y 200 monedas: 0, 1, 2, 6 y 10), abanico, bloqueo de 0,6 s y diferencias con el dash de otro jugador.

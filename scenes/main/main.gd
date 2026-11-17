@@ -452,7 +452,7 @@ func _update_roots(runtime: Dictionary, delta: float) -> void:
 	for player_index in range(players.size()):
 		if players[player_index].rooted_left > 0.0 or players[player_index].pos.distance_to(runtime.roots_position) > GameConfig.ROOTS_RADIUS:
 			continue
-		var result := _apply_hit(player_index, -1, 0.0, GameConfig.ROOTS_DROP_COUNT, GameConfig.ROOTS_DROP_COUNT, 0.0, "trap_root")
+		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_root")
 		if result.applied:
 			players[player_index].rooted_left = GameConfig.ROOTED_SECONDS
 
@@ -464,7 +464,7 @@ func _update_spikes(hazard: Dictionary) -> void:
 		for tile in hazard.get("tiles", []):
 			var rect := _tile_rect(tile).grow(GameConfig.PLAYER_RADIUS)
 			if rect.has_point(players[player_index].pos):
-				_apply_hit(player_index, -1, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
+				_apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_zap")
 				break
 
 func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
@@ -473,7 +473,7 @@ func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> voi
 	for index in range(players.size()):
 		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
 		if cooldowns[index] <= 0.0 and players[index].pos.distance_to(ghost_pos) <= GameConfig.PLAYER_RADIUS + GameConfig.GHOST_RADIUS:
-			_apply_hit(index, -1, 0.0, GameConfig.GHOST_DROP_COUNT, GameConfig.GHOST_DROP_COUNT, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
+			_apply_hit(index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
 			cooldowns[index] = GameConfig.GHOST_IGNORE_SECONDS
 	runtime.player_cooldowns = cooldowns
 
@@ -503,7 +503,7 @@ func _update_steam(hazard: Dictionary, runtime: Dictionary, _delta: float) -> vo
 		if offset.length() > GameConfig.STEAM_RADIUS:
 			continue
 		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
-		var result := _apply_hit(player_index, -1, 0.0, GameConfig.STEAM_DROP_COUNT, GameConfig.STEAM_DROP_COUNT, GameConfig.STEAM_STUN_SECONDS, "trap_steam")
+		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.STEAM_STUN_SECONDS, "trap_steam")
 		if result.applied:
 			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.STEAM_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
 
@@ -540,7 +540,7 @@ func _explode_barrel(center: Vector2) -> void:
 		if offset.length() > GameConfig.BARREL_RADIUS:
 			continue
 		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
-		var result := _apply_hit(player_index, -1, GameConfig.BARREL_DROP_FRACTION, GameConfig.BARREL_DROP_MIN, GameConfig.BARREL_DROP_MAX, 0.0, "trap_barrel")
+		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_barrel")
 		if result.applied:
 			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.BARREL_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
 
@@ -579,7 +579,7 @@ func _update_ray(hazard: Dictionary) -> void:
 				hit = true
 				break
 		if hit:
-			_apply_hit(player_index, -1, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_ray")
+			_apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.HIT_STUN_SECONDS, "trap_ray")
 
 func _start_roll(index: int) -> void:
 	roll_player = index
