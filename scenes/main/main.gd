@@ -1200,10 +1200,16 @@ func _draw_arena_hazards() -> void:
 				if parts.size() >= 4:
 					_draw_hazard_sprite("pinchos", Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5), frame)
 		elif kind == "cinta":
-			for tile in hazard.get("tiles", []):
+			var belt_tiles: Array = hazard.get("tiles", [])
+			var belt_direction := _json_point(hazard.get("dir", [1.0, 0.0]))
+			for tile_index in range(belt_tiles.size()):
+				var tile: Variant = belt_tiles[tile_index]
 				var parts: Variant = tile if tile is Array else String(tile).split(" ", false)
 				if parts.size() >= 4:
-					_draw_hazard_sprite("cinta", Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5), floori(elapsed * 8.0))
+					var tile_center := Vector2(float(parts[0]) + float(parts[2]) * 0.5, float(parts[1]) + float(parts[3]) * 0.5)
+					_draw_hazard_sprite("cinta", tile_center, floori(elapsed * 8.0), belt_direction.x < 0.0)
+					if tile_index == 0 or tile_index == belt_tiles.size() - 1:
+						_draw_hazard_sprite("cinta_rodillo", tile_center, floori(elapsed * 8.0))
 		elif kind == "portal":
 			var portal_sprite := String(hazard.get("sprite", "portal_cian"))
 			_draw_hazard_sprite(portal_sprite, _json_point(hazard.get("a", [])), floori(elapsed * 8.0))
@@ -1234,7 +1240,7 @@ func _draw_arena_hazards() -> void:
 			var position := _ghost_position(hazard)
 			_draw_hazard_sprite("fantasma", position, floori(elapsed * 8.0))
 
-func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 0) -> void:
+func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 0, flip_h: bool = false) -> void:
 	var info: Dictionary = arena.get("sprites", {}).get(sprite_id, {})
 	if info.is_empty():
 		return
@@ -1249,7 +1255,13 @@ func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 
 	var frame := posmod(frame_index, frame_count)
 	var scale_factor := float(info.get("scale", 0.5))
 	var frame_size := Vector2(frame_width, frame_height) * scale_factor
-	draw_texture_rect_region(texture, Rect2(center - frame_size * 0.5, frame_size), Rect2(frame * frame_width, 0, frame_width, frame_height))
+	var source := Rect2(frame * frame_width, 0, frame_width, frame_height)
+	if flip_h:
+		draw_set_transform(center + OFFSET, 0.0, Vector2(-1.0, 1.0))
+		draw_texture_rect_region(texture, Rect2(-frame_size.x * 0.5, -frame_size.y * 0.5, frame_size.x, frame_size.y), source)
+		draw_set_transform(OFFSET)
+	else:
+		draw_texture_rect_region(texture, Rect2(center - frame_size * 0.5, frame_size), source)
 
 func _json_point(value: Variant) -> Vector2:
 	if value is Array and value.size() >= 2:
@@ -1323,7 +1335,7 @@ func _draw_ray_beams(center: Vector2, angle: float) -> void:
 	var width := int(info.get("frame_w", 584))
 	var height := int(info.get("frame_h", 60))
 	for arm in range(2):
-		draw_set_transform(center, angle + float(arm) * PI, Vector2.ONE * float(info.get("scale", 0.5)))
+		draw_set_transform(center + OFFSET, angle + float(arm) * PI, Vector2.ONE * float(info.get("scale", 0.5)))
 		draw_texture_rect_region(texture, Rect2(6.0, -float(height) * 0.5, width, height), Rect2(0.0, 0.0, width, height))
 	draw_set_transform(OFFSET)
 

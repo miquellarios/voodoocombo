@@ -158,3 +158,9 @@ Formato de cada entrada:
 - Decisiones: Se deja la geometría de bordes de arena en el radio de jugador y se usa el radio de pies solo frente a objetos.
 - Problemas encontrados y cómo se resolvieron: Ninguno; suite core y carga del editor pasan.
 - Qué tienen que probar los humanos: Caminar despacio contra troncos y otros obstáculos de las cuatro arenas; comprobar que el sprite llega a la huella visible, que no atraviesa el objeto y que la separación de jugadores sigue funcionando.
+
+### Fase 10e — Alineación de rayo y cintas (17/11/2026)
+- Qué se ha hecho: El rayo ahora dibuja sus brazos desde `center + OFFSET`, alineados con el centro usado para el daño. Las cintas voltean el sprite cuando `dir.x` es negativo y dibujan rodillos en los extremos; el empuje ya usa la dirección `dir` del JSON. Revisada la referencia visual de las cuatro arenas.
+- Decisiones: No cambié las posiciones del JSON porque coinciden con la imagen de referencia.
+- Problemas encontrados y cómo se resolvieron: Ninguno; carga headless del editor y suite core pasan.
+- Qué tienen que probar los humanos: Confirmar que el daño del rayo coincide con el haz visible en Biblioteca y que ambas cintas del Taller muestran flechas y rodillos en la dirección del empuje.
