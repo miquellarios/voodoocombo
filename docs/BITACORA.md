@@ -243,3 +243,10 @@ Formato de cada entrada:
 - Vista de cuatro cuadrantes con assets y posiciones del JSON, premisas traducidas, retratos, marco iluminado y crecimiento del ganador. El servidor publica la misma votación; práctica usa la misma clase y conserva semilla y roster hasta MatchSim.
 - Tests test_vote.gd y test_lobby_view.gd: empate 2–2, nadie vota, voto inválido, determinismo y recorrido lobby→votación→carga; pasan.
 - Humanos: comparar ruleta en cuatro pantallas y comprobar navegación de cuadrantes con mando. Las conexiones de carga a partida se completan en 11g.
+
+### Fase 11g — Partida autoritativa en red
+- Entradas 30 Hz con secuencia, movimiento finito limitado a uno, caducidad de entrada y deduplicación de dash/hechizo fiable. Simulación servidor 30 Hz y snapshots 20 Hz; compresión y fragmentos de 1000 bytes evitan exceder la MTU. Se reenvía el estado de doblones para recuperarse de pérdidas.
+- ClientMatch predice movimiento con ArenaPhysics, aplica umbrales 8/64 px e interpola rivales con 100 ms. Vista identifica al jugador real, muestra ping y usa eventos y resultado del servidor.
+- Test tools/test-network.ps1 con servidor y cinco procesos: cuatro entran, votan 2–2, comparten baile, envían movimiento de longitud 5 y reciben idéntico ranking; quinto rechazado. Sin errores en los logs. Test de vista online y regresión local también pasan.
+- Problemas corregidos durante la prueba: colisión con Node._input, paquete mayor que MTU y avisos ENet por relay al desconectar simultáneamente; relay desactivado, pues todos hablan con el servidor.
+- Humanos: jugar con latencia y pérdida reales, comprobar correcciones de posición, dash y hechizos. La prueba automatizada usa una partida de tres segundos; la simulación de noventa segundos está cubierta por los tests core.

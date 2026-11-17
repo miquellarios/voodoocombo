@@ -30,11 +30,16 @@ func _process(delta: float) -> void:
 					room.arena_id = room.vote.winner
 					room.phase = "loading"
 					room["load_left"] = GameConfig.LOADING_SECONDS + 3.0
+					_prepare_match(room)
 					_publish(room)
 				elif vote_publish >= GameConfig.VOTE_PUBLISH_SECONDS: _publish(room)
-			if room.get("sim") is MatchSim:
-				var inputs: Array[Dictionary] = []
-				room.sim.step(GameConfig.NET_TICK, inputs)
+			elif room.phase == "loading":
+				room.load_left -= GameConfig.NET_TICK
+				if room.load_left <= 0:
+					room.phase = "playing"
+					_publish(room)
+			elif room.phase == "playing":
+				_step_match(room)
 	if vote_publish >= GameConfig.VOTE_PUBLISH_SECONDS: vote_publish = 0.0
 
 func _request(sender: int, action: String, data: Dictionary) -> void:
@@ -62,6 +67,8 @@ func _request(sender: int, action: String, data: Dictionary) -> void:
 				_publish(room)
 		"vote":
 			if not room.is_empty() and room.phase == "voting" and room.vote.vote(sender, str(data.get("arena", ""))): _publish(room)
+		"input", "intent":
+			if not room.is_empty() and room.phase == "playing": _accept_input(room, sender, action, data)
 		"social":
 			if room.is_empty(): return
 			var item := str(data.get("item", ""))
@@ -81,11 +88,70 @@ func _allow(sender: int, action: String) -> bool:
 	if now - int(rate.time) >= 1000: rate = {"time": now, "count": 0}
 	rate.count += 1
 	rate_limits[key] = rate
-	return int(rate.count) <= GameConfig.RPC_ACTION_LIMIT
+	return int(rate.count) <= (GameConfig.RPC_INPUT_LIMIT if action == "input" else GameConfig.RPC_ACTION_LIMIT)
+
+func _prepare_match(room: Dictionary) -> void:
+	room["sim"] = MatchSim.new()
+	room.sim.setup({"seed": room.vote.seed_value, "arena_id": room.arena_id, "mode": room.mode, "duration": GameConfig.CLASSIC_SECONDS if room.mode == "classic" else room.duration, "players": LobbyRules.roster(room)})
+	room["inputs"] = {}
+	room["sequences"] = {}
+	room["action_sequences"] = {}
+	room["snapshot_left"] = 0.0
+	room["last_coins"] = []
+
+func _accept_input(room: Dictionary, sender: int, action: String, data: Dictionary) -> void:
+	var seq := int(data.get("seq", -1))
+	if seq < 0 or seq > 2147483647: return
+	var input: Dictionary = room.inputs.get(sender, {"move": Vector2.ZERO, "dash": false, "spell": false, "time": 0})
+	if action == "input":
+		if seq <= int(room.sequences.get(sender, -1)): return
+		var move: Vector2 = data.move
+		if not move.is_finite(): return
+		input.move = move.limit_length()
+		input.time = Time.get_ticks_msec()
+		room.sequences[sender] = seq
+	for ability in ["dash", "spell"]:
+		var requested: bool = (str(data.action) == ability) if action == "intent" else bool(data.get(ability, false))
+		var key := "%d:%s" % [sender, ability]
+		if requested and seq > int(room.action_sequences.get(key, -1)):
+			input[ability] = true
+			room.action_sequences[key] = seq
+	room.inputs[sender] = input
+
+func _step_match(room: Dictionary) -> void:
+	var inputs: Array[Dictionary] = []
+	for player: Dictionary in room.sim.players:
+		var input: Dictionary = room.inputs.get(int(player.peer_id), {}).duplicate()
+		if Time.get_ticks_msec() - int(input.get("time", 0)) > int(GameConfig.NET_INPUT_TIMEOUT * 1000): input["move"] = Vector2.ZERO
+		inputs.append(input)
+	room.sim.step(GameConfig.NET_TICK, inputs)
+	for input: Dictionary in room.inputs.values():
+		input.dash = false
+		input.spell = false
+	var events: Array[Dictionary] = room.sim.pop_events()
+	if not events.is_empty():
+		for event: Dictionary in events:
+			if event.type == "match_over":
+				event["snapshot"] = room.sim.snapshot()
+				room.phase = "results"
+				Net.log_line("match over %s" % str(room.code))
+		for player: Dictionary in room.players: Net.match_events.rpc_id(int(player.peer_id), events)
+	room.snapshot_left -= GameConfig.NET_TICK
+	if room.snapshot_left <= 0.0:
+		room.snapshot_left += GameConfig.NET_SNAPSHOT_TICK
+		var snapshot: Dictionary = room.sim.snapshot()
+		for key in ["arena", "obstacle_rects", "player_hitbox_rects"]: snapshot.erase(key)
+		for player: Dictionary in snapshot.players:
+			for key: String in player.keys():
+				if key.begins_with("bot_"): player.erase(key)
+		# Se envía el conjunto actual comprimido: perder un paquete nunca pierde un doblón para siempre.
+		snapshot["ack"] = room.sequences.duplicate()
+		for player: Dictionary in room.players: Net.send_snapshot(int(player.peer_id), snapshot)
 
 func _publish(room: Dictionary) -> void:
 	var state := directory.public_state(room)
-	for player: Dictionary in room.players: Net.room_state.rpc_id(int(player.peer_id), state)
+	for player: Dictionary in room.players:
+		if Net.can_send(int(player.peer_id)): Net.room_state.rpc_id(int(player.peer_id), state)
 
 func _depart(sender: int) -> void:
 	var room := directory.leave(sender)

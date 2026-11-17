@@ -93,6 +93,11 @@ var floating_coin_font: Font
 var floating_notice_font: Font
 var menu_logo_tween: Tween
 var lobby_return := false
+var network_match := false
+var local_player := 0
+var client_match: ClientMatch
+var ping_ms := 0
+var ping_clock := 0.0
 
 func _build_online() -> void:
 	_clear_hud()
@@ -101,6 +106,7 @@ func _build_online() -> void:
 	var lobby := OnlineLobby.new()
 	root.add_child(lobby)
 	lobby.exit_requested.connect(_build_menu)
+	lobby.online_match_requested.connect(_begin_online_match)
 	lobby.locker_requested.connect(func(): lobby_return = true; _build_characters())
 	lobby.local_match_requested.connect(func(config: Dictionary): _begin_match(config.mode == "classic", str(config.arena_id), config))
 
@@ -111,7 +117,63 @@ func _locker_back() -> void:
 		_build_online()
 	else: _build_menu()
 
+func _begin_online_match(room: Dictionary) -> void:
+	if network_match and state in ["loading", "countdown", "playing", "paused"]: return
+	network_match = true
+	simulation = null
+	client_match = ClientMatch.new()
+	client_match.setup(room.initial, multiplayer.get_unique_id())
+	local_player = client_match.player_index
+	_read_state(room.initial)
+	_load_match_art()
+	_build_loading()
+
+func _load_match_art() -> void:
+	arena_background = load("res://assets/arenas/" + str(arena.background)) if not str(arena.background).is_empty() else null
+	for player in players:
+		var key := "%s_%s" % [player.character, player.sprite_color]
+		if not character_sheets.has(key): character_sheets[key] = load("res://assets/characters/%s.png" % key)
+
+func _network_snapshot(snapshot: Dictionary) -> void:
+	if not network_match or client_match == null or state in ["results", "match_end"]: return
+	client_match.receive(snapshot)
+	if state in ["loading", "countdown"]:
+		state = "playing"
+		_build_hud()
+
+func _network_events(events: Array) -> void:
+	if network_match: _handle_events(events)
+
+func _network_lost(reason: String) -> void:
+	if not network_match: return
+	network_match = false
+	_build_menu()
+	_label(hud_root, I18n.t(reason), Vector2(0, 265), 22, GameConfig.LOSS_TEXT, true)
+
+func _network_process(delta: float) -> void:
+	var move := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	simulation_accumulator += minf(delta, GameConfig.NET_MAX_FRAME)
+	while simulation_accumulator >= GameConfig.NET_TICK:
+		simulation_accumulator -= GameConfig.NET_TICK
+		client_match.predict(move, GameConfig.NET_TICK, pending_dash)
+		Net.submit_input.rpc_id(1, client_match.seq, move, pending_dash, pending_spell)
+		if pending_dash: Net.intent.rpc_id(1, client_match.seq, "dash")
+		if pending_spell: Net.intent.rpc_id(1, client_match.seq, "spell")
+		pending_dash = false
+		pending_spell = false
+	_read_state(client_match.render(delta))
+	ping_clock += delta
+	if ping_clock >= 1.0:
+		ping_clock = 0.0
+		Net.ping.rpc_id(1, Time.get_ticks_msec())
+	_update_hud()
+	queue_redraw()
+
 func _ready() -> void:
+	Net.snapshot_received.connect(_network_snapshot)
+	Net.events_received.connect(_network_events)
+	Net.disconnected.connect(_network_lost)
+	Net.pong_received.connect(func(stamp: int): ping_ms = Time.get_ticks_msec() - stamp)
 	get_window().title = "VoodooCombo 0.1"
 	Settings.apply_display()
 	player_name_font = ThemeBuilder.font("Oswald-Medium.woff2")
@@ -186,6 +248,9 @@ func _process(delta: float) -> void:
 	if state != "playing":
 		_animate_floating(delta)
 		return
+	if network_match:
+		_network_process(delta)
+		return
 	simulation_accumulator += minf(delta, 0.25)
 	while simulation_accumulator >= 1.0 / 30.0 and state == "playing":
 		var inputs: Array[Dictionary] = [{"move": Input.get_vector("move_left", "move_right", "move_up", "move_down"), "dash": pending_dash, "spell": pending_spell}]
@@ -196,8 +261,8 @@ func _process(delta: float) -> void:
 		_read_simulation()
 		_show_simulation_events()
 	if state == "playing":
-		if not players.is_empty() and float(players[0].dash_left) > 0.0 and dash_trail_emit <= 0.0:
-			_add_dash_trail(players[0].pos, players[0].color)
+		if not players.is_empty() and float(players[local_player].dash_left) > 0.0 and dash_trail_emit <= 0.0:
+			_add_dash_trail(players[local_player].pos, players[local_player].color)
 			dash_trail_emit = GameConfig.DASH_TRAIL_INTERVAL
 		if fog_material != null:
 			var safe_rect := ZoneRules.safe_rect(safe_zone_step)
@@ -243,11 +308,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		_build_hud()
 	elif state == "arena_select" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		_build_menu()
-	elif state == "loading" and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE and loading_elapsed >= GameConfig.LOADING_SKIP_SECONDS:
+	elif state == "loading" and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE and loading_elapsed >= GameConfig.LOADING_SKIP_SECONDS and _is_practice_match():
 		_start_countdown()
 		get_viewport().set_input_as_handled()
 
 func _begin_match(classic: bool = false, arena_id: String = "", overrides: Dictionary = {}) -> void:
+	network_match = false
+	local_player = 0
 	simulation = MatchSim.new()
 	seed_value = int(Time.get_unix_time_from_system()) + randi()
 	var roster: Array[Dictionary] = [
@@ -276,9 +343,11 @@ func _begin_match(classic: bool = false, arena_id: String = "", overrides: Dicti
 	_build_loading()
 
 func _read_simulation() -> void:
-	var data := simulation.snapshot()
+	_read_state(simulation.snapshot())
+
+func _read_state(data: Dictionary) -> void:
 	for key in data:
-		if key != "finished": set(key, data[key])
+		if key not in ["finished", "ack"]: set(key, data[key])
 
 func _start_dash(_index: int) -> void:
 	pending_dash = true
@@ -287,7 +356,10 @@ func _use_spell(_index: int) -> void:
 	pending_spell = true
 
 func _show_simulation_events() -> void:
-	for event in simulation.pop_events():
+	_handle_events(simulation.pop_events())
+
+func _handle_events(events: Array) -> void:
+	for event: Dictionary in events:
 		match str(event.type):
 			"text":
 				var text: String = event.text
@@ -301,11 +373,12 @@ func _show_simulation_events() -> void:
 			"hit_feedback":
 				Fx.hit()
 			"item_rolled":
-				if int(event.player) == 0:
+				if int(event.player) == local_player:
 					spell_notice_item = str(event.item)
 					spell_notice_time = GameConfig.SPELL_NOTICE_SECONDS
 			"match_over":
-				_finish_match()
+				if event.has("snapshot"): _read_state(event.snapshot)
+				_finish_match(event.get("ranking", []), event.get("awards", {}))
 				break
 
 func _build_loading() -> void:
@@ -350,7 +423,7 @@ func _build_loading() -> void:
 	var tip := _hud_label(root, GameConfig.LOADING_TIP_POSITION, GameConfig.LOADING_TIP_SIZE, GameConfig.LOADING_TIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
 	tip.name = "LoadingTip"
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var portrait_path := "res://assets/ui/retrato_%s_coral.png" % String(players[0].character)
+	var portrait_path := "res://assets/ui/retrato_%s_coral.png" % String(players[local_player].character)
 	var portrait := TextureRect.new()
 	portrait.texture = load(portrait_path)
 	portrait.position = GameConfig.LOADING_CHARACTER_POSITION
@@ -359,7 +432,7 @@ func _build_loading() -> void:
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	root.add_child(portrait)
 	var player_text := _hud_label(root, GameConfig.LOADING_CHARACTER_POSITION + GameConfig.LOADING_PLAYER_TEXT_OFFSET, GameConfig.LOADING_PLAYER_TEXT_SIZE, GameConfig.LOADING_PLAYER_TEXT_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
-	player_text.text = "%s\n%s %d · %s" % [String(players[0].name), I18n.t("loading_player"), GameConfig.LOADING_LOCAL_PLAYER_NUMBER, String(players[0].character).capitalize()]
+	player_text.text = "%s\n%s %d · %s" % [String(players[local_player].name), I18n.t("loading_player"), GameConfig.LOADING_LOCAL_PLAYER_NUMBER, String(players[local_player].character).capitalize()]
 	var progress := ProgressBar.new()
 	progress.name = "LoadingProgress"
 	progress.position = GameConfig.LOADING_PROGRESS_POSITION
@@ -380,6 +453,7 @@ func _update_loading_text() -> void:
 		tip.text = I18n.t("loading_tip_%d" % (loading_tip_index + 1))
 
 func _is_practice_match() -> bool:
+	if network_match: return false
 	for index in range(1, players.size()):
 		if not bool(players[index].is_bot): return false
 	return true
@@ -398,6 +472,13 @@ func _start_countdown() -> void:
 
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
+	if network_match:
+		var ping := hud_root.get_node_or_null("Ping") as Label
+		if ping == null:
+			ping = _hud_label(hud_root, Vector2(1150, 78), Vector2(110,28),18, HORIZONTAL_ALIGNMENT_RIGHT)
+			ping.name = "Ping"
+		ping.text = "%d ms" % ping_ms
+		ping.modulate = Color.GREEN if ping_ms < 80 else (Color.YELLOW if ping_ms < 150 else Color.RED)
 	var time_label := hud_root.get_node_or_null("Timer") as Label
 	if time_label:
 		var seconds := maxi(0, ceili(remaining))
@@ -413,7 +494,7 @@ func _update_hud() -> void:
 		var player: Dictionary = players[slot]
 		score_name_labels[slot].text = String(player.name)
 		score_name_labels[slot].add_theme_color_override("font_color", player.color)
-		score_tag_labels[slot].text = "%s%d · %s%s" % [I18n.t("player"), slot + 1, (I18n.t("you") + " · ") if slot == 0 else "", player.shape]
+		score_tag_labels[slot].text = "%s%d · %s%s" % [I18n.t("player"), slot + 1, (I18n.t("you") + " · ") if slot == local_player else "", player.shape]
 		score_tag_labels[slot].add_theme_color_override("font_color", player.color)
 		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
 		var portrait_texture: Texture2D = load(portrait_path)
@@ -433,7 +514,7 @@ func _update_hud() -> void:
 	var spell_glow := hud_root.get_node_or_null("SpellGlow") as TextureRect
 	var spell_key := hud_root.get_node_or_null("SpellKey") as TextureRect
 	if spell_icon and not players.is_empty():
-		var spell_index := ITEMS.find(String(players[0].item))
+		var spell_index := ITEMS.find(String(players[local_player].item))
 		spell_icon.visible = spell_index >= 0
 		spell_icon.texture = spell_atlases[spell_index] if spell_index >= 0 else null
 		if spell_glow:
@@ -441,10 +522,10 @@ func _update_hud() -> void:
 			spell_glow.modulate.a = 0.65 + 0.25 * sin(Time.get_ticks_msec() / 180.0) if not Settings.reduce_motion else 0.8
 		if spell_key: spell_key.texture = SPELL_KEY_B_TEXTURE if last_input_controller else SPELL_KEY_E_TEXTURE
 	if spell_name and not players.is_empty():
-		var item := String(players[0].item)
-		var is_active := float(players[0].item_time) > 0.0
-		spell_name.text = (I18n.t("spell_" + item) + "  %.1f" % float(players[0].item_time)) if is_active else (I18n.t("spell_" + item) if not item.is_empty() else I18n.t("spell"))
-		spell_name.modulate.a = 1.0 if SpellRules.can_activate(players[0]) else 0.72
+		var item := String(players[local_player].item)
+		var is_active := float(players[local_player].item_time) > 0.0
+		spell_name.text = (I18n.t("spell_" + item) + "  %.1f" % float(players[local_player].item_time)) if is_active else (I18n.t("spell_" + item) if not item.is_empty() else I18n.t("spell"))
+		spell_name.modulate.a = 1.0 if SpellRules.can_activate(players[local_player]) else 0.72
 	var notice := hud_root.get_node_or_null("SpellNotice") as Control
 	if notice:
 		notice.visible = spell_notice_time > 0.0
@@ -457,6 +538,8 @@ func _update_hud() -> void:
 		if notice_text: notice_text.text = I18n.t("spell_desc_" + spell_notice_item)
 
 func _build_menu() -> void:
+	if network_match: Net.leave_server()
+	network_match = false
 	_clear_hud()
 	_end_match_cleanup()
 	state = "menu"
@@ -992,14 +1075,14 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 	root.add_child(label)
 	return label
 
-func _finish_match() -> void:
+func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -> void:
 	if state in ["match_end", "results"]: return
-	results_ranking = MatchRanking.rank(players)
+	results_ranking.assign(server_ranking if not server_ranking.is_empty() else MatchRanking.rank(players))
 	var place := 1
 	for i in range(results_ranking.size()):
 		if results_ranking[i].name == Profile.nick: place = i + 1
-	results_xp = Profile.award_match(place, players[0].max_combo)
-	results_awards = MatchRanking.awards(players)
+	results_xp = Profile.award_match(place, players[local_player].max_combo)
+	results_awards = server_awards if not server_awards.is_empty() else MatchRanking.awards(players)
 	var directory := "user://matches"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
 	var public_players: Array[Dictionary] = []
@@ -1327,21 +1410,21 @@ func _draw() -> void:
 			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale))
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height))
 			draw_set_transform(OFFSET)
-		var name_color: Color = player.color if i == 0 else Color.WHITE
-		var name_text := (I18n.t("you") + " · " if i == 0 else "") + String(player.name)
+		var name_color: Color = player.color if i == local_player else Color.WHITE
+		var name_text := (I18n.t("you") + " · " if i == local_player else "") + String(player.name)
 		var name_font: Font = player_name_font if player_name_font != null else ThemeDB.fallback_font
-		var name_size := GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE if i == 0 else GameConfig.PLAYER_NAME_FONT_SIZE
+		var name_size := GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE if i == local_player else GameConfig.PLAYER_NAME_FONT_SIZE
 		var name_position: Vector2 = pos + Vector2(-GameConfig.PLAYER_NAME_WIDTH * 0.5, GameConfig.PLAYER_NAME_Y)
 		draw_string_outline(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, GameConfig.PLAYER_NAME_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
 		draw_string(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, name_color)
-		if i == 0:
+		if i == local_player:
 			var arrow_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y - GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE - GameConfig.PLAYER_ARROW_NAME_GAP)
 			draw_colored_polygon(PackedVector2Array([arrow_center + Vector2(-GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(0.0, GameConfig.PLAYER_ARROW_TIP_LENGTH)]), name_color)
 			var aura_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_AURA_CENTER_Y)
 			var aura_alpha := GameConfig.PLAYER_AURA_REDUCED_ALPHA if Settings.reduce_motion else (GameConfig.PLAYER_AURA_MIN_ALPHA + GameConfig.PLAYER_AURA_ALPHA_RANGE * (sin(elapsed * GameConfig.PLAYER_AURA_PULSE_SPEED) * 0.5 + 0.5))
 			draw_arc(aura_center, GameConfig.PLAYER_AURA_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, Color(name_color, aura_alpha), GameConfig.PLAYER_AURA_WIDTH, true)
 		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
-		if i == 0 and player.combo > 1:
+		if i == local_player and player.combo > 1:
 			var badge_center: Vector2 = pos + GameConfig.COMBO_BADGE_OFFSET
 			draw_circle(badge_center, GameConfig.COMBO_BADGE_RADIUS, Color("241838", 0.92))
 			draw_arc(badge_center, GameConfig.COMBO_BADGE_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, GameConfig.GOLD, GameConfig.COMBO_BADGE_OUTLINE_WIDTH, true)
