@@ -71,6 +71,7 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 	current_inputs = inputs.duplicate(true)
 	delta = minf(delta, remaining)
 	for index in range(players.size()):
+		if bool(players[index].get("disconnected", false)): continue
 		if bool(players[index].is_bot): continue
 		var entry: Dictionary = current_inputs[index] if index < current_inputs.size() else {}
 		if bool(entry.get("dash", false)): _start_dash(index)
@@ -91,6 +92,7 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 		chests.append(_random_position_in_safe_zone())
 		chest_fade_alpha.append(1.0)
 	for index in range(players.size()):
+		if bool(players[index].get("disconnected", false)): continue
 		if bool(players[index].is_bot): _update_bot(index, delta)
 		else: _update_player(index, delta)
 	_update_arena_hazards(delta)
@@ -121,10 +123,31 @@ func _input_move(index: int) -> Vector2:
 	var move: Variant = current_inputs[index].get("move", Vector2.ZERO)
 	return (move as Vector2).limit_length() if move is Vector2 and move.is_finite() else Vector2.ZERO
 
-func _finish_match() -> void:
+func disconnect_player(peer_id: int) -> void:
+	for player: Dictionary in players:
+		if int(player.peer_id) == peer_id:
+			events.append({"type": "player_left", "peer_id": peer_id, "pos": player.pos})
+			player["disconnected"] = true
+			player.pos = Vector2(-10000, -10000)
+			player.vel = Vector2.ZERO
+	var humans: Array[Dictionary] = []
+	for player in players:
+		if not bool(player.is_bot) and not bool(player.get("disconnected", false)): humans.append(player)
+	if humans.size() == 1:
+		_finish_match(int(humans[0].peer_id))
+
+func _finish_match(winner_peer: int = 0) -> void:
 	if finished: return
 	finished = true
-	events.append({"type": "match_over", "ranking": MatchRanking.rank(players), "awards": MatchRanking.awards(players)})
+	var active: Array[Dictionary] = players.filter(func(player: Dictionary): return not bool(player.get("disconnected", false)))
+	var ranking := MatchRanking.rank(active)
+	if winner_peer != 0:
+		for index in ranking.size():
+			if int(ranking[index].peer_id) == winner_peer:
+				var winner: Dictionary = ranking.pop_at(index)
+				ranking.push_front(winner)
+				break
+	events.append({"type": "match_over", "ranking": ranking, "awards": MatchRanking.awards(active)})
 
 func _message(key: String) -> String:
 	return "{" + key + "}"
@@ -261,6 +284,7 @@ func _start_dash(index: int) -> void:
 
 func _update_pickups() -> void:
 	for i in range(players.size()):
+		if bool(players[i].get("disconnected", false)): continue
 		var player := players[i]
 		if SpellRules.is_active(player, "sheep"): continue
 		for c in range(coins.size() - 1, -1, -1):
@@ -304,8 +328,10 @@ func _update_pickups() -> void:
 
 func _update_dash_hits() -> void:
 	for i in range(players.size()):
+		if bool(players[i].get("disconnected", false)): continue
 		if players[i].dash_left <= 0.0: continue
 		for j in range(players.size()):
+			if bool(players[j].get("disconnected", false)): continue
 			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > GameConfig.PLAYER_RADIUS * 2.0: continue
 			if players[j].dash_left > 0.0:
 				var away: Vector2 = (players[i].pos - players[j].pos).normalized()
@@ -365,6 +391,7 @@ func _update_safe_zone(delta: float) -> void:
 		elif chest_fade_alpha[chest_index] < 1.0:
 			chest_fade_alpha[chest_index] = minf(1.0, chest_fade_alpha[chest_index] + delta / GameConfig.ZONE_COIN_FADE_SECONDS)
 	for index in range(players.size()):
+		if bool(players[index].get("disconnected", false)): continue
 		var player: Dictionary = players[index]
 		if safe_rect.has_point(player.pos):
 			player.zone_drain_left = GameConfig.ZONE_DRAIN_INTERVAL
@@ -483,6 +510,7 @@ func _update_roots(runtime: Dictionary, delta: float) -> void:
 	if String(runtime.roots_state) != "active":
 		return
 	for player_index in range(players.size()):
+		if bool(players[player_index].get("disconnected", false)): continue
 		if players[player_index].rooted_left > 0.0 or players[player_index].pos.distance_to(runtime.roots_position) > GameConfig.ROOTS_RADIUS:
 			continue
 		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_root")
@@ -495,6 +523,7 @@ func _update_spikes(hazard: Dictionary) -> void:
 	if current_state != "up":
 		return
 	for player_index in range(players.size()):
+		if bool(players[player_index].get("disconnected", false)): continue
 		for tile in hazard.get("tiles", []):
 			var rect := _tile_rect(tile).grow(GameConfig.PLAYER_RADIUS)
 			if rect.has_point(players[player_index].pos):
@@ -506,6 +535,7 @@ func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> voi
 	var ghost_pos := _ghost_position(hazard)
 	var cooldowns: Array = runtime.player_cooldowns
 	for index in range(players.size()):
+		if bool(players[index].get("disconnected", false)): continue
 		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
 		if cooldowns[index] <= 0.0 and players[index].pos.distance_to(ghost_pos) <= GameConfig.PLAYER_RADIUS + GameConfig.GHOST_RADIUS:
 			_apply_hit(index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
@@ -519,6 +549,7 @@ func _update_conveyor(hazard: Dictionary, delta: float) -> void:
 	for tile in hazard.get("tiles", []):
 		var rect := _tile_rect(tile)
 		for player_index in range(players.size()):
+			if bool(players[player_index].get("disconnected", false)): continue
 			if rect.has_point(players[player_index].pos):
 				players[player_index].pos = _move_player(players[player_index].pos, motion)
 		for coin in coins:
@@ -536,6 +567,7 @@ func _update_steam(hazard: Dictionary, runtime: Dictionary, _delta: float) -> vo
 	runtime.last_steam_cycle = cycle
 	var center := _json_point(hazard.get("center", []))
 	for player_index in range(players.size()):
+		if bool(players[player_index].get("disconnected", false)): continue
 		var offset: Vector2 = players[player_index].pos - center
 		if offset.length() > GameConfig.STEAM_RADIUS:
 			continue
@@ -550,6 +582,7 @@ func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 	var state_now := String(runtime.barrel_state)
 	if state_now == "idle":
 		for player_index in range(players.size()):
+			if bool(players[player_index].get("disconnected", false)): continue
 			if players[player_index].dash_left > 0.0 and players[player_index].pos.distance_to(center) <= GameConfig.BARREL_CONTACT_RADIUS:
 				runtime.barrel_state = "fusing"
 				runtime.barrel_timer = GameConfig.BARREL_FUSE_SECONDS
@@ -575,6 +608,7 @@ func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 
 func _explode_barrel(center: Vector2) -> void:
 	for player_index in range(players.size()):
+		if bool(players[player_index].get("disconnected", false)): continue
 		var offset: Vector2 = players[player_index].pos - center
 		if offset.length() > GameConfig.BARREL_RADIUS:
 			continue
@@ -587,6 +621,7 @@ func _explode_barrel(center: Vector2) -> void:
 func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
 	var cooldowns: Array = runtime.player_cooldowns
 	for index in range(players.size()):
+		if bool(players[index].get("disconnected", false)): continue
 		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
 		if cooldowns[index] > 0.0:
 			continue
@@ -614,6 +649,7 @@ func _update_ray(hazard: Dictionary) -> void:
 	var direction := Vector2.RIGHT.rotated(elapsed * TAU / GameConfig.RAY_PERIOD)
 	var ends := [center + direction * GameConfig.RAY_LENGTH, center - direction * GameConfig.RAY_LENGTH]
 	for player_index in range(players.size()):
+		if bool(players[player_index].get("disconnected", false)): continue
 		var hit := false
 		for endpoint in ends:
 			if HazardRules.ray_hits(players[player_index].pos, center, endpoint, GameConfig.RAY_HIT_RADIUS):
@@ -669,10 +705,12 @@ func _spell_is_useful(index: int, item: String) -> bool:
 	var player: Dictionary = players[index]
 	if item == "frost":
 		for j in range(players.size()):
+			if bool(players[j].get("disconnected", false)): continue
 			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_FROST_RADIUS: return true
 	if item == "sheep": return _leader_index() != index
 	if item == "pin":
 		for j in range(players.size()):
+			if bool(players[j].get("disconnected", false)): continue
 			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_PIN_RANGE: return true
 	return false
 
@@ -683,6 +721,7 @@ func _cast_instant_spell(index: int) -> void:
 	match String(player.item):
 		"frost":
 			for j in range(players.size()):
+				if bool(players[j].get("disconnected", false)): continue
 				if j == index or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
 				if SpellRules.is_active(players[j], "cloak"):
 					players[j].item = ""
@@ -702,6 +741,7 @@ func _cast_instant_spell(index: int) -> void:
 			var target := -1
 			var best := GameConfig.SPELL_PIN_RANGE * GameConfig.SPELL_PIN_RANGE
 			for j in range(players.size()):
+				if bool(players[j].get("disconnected", false)): continue
 				if j != index and player.pos.distance_squared_to(players[j].pos) < best:
 					best = player.pos.distance_squared_to(players[j].pos)
 					target = j
@@ -836,7 +876,9 @@ func _move_player(position: Vector2, motion: Vector2) -> Vector2:
 
 func _separate_players() -> void:
 	for first_index in range(players.size()):
+		if bool(players[first_index].get("disconnected", false)): continue
 		for second_index in range(first_index + 1, players.size()):
+			if bool(players[second_index].get("disconnected", false)): continue
 			var separated := ArenaPhysics.separate_pair(players[first_index].pos, players[second_index].pos, GameConfig.PLAYER_RADIUS, obstacle_rects)
 			players[first_index].pos = separated[0]
 			players[second_index].pos = separated[1]
@@ -849,9 +891,10 @@ func _spawn_coin() -> void:
 
 func _leader_index() -> int:
 	if players.is_empty(): return -1
-	var best := 0
-	for i in range(1, players.size()):
-		if players[i].score > players[best].score: best = i
+	var best := -1
+	for i in range(players.size()):
+		if bool(players[i].get("disconnected", false)): continue
+		if best < 0 or players[i].score > players[best].score: best = i
 	return best
 
 

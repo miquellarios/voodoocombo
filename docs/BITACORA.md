@@ -250,3 +250,9 @@ Formato de cada entrada:
 - Test tools/test-network.ps1 con servidor y cinco procesos: cuatro entran, votan 2–2, comparten baile, envían movimiento de longitud 5 y reciben idéntico ranking; quinto rechazado. Sin errores en los logs. Test de vista online y regresión local también pasan.
 - Problemas corregidos durante la prueba: colisión con Node._input, paquete mayor que MTU y avisos ENet por relay al desconectar simultáneamente; relay desactivado, pues todos hablan con el servidor.
 - Humanos: jugar con latencia y pérdida reales, comprobar correcciones de posición, dash y hechizos. La prueba automatizada usa una partida de tres segundos; la simulación de noventa segundos está cubierta por los tests core.
+
+### Fase 11h — Desconexiones, resultados y revancha
+- Una desconexión elimina al muñeco de movimiento, colisiones, trampas y clasificación. Con dos humanos continúa; el último humano gana aunque el jugador que se marchó tuviera más puntos. Evento visual de salida y mensaje al perder el servidor.
+- El servidor guarda JSON por sala, publica resultados y estado HTTP. Revancha devuelve a la misma sala con todos no listos; podio online conserva la sala y comparte emotes.
+- Corregida una sangría en los bucles de hechizos durante la integración. Tests de desconexión, vista local y vista online pasan; prueba real de cuatro clientes más quinto rechazado también pasa con el mismo ranking y sin errores de red. El test de vista sigue mostrando dos instancias ObjectDB al terminar.
+- Humanos: comprobar abandono durante carga, partida y podio; pulsar Otra en dos clientes; verificar /results y cierre del servidor durante una partida.

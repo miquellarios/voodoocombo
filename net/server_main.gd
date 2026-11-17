@@ -41,6 +41,15 @@ func _process(delta: float) -> void:
 			elif room.phase == "playing":
 				_step_match(room)
 	if vote_publish >= GameConfig.VOTE_PUBLISH_SECONDS: vote_publish = 0.0
+	var public_rooms: Array[Dictionary] = []
+	for room: Dictionary in rooms.values():
+		var status := {"code": room.code, "mode": room.mode, "phase": room.phase, "players": []}
+		if room.get("sim") is MatchSim:
+			status["time"] = room.sim.remaining
+			for player: Dictionary in room.sim.players:
+				if not bool(player.get("disconnected", false)): status.players.append({"name": player.name, "score": player.score})
+		public_rooms.append(status)
+	HttpEndpoint.set_status({"rooms": public_rooms})
 
 func _request(sender: int, action: String, data: Dictionary) -> void:
 	if sender <= 1 or var_to_bytes(data).size() > GameConfig.RPC_MAX_BYTES or not _allow(sender, action): return
@@ -58,6 +67,13 @@ func _request(sender: int, action: String, data: Dictionary) -> void:
 				_publish(room)
 				Net.log_line("room %s %s %d" % [action, room.code, sender])
 		"leave": _depart(sender)
+		"rematch":
+			if room.is_empty() or room.phase != "results": return
+			room.phase = "lobby"
+			room.erase("sim")
+			room.erase("vote")
+			for player: Dictionary in room.players: player.ready = false
+			_publish(room)
 		"ready", "bots", "mode", "cosmetics":
 			if not room.is_empty() and LobbyRules.apply(room, sender, action, data):
 				if LobbyRules.all_ready(room):
@@ -135,7 +151,9 @@ func _step_match(room: Dictionary) -> void:
 				event["snapshot"] = room.sim.snapshot()
 				room.phase = "results"
 				Net.log_line("match over %s" % str(room.code))
-		for player: Dictionary in room.players: Net.match_events.rpc_id(int(player.peer_id), events)
+				_save_result(room, event)
+		for player: Dictionary in room.players:
+			if Net.can_send(int(player.peer_id)): Net.match_events.rpc_id(int(player.peer_id), events)
 	room.snapshot_left -= GameConfig.NET_TICK
 	if room.snapshot_left <= 0.0:
 		room.snapshot_left += GameConfig.NET_SNAPSHOT_TICK
@@ -155,5 +173,23 @@ func _publish(room: Dictionary) -> void:
 
 func _depart(sender: int) -> void:
 	var room := directory.leave(sender)
-	if not room.is_empty(): _publish(room)
+	if not room.is_empty():
+		if room.get("sim") is MatchSim and room.phase in ["loading", "playing"]:
+			room.sim.disconnect_player(sender)
+			if room.players.is_empty():
+				room.phase = "lobby"
+				room.erase("sim")
+			else: _step_match(room)
+		_publish(room)
 	directory.attempts.erase(sender)
+
+func _save_result(room: Dictionary, event: Dictionary) -> void:
+	var ranking: Array[Dictionary] = []
+	for player: Dictionary in event.ranking:
+		ranking.append({"name": player.name, "score": player.score, "max_combo": player.max_combo, "peer_id": player.peer_id})
+	if ranking.is_empty(): return
+	var record := {"date": Time.get_datetime_string_from_system(), "room": room.code, "mode": room.mode, "winner": ranking[0].name, "ranking": ranking, "awards": event.awards}
+	DirAccess.make_dir_recursive_absolute("user://matches")
+	var file := FileAccess.open("user://matches/%s-%s.json" % [record.date.replace(":", "-"), room.code], FileAccess.WRITE)
+	if file: file.store_string(JSON.stringify(record))
+	HttpEndpoint.add_result(record)

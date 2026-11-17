@@ -173,6 +173,9 @@ func _ready() -> void:
 	Net.snapshot_received.connect(_network_snapshot)
 	Net.events_received.connect(_network_events)
 	Net.disconnected.connect(_network_lost)
+	Net.room_changed.connect(func(room: Dictionary):
+		if network_match and room.phase == "lobby" and state in ["results", "match_end"]: _build_online()
+	)
 	Net.pong_received.connect(func(stamp: int): ping_ms = Time.get_ticks_msec() - stamp)
 	get_window().title = "VoodooCombo 0.1"
 	Settings.apply_display()
@@ -211,7 +214,7 @@ func _process(delta: float) -> void:
 		results_elapsed += delta
 		results_emote_cooldown = maxf(0.0, results_emote_cooldown - delta)
 		_update_result_emotes(delta)
-		if results_elapsed >= GameConfig.RESULTS_AUTO_MENU_SECONDS: _build_menu()
+		if not network_match and results_elapsed >= GameConfig.RESULTS_AUTO_MENU_SECONDS: _build_menu()
 		return
 	if state == "menu":
 		if not Settings.reduce_motion: character_idle += delta
@@ -361,6 +364,12 @@ func _show_simulation_events() -> void:
 func _handle_events(events: Array) -> void:
 	for event: Dictionary in events:
 		match str(event.type):
+			"player_left":
+				Fx.pop("☁", event.pos + OFFSET, Color("b8a9d1"))
+			"social":
+				if state == "results":
+					for index in results_ranking.size():
+						if int(results_ranking[index].get("peer_id", 0)) == int(event.peer_id): _add_result_emote(index, str(event.item))
 			"text":
 				var text: String = event.text
 				var expression := RegEx.new()
@@ -1179,7 +1188,10 @@ func _show_results() -> void:
 	var main_button := _button(root, I18n.t("main_menu"), Vector2(0.0, 600.0), _build_menu)
 	main_button.position = Vector2(920.0, 632.0)
 	main_button.size = Vector2(170.0, 54.0)
-	var again_button := _button(root, I18n.t("again"), Vector2(0.0, 600.0), func(): _begin_match(mode == "classic", selected_arena_id))
+	var again_button := _button(root, I18n.t("again"), Vector2(0.0, 600.0), func():
+		if network_match: Net.lobby_action.rpc_id(1, "rematch")
+		else: _build_online()
+	)
 	again_button.position = Vector2(1100.0, 632.0)
 	again_button.size = Vector2(150.0, 54.0)
 	main_button.grab_focus()
@@ -1236,11 +1248,14 @@ func _result_emote_icon(emote_id: String) -> TextureRect:
 	return icon
 
 func _launch_result_emote(index: int) -> void:
-	if index < 0 or index >= results_ranking.size() or results_emote_cooldown > 0.0: return
+	if index < 0 or index >= 4 or results_emote_cooldown > 0.0: return
 	var equipped: Array = Profile.cosmetics.get("emotes", ["risa", "enfado", "gg", "corazon"])
 	if equipped.is_empty(): return
 	var emote_id := String(equipped[posmod(index, equipped.size())])
-	_add_result_emote(index, emote_id)
+	if network_match: Net.lobby_action.rpc_id(1, "social", {"item": emote_id})
+	else:
+		for place in results_ranking.size():
+			if str(results_ranking[place].name) == Profile.nick: _add_result_emote(place, emote_id)
 	results_emote_cooldown = GameConfig.RESULTS_EMOTE_COOLDOWN
 	results_elapsed = 0.0
 
@@ -1395,6 +1410,7 @@ func _draw() -> void:
 		var opening_frame := 1 + mini(4, floori(progress * 5.0))
 		_draw_strip_frame(CHEST_TEXTURE, opened_size, opening_frame, chest.pos, float(opened_meta.get("scale", 0.5)), int(opened_meta.get("frames", 6)))
 	for i in range(players.size()):
+		if bool(players[i].get("disconnected", false)): continue
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
