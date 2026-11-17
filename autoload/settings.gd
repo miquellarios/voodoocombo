@@ -2,6 +2,7 @@ extends Node
 
 var reduce_motion := false
 var server_host := "127.0.0.1"
+var server_choice := 2
 var ui_scale := 1.0
 var music_volume := 0.7
 var sfx_volume := 0.8
@@ -11,6 +12,8 @@ var window_size_index := GameConfig.DEFAULT_WINDOW_SIZE_INDEX
 func _ready() -> void:
 	var config := ConfigFile.new()
 	if config.load("user://settings.cfg") == OK:
+		server_host = str(config.get_value("network", "host", server_host))
+		server_choice = int(config.get_value("network", "choice", server_choice))
 		reduce_motion = config.get_value("accessibility", "reduce_motion", false)
 		ui_scale = config.get_value("accessibility", "ui_scale", 1.0)
 		music_volume = config.get_value("audio", "music", 0.7)
@@ -21,6 +24,8 @@ func _ready() -> void:
 
 func save() -> void:
 	var config := ConfigFile.new()
+	config.set_value("network", "host", server_host)
+	config.set_value("network", "choice", server_choice)
 	config.set_value("accessibility", "reduce_motion", reduce_motion)
 	config.set_value("accessibility", "ui_scale", ui_scale)
 	config.set_value("audio", "music", music_volume)

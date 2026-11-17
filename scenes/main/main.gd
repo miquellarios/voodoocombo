@@ -887,6 +887,9 @@ func _build_settings() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	_label(root, I18n.t("settings"), Vector2(0, 130), 44, GameConfig.GOLD, true)
+	var server_button := _button(root, I18n.t("server"), Vector2.ZERO, _build_server_settings)
+	server_button.position = Vector2(980, 30)
+	server_button.size = Vector2(260, 55)
 	_button(root, "%s: %s" % [I18n.t("settings_reduce_motion"), I18n.t("settings_yes") if Settings.reduce_motion else I18n.t("settings_no")], Vector2(0, 215), func():
 		Settings.reduce_motion = not Settings.reduce_motion
 		Settings.save()
@@ -915,6 +918,34 @@ func _build_pause() -> void:
 	_label(root, "PAUSA", Vector2(0, 190), 48, GameConfig.GOLD, true)
 	_button(root, "Continuar", Vector2(0, 275), func(): state = "playing"; _build_hud())
 	_button(root, I18n.t("menu"), Vector2(0, 345), _build_menu)
+
+func _build_server_settings() -> void:
+	_clear_hud()
+	var root := _new_overlay()
+	_label(root, I18n.t("server"), Vector2(0, 90), 40, GameConfig.BONE_TEXT, true)
+	var choice := OptionButton.new()
+	choice.position = Vector2(390, 210)
+	choice.size = Vector2(500, 60)
+	for key in ["server_oracle", "server_lan", "server_pc"]: choice.add_item(I18n.t(key))
+	choice.select(Settings.server_choice)
+	root.add_child(choice)
+	var address := LineEdit.new()
+	address.position = Vector2(390, 310)
+	address.size = Vector2(500, 60)
+	address.max_length = 253
+	address.text = Settings.server_host
+	root.add_child(address)
+	choice.item_selected.connect(func(index: int):
+		Settings.server_choice = index
+		address.text = GameConfig.ONLINE_HOST if index == 0 else ("127.0.0.1" if index == 2 else "")
+		address.editable = index != 2
+	)
+	_button(root, I18n.t("name_save"), Vector2(0, 430), func():
+		Settings.server_host = address.text.strip_edges()
+		Settings.save()
+		_build_settings()
+	)
+	_button(root, I18n.t("menu"), Vector2(0, 530), _build_settings)
 
 func _build_hud() -> void:
 	_clear_hud()

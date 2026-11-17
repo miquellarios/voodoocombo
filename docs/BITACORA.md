@@ -256,3 +256,8 @@ Formato de cada entrada:
 - El servidor guarda JSON por sala, publica resultados y estado HTTP. Revancha devuelve a la misma sala con todos no listos; podio online conserva la sala y comparte emotes.
 - Corregida una sangría en los bucles de hechizos durante la integración. Tests de desconexión, vista local y vista online pasan; prueba real de cuatro clientes más quinto rechazado también pasa con el mismo ranking y sin errores de red. El test de vista sigue mostrando dos instancias ObjectDB al terminar.
 - Humanos: comprobar abandono durante carga, partida y podio; pulsar Otra en dos clientes; verificar /results y cierre del servidor durante una partida.
+
+### Fase 11i — Preparación del despliegue
+- Presets Windows, Linux ARM64 y x86_64 dedicados; scripts de arranque, servicio systemd y guía Oracle/LAN. Ajustes de servidor editables y persistentes, sin inventar una IP Oracle.
+- Documentación oficial de Godot 4.7 y Always Free consultada. El despliegue externo corresponde a los humanos; no se han creado recursos. No hay plantillas de exportación instaladas en las rutas comprobadas; los presets quedan preparados y la exportación binaria pendiente de disponer de ellas.
+- Test de vista online pasa. Humanos: instalar plantillas coincidentes, exportar, probar en Linux y desde dos redes; seguir docs/DESPLIEGUE.md y verificar cuota gratuita.

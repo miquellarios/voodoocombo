@@ -3,6 +3,7 @@ extends RefCounted
 
 # Red autoritativa.
 const NET_PORT := 7777
+const ONLINE_HOST := ""
 const NET_MAX_PEERS := 32
 const NET_MAX_ROOMS := 8
 const NET_TICK := 1.0 / 30.0

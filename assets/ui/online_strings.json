@@ -47,7 +47,10 @@
     "premise_cienaga": "El barro tiene hambre y las raíces, memoria.",
     "premise_cripta": "Pisa lejos de los pinchos. No despiertes al guardián.",
     "premise_taller": "Lo que no explota, sale por la cinta.",
-    "premise_biblioteca": "Portales y un rayo que nunca duerme. Silencio, por favor."
+    "premise_biblioteca": "Portales y un rayo que nunca duerme. Silencio, por favor.",
+    "server_oracle": "Oracle",
+    "server_lan": "Red local",
+    "server_pc": "Este PC"
   },
   "ca": {
     "online": "JUGAR EN LÍNIA",
@@ -97,7 +100,10 @@
     "premise_cienaga": "El fang té gana i les arrels, memòria.",
     "premise_cripta": "Evita les punxes. No despertis el guardià.",
     "premise_taller": "El que no explota, surt per la cinta.",
-    "premise_biblioteca": "Portals i un llamp que mai dorm. Silenci, si us plau."
+    "premise_biblioteca": "Portals i un llamp que mai dorm. Silenci, si us plau.",
+    "server_oracle": "Oracle",
+    "server_lan": "Xarxa local",
+    "server_pc": "Aquest PC"
   },
   "en": {
     "online": "PLAY ONLINE",
@@ -147,6 +153,9 @@
     "premise_cienaga": "Hungry mud and roots that remember.",
     "premise_cripta": "Avoid the spikes. Do not wake the guardian.",
     "premise_taller": "What does not explode goes down the conveyor.",
-    "premise_biblioteca": "Portals and a ray that never sleeps. Silence, please."
+    "premise_biblioteca": "Portals and a ray that never sleeps. Silence, please.",
+    "server_oracle": "Oracle",
+    "server_lan": "Local network",
+    "server_pc": "This PC"
   }
 }
