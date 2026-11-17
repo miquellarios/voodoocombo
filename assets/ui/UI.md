@@ -49,3 +49,12 @@ static func box(path: String) -> StyleBoxTexture:
 | `podio.png` | 1080×400 | Los tres bloques del podio. `fase10.json` dice dónde va cada personaje |
 | `resultados_fondo.png` | 1920×1080 | Fondo limpio de la pantalla de resultados |
 | `zona_niebla.png` | 256×256 | Niebla que se repite sin costuras, para lo que queda fuera de la zona segura |
+
+## Menú de mapas y pantalla de carga
+
+`carga.json` tiene los datos de esto.
+
+| Archivo | Tamaño (px) | Uso |
+|---|---|---|
+| `arena_<id>_mini.png` | 960×540 | Vista de cada arena con sus trampas (`cienaga`, `cripta`, `taller`, `biblioteca`), para ELIGE ARENA y la pantalla de carga |
+| `trampas_iconos.png` | 9 × 128×128 | Un icono por trampa: lodo, raíces, pinchos, fantasma, cinta, vapor, barril, portal, rayo. Dibujar a 48-64 px |

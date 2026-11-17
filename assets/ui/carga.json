@@ -1,0 +1,34 @@
+{
+  "arena_mini": {
+    "file": "arena_<id>_mini.png",
+    "size": [
+      960,
+      540
+    ],
+    "ids": [
+      "cienaga",
+      "cripta",
+      "taller",
+      "biblioteca"
+    ],
+    "note": "Vista de la arena con sus trampas, para el menú de mapas y la pantalla de carga."
+  },
+  "trampas_iconos": {
+    "file": "trampas_iconos.png",
+    "frame_w": 128,
+    "frame_h": 128,
+    "frames": 9,
+    "order": [
+      "lodo",
+      "raices",
+      "pinchos",
+      "fantasma",
+      "cinta",
+      "vapor",
+      "barril",
+      "portal",
+      "rayo"
+    ],
+    "note": "Un icono por trampa, para la pantalla de carga y CÓMO SE JUEGA. Dibujar a 48-64 px."
+  }
+}
