@@ -152,3 +152,9 @@ Formato de cada entrada:
 - Decisiones: Capa, botas, imán y anillo duran 8/4/5/6 s desde la activación; oveja conserva sus 3 s y los instantáneos se consumen al lanzarse.
 - Problemas encontrados y cómo se resolvieron: Ninguno en los tests core; la carga headless del editor y los tests pasan.
 - Qué tienen que probar los humanos: Abrir cofres, guardar varios tipos de hechizo, activar con E y B, comprobar duración/caducidad, escudo y resultados contra rivales; verificar que la tarjeta desaparece a los 2 s y que los bots usan hechizos con sentido.
+
+### Fase 10d — Colisión con la huella visible (17/11/2026)
+- Qué se ha hecho: El movimiento y los empujes de jugadores usan el campo `hitbox` de los obstáculos y un círculo en los pies de radio 14 px, 12 px bajo el centro. Se mantienen el rectángulo de rejilla/monedas y el radio de 22 px para separación entre jugadores.
+- Decisiones: Se deja la geometría de bordes de arena en el radio de jugador y se usa el radio de pies solo frente a objetos.
+- Problemas encontrados y cómo se resolvieron: Ninguno; suite core y carga del editor pasan.
+- Qué tienen que probar los humanos: Caminar despacio contra troncos y otros obstáculos de las cuatro arenas; comprobar que el sprite llega a la huella visible, que no atraviesa el objeto y que la separación de jugadores sigue funcionando.

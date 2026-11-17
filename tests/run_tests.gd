@@ -7,6 +7,7 @@ func _initialize() -> void:
 	_test_drop_limits()
 	_test_arena()
 	_test_arena_physics()
+	_test_player_foot_collision()
 	_test_bot_pathfinding()
 	_test_bot_dash_rate()
 	_test_hazard_rules()
@@ -65,6 +66,14 @@ func _test_arena_physics() -> void:
 	_check(slid.y > start.y and is_equal_approx(slid.x, start.x), "circle slides along obstacle")
 	var separated := ArenaPhysics.separate_pair(Vector2(100.0, 100.0), Vector2(100.0, 100.0), 22.0, [])
 	_check(separated[0].distance_to(separated[1]) >= 44.0, "overlapping players separate to collision diameter")
+
+func _test_player_foot_collision() -> void:
+	var obstacle: Array[Rect2] = [Rect2(100.0, 100.0, 40.0, 40.0)]
+	var feet := Vector2(78.0, 100.0)
+	for _frame in range(60):
+		feet = ArenaPhysics.move_circle(feet, Vector2(2.0, 0.0), GameConfig.PLAYER_FOOT_RADIUS, obstacle)
+	_check(feet.x > 80.0 and feet.x <= 86.1, "feet reach the obstacle before stopping")
+	_check(feet.distance_to(Vector2(100.0, 100.0)) >= GameConfig.PLAYER_FOOT_RADIUS - 0.1, "feet circle does not penetrate obstacle")
 
 func _test_bot_pathfinding() -> void:
 	var blocked: Dictionary = {}

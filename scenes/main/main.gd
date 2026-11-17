@@ -21,6 +21,7 @@ var seed_value := 0
 var arena: Dictionary = {}
 var previous_arena_id := ""
 var obstacle_rects: Array[Rect2] = []
+var player_hitbox_rects: Array[Rect2] = []
 var hazard_runtime: Array[Dictionary] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
@@ -164,6 +165,7 @@ func _begin_match(classic: bool = false) -> void:
 	arena = ArenaGen.generate(seed_value, previous_arena_id, "", classic)
 	previous_arena_id = String(arena.get("map_id", ""))
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
+	player_hitbox_rects = _get_obstacle_hitboxes(arena.get("obstacles", []))
 	_initialize_hazard_runtime()
 	arena_background = load("res://assets/arenas/" + String(arena.background)) if not String(arena.background).is_empty() else null
 	players.clear()
@@ -205,7 +207,7 @@ func _update_player(index: int, delta: float) -> void:
 		return
 	if player.recoil_left > 0.0:
 		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
-		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		player.pos = _move_player(player.pos, recoil_motion)
 		player.recoil_left = maxf(0.0, player.recoil_left - delta)
 		player.vel = Vector2.ZERO
 		return
@@ -227,7 +229,7 @@ func _update_player(index: int, delta: float) -> void:
 		player.vel = direction * speed
 		motion = player.vel * delta
 	var previous_position: Vector2 = player.pos
-	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	player.pos = _move_player(player.pos, motion)
 	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
 		player.dash_left = 0.0
 	if SpellRules.is_active(player, "magnet"):
@@ -248,7 +250,7 @@ func _update_bot(index: int, delta: float) -> void:
 		return
 	if player.recoil_left > 0.0:
 		var recoil_motion: Vector2 = player.recoil_dir * GameConfig.DASH_CLASH_RECOIL_DISTANCE * delta / GameConfig.DASH_CLASH_RECOIL_SECONDS
-		player.pos = ArenaPhysics.move_circle(player.pos, recoil_motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		player.pos = _move_player(player.pos, recoil_motion)
 		player.recoil_left = maxf(0.0, player.recoil_left - delta)
 		player.vel = Vector2.ZERO
 		return
@@ -285,7 +287,7 @@ func _update_bot(index: int, delta: float) -> void:
 		player.vel = direction * GameConfig.PLAYER_SPEED * speed_scale
 	var motion := movement * GameConfig.PLAYER_SPEED * speed_scale * delta * (GameConfig.DASH_MULTIPLIER if player.dash_left > 0.0 else 1.0)
 	var previous_position: Vector2 = player.pos
-	player.pos = ArenaPhysics.move_circle(player.pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+	player.pos = _move_player(player.pos, motion)
 	if player.dash_left > 0.0 and player.pos.distance_to(previous_position) + 0.1 < motion.length():
 		player.dash_left = 0.0
 	if player.dash_left > 0.0: player.dash_left = maxf(0.0, player.dash_left - delta)
@@ -494,7 +496,7 @@ func _update_conveyor(hazard: Dictionary, delta: float) -> void:
 		var rect := _tile_rect(tile)
 		for player_index in range(players.size()):
 			if rect.has_point(players[player_index].pos):
-				players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, motion, GameConfig.PLAYER_RADIUS, obstacle_rects)
+				players[player_index].pos = _move_player(players[player_index].pos, motion)
 		for coin in coins:
 			if rect.has_point(coin.pos):
 				coin.pos += motion
@@ -515,7 +517,7 @@ func _update_steam(hazard: Dictionary, runtime: Dictionary, _delta: float) -> vo
 		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
 		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.STEAM_STUN_SECONDS, "trap_steam")
 		if result.applied:
-			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.STEAM_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
+			players[player_index].pos = _move_player(players[player_index].pos, direction * GameConfig.STEAM_PUSH_DISTANCE)
 
 func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
 	var center := _json_point(hazard.get("center", []))
@@ -552,7 +554,7 @@ func _explode_barrel(center: Vector2) -> void:
 		var direction := offset.normalized() if offset.length() > 0.01 else Vector2.UP
 		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_barrel")
 		if result.applied:
-			players[player_index].pos = ArenaPhysics.move_circle(players[player_index].pos, direction * GameConfig.BARREL_PUSH_DISTANCE, GameConfig.PLAYER_RADIUS, obstacle_rects)
+			players[player_index].pos = _move_player(players[player_index].pos, direction * GameConfig.BARREL_PUSH_DISTANCE)
 
 func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
 	var cooldowns: Array = runtime.player_cooldowns
@@ -572,7 +574,7 @@ func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 		var direction: Vector2 = players[index].vel.normalized()
 		if direction == Vector2.ZERO:
 			direction = (destination - source).normalized()
-		players[index].pos = ArenaPhysics.move_circle(destination + direction * GameConfig.PORTAL_EXIT_DISTANCE, Vector2.ZERO, GameConfig.PLAYER_RADIUS, obstacle_rects)
+		players[index].pos = _move_player(destination + direction * GameConfig.PORTAL_EXIT_DISTANCE, Vector2.ZERO)
 		cooldowns[index] = GameConfig.PORTAL_COOLDOWN_SECONDS
 		Fx.pop(I18n.t("trap_portal"), players[index].pos + OFFSET, Color("7fe7ff"))
 		Sfx.play_tone(760.0, 0.1)
@@ -1399,6 +1401,20 @@ func _get_obstacle_rects(obstacles: Array) -> Array[Rect2]:
 		if values.size() >= 4:
 			rects.append(Rect2(Vector2(float(values[0]), float(values[1])), Vector2(float(values[2]), float(values[3]))))
 	return rects
+
+func _get_obstacle_hitboxes(obstacles: Array) -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for obstacle in obstacles:
+		var values: Array = obstacle.get("hitbox", obstacle.get("rect", []))
+		if values.size() >= 4:
+			rects.append(Rect2(Vector2(float(values[0]), float(values[1])), Vector2(float(values[2]), float(values[3]))))
+	return rects
+
+func _move_player(position: Vector2, motion: Vector2) -> Vector2:
+	var feet := position + Vector2(0.0, GameConfig.PLAYER_FOOT_OFFSET)
+	var moved_feet := ArenaPhysics.move_circle(feet, motion, GameConfig.PLAYER_FOOT_RADIUS, player_hitbox_rects)
+	var center := moved_feet - Vector2(0.0, GameConfig.PLAYER_FOOT_OFFSET)
+	return Vector2(clampf(center.x, GameConfig.PLAYER_RADIUS, GameConfig.ARENA_SIZE.x - GameConfig.PLAYER_RADIUS), clampf(center.y, GameConfig.PLAYER_RADIUS, GameConfig.ARENA_SIZE.y - GameConfig.PLAYER_RADIUS))
 
 func _separate_players() -> void:
 	for first_index in range(players.size()):

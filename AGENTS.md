@@ -69,7 +69,7 @@ res://
 - **Doblones y cofres:** van en casillas libres al azar. Nunca en obstáculos ni en trampas fijas; sobre el lodo sí.
 
 ### 4.2 Jugador
-- **Movimiento:** 260 px/s, radio de 22 px, choca con los obstáculos y con los bordes.
+- **Movimiento:** 260 px/s, radio de 22 px para jugadores; contra obstáculos usa los pies (radio 14 px, 12 px por debajo del centro). Choca también con los bordes.
 - **Dash:**
   - Dura 0,18 s a 3× la velocidad normal (unos 140 px) y tiene 1,5 s de espera.
   - Si golpea a un rival, este:
