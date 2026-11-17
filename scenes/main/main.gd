@@ -92,6 +92,24 @@ var player_name_font: Font
 var floating_coin_font: Font
 var floating_notice_font: Font
 var menu_logo_tween: Tween
+var lobby_return := false
+
+func _build_online() -> void:
+	_clear_hud()
+	state = "online"
+	var root := _new_overlay()
+	var lobby := OnlineLobby.new()
+	root.add_child(lobby)
+	lobby.exit_requested.connect(_build_menu)
+	lobby.locker_requested.connect(func(): lobby_return = true; _build_characters())
+	lobby.local_match_requested.connect(func(config: Dictionary): _begin_match(config.mode == "classic", str(config.arena_id)))
+
+func _locker_back() -> void:
+	if lobby_return:
+		lobby_return = false
+		if not Net.room.is_empty(): Net.lobby_action.rpc_id(1, "cosmetics", {"character": Profile.character, "cosmetics": Profile.cosmetics})
+		_build_online()
+	else: _build_menu()
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
@@ -465,7 +483,7 @@ func _build_menu() -> void:
 		menu_logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		menu_logo_tween.set_loops()
 	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
-	var actions: Array[Callable] = [func(): _build_arena_select(false), func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
+	var actions: Array[Callable] = [_build_online, func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
 	for index in range(labels.size()):
 		var button := _button(root, labels[index], Vector2(0, 302 + index * 59), actions[index])
 		if not Settings.reduce_motion:
@@ -565,7 +583,7 @@ func _build_locker(tab: String) -> void:
 		tab_button.size = Vector2(210.0, 46.0)
 	if tab != "character":
 		_build_cosmetic_tab(root, tab)
-		_button(root, I18n.t("menu"), Vector2(0, 610), _build_menu)
+		_button(root, I18n.t("menu"), Vector2(0, 610), _locker_back)
 		return
 	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
 	character_preview_id = Profile.character
@@ -588,10 +606,13 @@ func _build_locker(tab: String) -> void:
 	var next_button := _button(root, "▶", Vector2(210, 265), func(): _cycle_character(1))
 	next_button.position = Vector2(866, 265)
 	next_button.size = Vector2(64, 54)
-	_button(root, I18n.t("menu"), Vector2(0, 565), _build_menu)
+	_button(root, I18n.t("menu"), Vector2(0, 565), _locker_back)
 	character_idle = 0.0
 
 func _build_cosmetic_tab(root: Control, tab: String) -> void:
+	if tab == "emotes":
+		_build_social_locker(root)
+		return
 	var ids: Array[String] = []
 	var levels: Dictionary = {}
 	if tab == "frame":
@@ -664,6 +685,27 @@ func _select_locker_item(tab: String, item_id: String) -> void:
 		Profile.cosmetics["frame" if tab == "frame" else "trail"] = item_id
 	Profile.save()
 	_build_locker(tab)
+
+func _build_social_locker(root: Control) -> void:
+	var equipped: Array = Profile.cosmetics.get("social", GameConfig.SOCIAL_DEFAULT)
+	var ids: Array = GameConfig.SOCIAL_LEVELS.keys()
+	for slot in 8:
+		var column := slot % 2
+		var row := slot / 2
+		var selector := OptionButton.new()
+		selector.position = Vector2(150 + column * 510, 190 + row * 90)
+		selector.size = Vector2(460, 60)
+		for index in ids.size():
+			var item: String = str(ids[index])
+			var key := item if item.begins_with("dance") or item.begins_with("shout") else "cosmetic_" + item
+			selector.add_item("%d · %s" % [slot + 1, I18n.t(key)])
+			selector.set_item_disabled(index, Profile.level() < int(GameConfig.SOCIAL_LEVELS[item]))
+			if item == str(equipped[slot]): selector.select(index)
+		selector.item_selected.connect(func(index: int):
+			Profile.cosmetics.social[slot] = ids[index]
+			Profile.save()
+		)
+		root.add_child(selector)
 
 func _build_nickname_dialog(return_to_characters: bool = false) -> void:
 	_clear_hud()

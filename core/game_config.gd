@@ -18,6 +18,12 @@ const ROOM_ATTEMPT_WINDOW := 60.0
 const RPC_INPUT_LIMIT := 40
 const RPC_ACTION_LIMIT := 12
 const RPC_MAX_BYTES := 2048
+const LOBBY_PEDESTALS := [Vector2(280, 507), Vector2(520, 507), Vector2(760, 507), Vector2(1000, 507)]
+const SOCIAL_SECONDS := 2.0
+const SOCIAL_COOLDOWN := 1.0
+const SOCIAL_DEFAULT := ["risa", "enfado", "gg", "corazon", "dance_0", "shout_0", "shout_1", "risa"]
+const SOCIAL_LEVELS := {"risa": 1, "enfado": 1, "gg": 1, "corazon": 1, "llanto": 6, "pulgar": 9, "fuego": 9, "calavera": 3, "dado": 2, "jarra": 2, "rana": 3, "zzz": 4, "pregunta": 4, "jaja": 5, "pollo": 6, "grito": 7, "dance_0": 1, "dance_1": 3, "dance_2": 5, "dance_3": 8, "shout_0": 1, "shout_1": 1, "shout_2": 2, "shout_3": 4, "shout_4": 6, "shout_5": 8}
+const SOCIAL_EMOTES := ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego", "dado", "jarra", "rana", "zzz", "pregunta", "jaja", "pollo", "grito"]
 
 const ARENA_SIZE := Vector2(1200.0, 600.0)
 const EMBER := Color("ff6a2b")

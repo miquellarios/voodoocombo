@@ -1,6 +1,7 @@
 extends Node
 
 var reduce_motion := false
+var server_host := "127.0.0.1"
 var ui_scale := 1.0
 var music_volume := 0.7
 var sfx_volume := 0.8

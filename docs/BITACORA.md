@@ -231,3 +231,9 @@ Formato de cada entrada:
 - Tests: test_rooms.gd comprueba aforo, versión, códigos inexistentes, límite, migración y caducidad. Importación headless sin errores.
 - La prueba ENet de 11c necesitó ejecutar servidor y clientes juntos fuera del aislamiento de red; dos rondas ping/pong verificadas. La prueba completa con cuatro clientes queda integrada con 11g.
 - Humanos: comprobar los mensajes de error y copiar el código en el lobby que incorpora 11e.
+
+### Fase 11e — Lobby de mazmorra y rueda social
+- Añadidos entrada online, crear/unirse, práctica con tres bots, estrados con jugador local en segundo lugar, anfitrión, listo, bots, modos y copia de código. Fondo del pack con antorchas, polvo, niebla y araña; animación desactivable.
+- Rueda de ocho ranuras en Q/Y, accesos 1–4, cuatro bailes, dieciséis emotes y seis gritos propios. La taquilla permite asignar ranuras según nivel; el servidor limita mensajes sociales a uno por segundo.
+- I18n es/ca/en para la UI nueva. Test de lobby: cuatro personajes, segundo estrado y ocho botones; pasó. El primer test usó carga anticipada incompatible con autoloads bajo --script; corregido con carga diferida. Persisten dos avisos ObjectDB al salir del test.
+- Humanos: comprobar composición, foco con mando, rueda mantenida, gritos y bailes entre clientes. El paso de listo a votación se conecta en 11f.

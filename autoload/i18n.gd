@@ -8,6 +8,9 @@ var strings := {
 }
 
 func _init() -> void:
+	var online: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/ui/online_strings.json"))
+	if online is Dictionary:
+		for locale: String in online: strings[locale].merge(online[locale], true)
 	strings.es.merge({
 		"settings_reduce_motion": "Reducir movimiento",
 		"settings_yes": "Sí",

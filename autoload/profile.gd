@@ -70,7 +70,12 @@ func _normalize_cosmetics() -> void:
 	var trail_id := str(cosmetics.get("trail", "color"))
 	if not GameConfig.FRAME_UNLOCK_LEVELS.has(frame_id) or int(GameConfig.FRAME_UNLOCK_LEVELS[frame_id]) > level(): frame_id = "madera"
 	if not GameConfig.TRAIL_UNLOCK_LEVELS.has(trail_id) or int(GameConfig.TRAIL_UNLOCK_LEVELS[trail_id]) > level(): trail_id = "color"
-	cosmetics = {"frame": frame_id, "trail": trail_id, "emotes": clean}
+	var social: Array = cosmetics.get("social", GameConfig.SOCIAL_DEFAULT).duplicate()
+	if social.size() != 8: social = GameConfig.SOCIAL_DEFAULT.duplicate()
+	for index in social.size():
+		if not GameConfig.SOCIAL_LEVELS.has(str(social[index])) or int(GameConfig.SOCIAL_LEVELS.get(str(social[index]), 99)) > level():
+			social[index] = GameConfig.SOCIAL_DEFAULT[index]
+	cosmetics = {"frame": frame_id, "trail": trail_id, "emotes": clean, "social": social}
 
 func save() -> void:
 	_normalize_cosmetics()

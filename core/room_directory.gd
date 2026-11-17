@@ -15,7 +15,7 @@ func validate(nick: String, character: String, cosmetics: Dictionary, version: S
 	error = ""
 	if version != GameConfig.NET_VERSION: error = "version"
 	elif not NicknameRules.is_valid(nick) or nick.length() > 12: error = "nickname"
-	elif not character in ["mago", "trol", "gnomo", "nigromante"]: error = "character"
+	elif not character in ["mago", "trol", "gnomo", "nigro"]: error = "character"
 	elif var_to_bytes(cosmetics).size() > GameConfig.RPC_MAX_BYTES: error = "cosmetics"
 	for index in nick.length():
 		if nick.unicode_at(index) < 32 or nick.unicode_at(index) == 127: error = "nickname"
