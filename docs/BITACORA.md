@@ -176,3 +176,9 @@ Formato de cada entrada:
 - Decisiones: La partida y las monedas se preparan antes de abrir la carga; saltar solo evita la espera y siempre conserva la cuenta atrás 3-2-1.
 - Problemas encontrados y cómo se resolvieron: Ninguno; el manifiesto `carga.json`, carga headless del editor, tests core y smoke test pasan.
 - Qué tienen que probar los humanos: Comprobar la carga de 15 s, el cambio de consejos, iconos/textos según cada arena y el salto con Espacio a partir de 5 s; verificarlo en ambos modos.
+
+### Fase 10h — Nombre e identidad del jugador (17/11/2026)
+- Qué se ha hecho: En un perfil sin nick aparece el diálogo inicial; valida 3–12 caracteres y recorta espacios externos. PERSONAJES permite cambiarlo. En partida cada muñeco lleva su nick contorneado; el local añade «TÚ», su color, una flecha y un aro bajo los pies. Los bots conservan sus nombres propios.
+- Decisiones: La validación vive en `NicknameRules` para poder probarla como lógica pura. El nick se guarda en el mismo `Profile` que se usa para el marcador.
+- Problemas encontrados y cómo se resolvieron: La primera versión del test intentó acceder al autoload `Profile` desde el test `SceneTree` y no compiló; se extrajo la regla a `NicknameRules` y los tests core pasan.
+- Qué tienen que probar los humanos: Crear un perfil nuevo, probar nombres de 2, 3 y 13 caracteres y espacios externos; cambiar el nick desde PERSONAJES y comprobar sobre la arena colores, contornos, flecha, aro y nombres de bots.

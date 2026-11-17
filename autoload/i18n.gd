@@ -9,6 +9,11 @@ var strings := {
 
 func _init() -> void:
 	strings.es.merge({
+		"name_title": "¿Cómo te llamas?",
+		"name_hint": "De 3 a 12 caracteres",
+		"name_save": "GUARDAR",
+		"name_invalid": "Escribe un nombre de 3 a 12 caracteres.",
+		"name_edit": "CAMBIAR NOMBRE",
 		"loading_controls": "WASD / flechas mover · Espacio dash · E hechizo · 1–4 emotes",
 		"loading_player": "Eres el Jugador",
 		"loading_skip": "Pulsa Espacio para empezar",
@@ -33,6 +38,11 @@ func _init() -> void:
 		"loading_tip_10": "Recoge los doblones cerca del centro antes de que acabe la partida."
 	}, true)
 	strings.ca.merge({
+		"name_title": "Com et dius?",
+		"name_hint": "De 3 a 12 caràcters",
+		"name_save": "DESAR",
+		"name_invalid": "Escriu un nom de 3 a 12 caràcters.",
+		"name_edit": "CANVIAR NOM",
 		"loading_controls": "WASD / fletxes moure · Espai dash · E encanteri · 1–4 emotes",
 		"loading_player": "Ets el Jugador",
 		"loading_skip": "Prem Espai per començar",
@@ -57,6 +67,11 @@ func _init() -> void:
 		"loading_tip_10": "Recull els doblons prop del centre abans que s'acabi la partida."
 	}, true)
 	strings.en.merge({
+		"name_title": "What's your name?",
+		"name_hint": "3 to 12 characters",
+		"name_save": "SAVE",
+		"name_invalid": "Enter a name with 3 to 12 characters.",
+		"name_edit": "CHANGE NAME",
 		"loading_controls": "WASD / arrows move · Space dash · E spell · 1–4 emotes",
 		"loading_player": "You are Player",
 		"loading_skip": "Press Space to start",

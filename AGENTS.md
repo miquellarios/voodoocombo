@@ -69,6 +69,7 @@ res://
 - **Doblones y cofres:** van en casillas libres al azar. Nunca en obstáculos ni en trampas fijas; sobre el lodo sí.
 
 ### 4.2 Jugador
+- En la primera ejecución se pide un nick de 3-12 caracteres, recortando espacios de los extremos; puede cambiarse desde PERSONAJES. Sobre cada muñeco aparece su nick con contorno; el local se muestra en su color con «TÚ», una flecha y un aro bajo los pies.
 - **Movimiento:** 260 px/s, radio de 22 px para jugadores; contra obstáculos usa los pies (radio 14 px, 12 px por debajo del centro). Choca también con los bordes.
 - **Dash:**
   - Dura 0,18 s a 3× la velocidad normal (unos 140 px) y tiene 1,5 s de espera.

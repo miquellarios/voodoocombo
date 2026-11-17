@@ -66,9 +66,14 @@ var spell_notice_item := ""
 var last_input_controller := false
 var loading_elapsed := 0.0
 var loading_tip_index := -1
+var nick_line_edit: LineEdit
+var nick_error_label: Label
+var nick_dialog_returns_to_characters := false
+var player_name_font: Font
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
+	player_name_font = load("res://assets/fonts/Baloo2-Regular.woff2") as Font
 	previous_arena_id = Profile.last_arena_id
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
@@ -87,7 +92,10 @@ func _ready() -> void:
 		spell_atlases.append(atlas)
 	Fx.floating_text.connect(_on_floating_text)
 	Fx.shake.connect(_on_shake)
-	_build_menu()
+	if Profile.nick.strip_edges().is_empty():
+		_build_nickname_dialog()
+	else:
+		_build_menu()
 
 func _process(delta: float) -> void:
 	if state == "match_end":
@@ -995,6 +1003,8 @@ func _build_characters() -> void:
 	var display: Dictionary = character_metadata.get("characters", {}).get(character_preview_id, {})
 	_label(root, String(display.get("name", character_preview_id.to_upper())), Vector2(0, 420), 34, Color("fff6c2"), true)
 	_label(root, String(display.get("role", "")), Vector2(0, 465), 20, Color("b8a9d1"), false)
+	_label(root, Profile.nick, Vector2(0.0, GameConfig.CHARACTER_NICKNAME_Y), GameConfig.CHARACTER_NICKNAME_FONT_SIZE, Color("fff6c2"), false)
+	_button(root, I18n.t("name_edit"), Vector2(0.0, GameConfig.NICK_EDIT_BUTTON_Y), func(): _build_nickname_dialog(true))
 	var previous_button := _button(root, "◀", Vector2(-210, 265), func(): _cycle_character(-1))
 	previous_button.position = Vector2(350, 265)
 	previous_button.size = Vector2(64, 54)
@@ -1003,6 +1013,46 @@ func _build_characters() -> void:
 	next_button.size = Vector2(64, 54)
 	_button(root, I18n.t("menu"), Vector2(0, 565), _build_menu)
 	character_idle = 0.0
+
+func _build_nickname_dialog(return_to_characters: bool = false) -> void:
+	_clear_hud()
+	state = "nickname"
+	nick_dialog_returns_to_characters = return_to_characters
+	var root := _new_overlay()
+	var backdrop := _screen_backdrop()
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	_label(root, I18n.t("name_title"), Vector2(0.0, GameConfig.NICK_DIALOG_TITLE_Y), GameConfig.NICK_DIALOG_TITLE_SIZE, GameConfig.GOLD, true)
+	var hint := _hud_label(root, GameConfig.NICK_DIALOG_HINT_POSITION, GameConfig.NICK_DIALOG_HINT_SIZE, GameConfig.NICK_DIALOG_HINT_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	hint.text = I18n.t("name_hint")
+	nick_line_edit = LineEdit.new()
+	nick_line_edit.position = GameConfig.NICK_DIALOG_FIELD_POSITION
+	nick_line_edit.size = GameConfig.NICK_DIALOG_FIELD_SIZE
+	nick_line_edit.max_length = GameConfig.NICK_MAX_LENGTH
+	nick_line_edit.text = Profile.nick
+	nick_line_edit.placeholder_text = I18n.t("name_hint")
+	nick_line_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nick_line_edit.focus_mode = Control.FOCUS_ALL
+	nick_line_edit.text_submitted.connect(_save_nickname)
+	root.add_child(nick_line_edit)
+	nick_error_label = _hud_label(root, Vector2(GameConfig.NICK_DIALOG_HINT_POSITION.x, GameConfig.NICK_DIALOG_ERROR_Y), GameConfig.NICK_DIALOG_ERROR_SIZE, GameConfig.NICK_DIALOG_ERROR_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	nick_error_label.add_theme_color_override("font_color", Color("ff7474"))
+	var save_button := _button(root, I18n.t("name_save"), Vector2(0.0, GameConfig.NICK_DIALOG_BUTTON_Y), func(): _save_nickname(nick_line_edit.text))
+	save_button.grab_focus()
+	nick_line_edit.grab_focus()
+	nick_line_edit.caret_column = nick_line_edit.text.length()
+
+func _save_nickname(value: String) -> void:
+	var cleaned := NicknameRules.normalize(value)
+	if not NicknameRules.is_valid(cleaned):
+		if is_instance_valid(nick_error_label): nick_error_label.text = I18n.t("name_invalid")
+		return
+	Profile.nick = cleaned
+	Profile.save()
+	if nick_dialog_returns_to_characters:
+		_build_characters()
+	else:
+		_build_menu()
 
 func _cycle_character(direction: int) -> void:
 	var keys := ["mago", "trol", "gnomo", "nigro"]
@@ -1303,7 +1353,7 @@ func _screen_backdrop() -> ColorRect:
 	return backdrop
 
 func _draw() -> void:
-	if state in ["menu", "results", "match_end"]:
+	if state in ["menu", "results", "match_end", "nickname"]:
 		draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
 		return
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
@@ -1348,6 +1398,19 @@ func _draw() -> void:
 			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale))
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height))
 			draw_set_transform(OFFSET)
+		var name_color: Color = player.color if i == 0 else Color.WHITE
+		var name_text := (I18n.t("you") + " · " if i == 0 else "") + String(player.name)
+		var name_font: Font = player_name_font if player_name_font != null else ThemeDB.fallback_font
+		var name_size := GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE if i == 0 else GameConfig.PLAYER_NAME_FONT_SIZE
+		var name_position: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y)
+		draw_string_outline(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, GameConfig.PLAYER_NAME_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
+		draw_string(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, name_color)
+		if i == 0:
+			var arrow_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y - GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE - GameConfig.PLAYER_ARROW_NAME_GAP)
+			draw_colored_polygon(PackedVector2Array([arrow_center + Vector2(-GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(0.0, GameConfig.PLAYER_ARROW_TIP_LENGTH)]), name_color)
+			var aura_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_AURA_CENTER_Y)
+			var aura_alpha := GameConfig.PLAYER_AURA_REDUCED_ALPHA if Settings.reduce_motion else (GameConfig.PLAYER_AURA_MIN_ALPHA + GameConfig.PLAYER_AURA_ALPHA_RANGE * (sin(elapsed * GameConfig.PLAYER_AURA_PULSE_SPEED) * 0.5 + 0.5))
+			draw_arc(aura_center, GameConfig.PLAYER_AURA_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, Color(name_color, aura_alpha), GameConfig.PLAYER_AURA_WIDTH, true)
 		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
 		if i == 0 and player.combo > 1:
 			draw_string(ThemeDB.fallback_font, pos + Vector2(27, -16), "x%d · %d" % [Scoring.multiplier(player.combo, mode == "classic"), player.combo], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GameConfig.GOLD)

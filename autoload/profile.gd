@@ -1,6 +1,6 @@
 extends Node
 
-var nick := "Viajero Vudú"
+var nick := ""
 var character := "mago"
 var xp := 0
 var games := 0
