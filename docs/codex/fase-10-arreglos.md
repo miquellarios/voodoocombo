@@ -5,7 +5,7 @@
 > - `hud_v2_referencia.png`: partida con nombres, ranura nueva y la niebla cerrándose;
 > - `resultados_referencia.png`: podio con emotes.
 >
-> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11. Quitar el modo Clásico y los modos nuevos van en la fase 13: aquí no toques el Clásico.
+> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11, igual que quitar el modo Clásico y los modos nuevos: aquí no toques el Clásico.
 
 ## Qué hemos visto al probar la versión 9
 
@@ -99,7 +99,7 @@
 
 ## 10f · Elegir el mapa
 
-- Después de JUGAR aparece la pantalla de votación de arena descrita en `docs/codex/fase-11-online-lobby.md`, bloque **11e**:
+- Después de JUGAR aparece la pantalla de votación de arena descrita en `docs/codex/fase-11-online-lobby-dopamina-modos.md`, bloque **11e**:
   - los 4 mapas, uno en cada esquina de la pantalla, con su premisa;
   - votas con las flechas y los bots también votan;
   - si hay empate, ruleta.
@@ -109,7 +109,7 @@
 ## 10g · Pantalla de carga de 15 s
 
 - Entre elegir arena y la cuenta atrás hay una pantalla de carga de **15 s** (`GameConfig.LOADING_SECONDS = 15.0`):
-  - arriba, el nombre de la arena (New Rocker) y su miniatura grande;
+  - arriba, el nombre de la arena (Cinzel Bold) y su miniatura grande;
   - a un lado, **sus trampas**: icono de `trampas_iconos.png` y una frase que diga qué hacen y cuánto quitan;
   - debajo, los **controles**: mover, dash, hechizo (E) y emotes (1-4);
   - un **consejo** que cambia cada 4 s, de una lista de al menos 10. Ejemplos: "El combo se pierde si pasas 1,5 s sin coger un doblón", "Con la corona sueltas más doblones si te golpean", "Los doblones que sueltas no los puedes recoger durante un momento";
@@ -122,7 +122,7 @@
 
 - **Primera vez que se abre el juego:** pantalla "¿Cómo te llamas?" con un campo de texto (de 3 a 12 caracteres, sin espacios al principio ni al final). Se guarda en `Profile.nick`. Se puede cambiar después desde PERSONAJES.
 - **En la partida:**
-  - Encima de cada personaje, su nombre: blanco, Baloo 2 de 18 px, con contorno.
+  - Encima de cada personaje, su nombre: blanco, Oswald Medium de 18 px, con contorno.
   - El tuyo, más grande (22 px), en tu color y con "TÚ" y una flecha encima.
   - Bajo tus pies, un aro de tu color que late suavemente durante toda la partida.
   - Mira `hud_v2_referencia.png`.
@@ -134,8 +134,8 @@
 **Causa:** `_draw()` usa `ThemeDB.fallback_font` a 17-22 px, y los textos flotantes duran 0,8 s (`_on_floating_text`).
 
 - Usa las fuentes del proyecto con contorno (`draw_string_outline` y después `draw_string`, o `Label` con `outline_size`):
-  - "+N": Lilita One de 30 px (36 px si vale 3 o más), contorno de 6 px `#0B0710`, color según el multiplicador (blanco → `#FF9F1C` → `#FF4FD8`).
-  - Avisos de combo ("¡Combo!", "¡VOODOO COMBO!") y de trampa ("¡Atrapado!", "¡Zas!"): New Rocker de 44-64 px con contorno de 8 px.
+  - "+N": Oswald Bold de 30 px (36 px si vale 3 o más), plana, con contorno de 6 px `#0B0710`. Hueso `#EFE7DA` si vale 1 y brasa `#FF6A2B` si lleva bonus.
+  - Avisos de combo ("¡Combo!", "¡VOODOO COMBO!") y de trampa ("¡Atrapado!", "¡Zas!"): Cinzel Bold de 44-64 px, espaciada, en brasa `#FF6A2B` con resplandor suave (ver el bloque 11j del documento de la fase 11).
 - **Duración:** "+N" 1,2 s; avisos 1,6 s. Entran con *pop* (escala 1,6 → 1 en 0,15 s), suben 40 px y se desvanecen solo en los últimos 0,3 s.
 - Junto a tu personaje, mientras dure la racha, un círculo pequeño con "x2" / "x3" y el número del combo, como en el tráiler.
 - Los avisos grandes de combo van en la capa del HUD, cerca del centro arriba, para que no los tape nada.
