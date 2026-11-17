@@ -42,7 +42,12 @@
     "cosmetic_pregunta": "¿?",
     "cosmetic_jaja": "JA JA",
     "cosmetic_pollo": "¡Gallina!",
-    "cosmetic_grito": "Grito"
+    "cosmetic_grito": "Grito",
+    "vote_now": "¡VOTAD!",
+    "premise_cienaga": "El barro tiene hambre y las raíces, memoria.",
+    "premise_cripta": "Pisa lejos de los pinchos. No despiertes al guardián.",
+    "premise_taller": "Lo que no explota, sale por la cinta.",
+    "premise_biblioteca": "Portales y un rayo que nunca duerme. Silencio, por favor."
   },
   "ca": {
     "online": "JUGAR EN LÍNIA",
@@ -87,7 +92,12 @@
     "cosmetic_pregunta": "?",
     "cosmetic_jaja": "HA HA",
     "cosmetic_pollo": "Gallina!",
-    "cosmetic_grito": "Crit"
+    "cosmetic_grito": "Crit",
+    "vote_now": "VOTEU!",
+    "premise_cienaga": "El fang té gana i les arrels, memòria.",
+    "premise_cripta": "Evita les punxes. No despertis el guardià.",
+    "premise_taller": "El que no explota, surt per la cinta.",
+    "premise_biblioteca": "Portals i un llamp que mai dorm. Silenci, si us plau."
   },
   "en": {
     "online": "PLAY ONLINE",
@@ -132,6 +142,11 @@
     "cosmetic_pregunta": "?",
     "cosmetic_jaja": "HA HA",
     "cosmetic_pollo": "Chicken!",
-    "cosmetic_grito": "Shout"
+    "cosmetic_grito": "Shout",
+    "vote_now": "VOTE!",
+    "premise_cienaga": "Hungry mud and roots that remember.",
+    "premise_cripta": "Avoid the spikes. Do not wake the guardian.",
+    "premise_taller": "What does not explode goes down the conveyor.",
+    "premise_biblioteca": "Portals and a ray that never sleeps. Silence, please."
   }
 }

@@ -72,6 +72,7 @@ func public_state(room: Dictionary) -> Dictionary:
 	var result := {}
 	for key in ["code", "players", "host", "mode", "duration", "phase", "arena_id", "bots"]:
 		result[key] = room[key]
+	if room.has("vote"): result["vote_state"] = room.vote.snapshot()
 	return result.duplicate(true)
 
 func step(delta: float) -> Array[String]:

@@ -237,3 +237,9 @@ Formato de cada entrada:
 - Rueda de ocho ranuras en Q/Y, accesos 1–4, cuatro bailes, dieciséis emotes y seis gritos propios. La taquilla permite asignar ranuras según nivel; el servidor limita mensajes sociales a uno por segundo.
 - I18n es/ca/en para la UI nueva. Test de lobby: cuatro personajes, segundo estrado y ocho botones; pasó. El primer test usó carga anticipada incompatible con autoloads bajo --script; corregido con carga diferida. Persisten dos avisos ObjectDB al salir del test.
 - Humanos: comprobar composición, foco con mando, rueda mantenida, gritos y bailes entre clientes. El paso de listo a votación se conecta en 11f.
+
+### Fase 11f — Votación compartida
+- ArenaVote cuenta votos durante diez segundos, permite cambiarlos, programa votos de bots y genera una secuencia horaria reproducible para empates o ausencia de votos. El último salto coincide con el ganador.
+- Vista de cuatro cuadrantes con assets y posiciones del JSON, premisas traducidas, retratos, marco iluminado y crecimiento del ganador. El servidor publica la misma votación; práctica usa la misma clase y conserva semilla y roster hasta MatchSim.
+- Tests test_vote.gd y test_lobby_view.gd: empate 2–2, nadie vota, voto inválido, determinismo y recorrido lobby→votación→carga; pasan.
+- Humanos: comparar ruleta en cuatro pantallas y comprobar navegación de cuadrantes con mando. Las conexiones de carga a partida se completan en 11g.

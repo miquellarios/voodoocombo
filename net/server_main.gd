@@ -3,6 +3,7 @@ extends Node
 var directory := RoomDirectory.new()
 var rooms: Dictionary = directory.rooms
 var rate_limits: Dictionary = {}
+var vote_publish := 0.0
 var accumulator := 0.0
 
 func _ready() -> void:
@@ -19,13 +20,22 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	for code in directory.step(delta): Net.log_line("room closed %s" % code)
+	vote_publish += delta
 	accumulator += minf(delta, GameConfig.NET_MAX_FRAME)
 	while accumulator >= GameConfig.NET_TICK:
 		accumulator -= GameConfig.NET_TICK
 		for room: Dictionary in rooms.values():
+			if room.phase == "voting":
+				if room.vote.step(GameConfig.NET_TICK):
+					room.arena_id = room.vote.winner
+					room.phase = "loading"
+					room["load_left"] = GameConfig.LOADING_SECONDS + 3.0
+					_publish(room)
+				elif vote_publish >= GameConfig.VOTE_PUBLISH_SECONDS: _publish(room)
 			if room.get("sim") is MatchSim:
 				var inputs: Array[Dictionary] = []
 				room.sim.step(GameConfig.NET_TICK, inputs)
+	if vote_publish >= GameConfig.VOTE_PUBLISH_SECONDS: vote_publish = 0.0
 
 func _request(sender: int, action: String, data: Dictionary) -> void:
 	if sender <= 1 or var_to_bytes(data).size() > GameConfig.RPC_MAX_BYTES or not _allow(sender, action): return
@@ -44,7 +54,14 @@ func _request(sender: int, action: String, data: Dictionary) -> void:
 				Net.log_line("room %s %s %d" % [action, room.code, sender])
 		"leave": _depart(sender)
 		"ready", "bots", "mode", "cosmetics":
-			if not room.is_empty() and LobbyRules.apply(room, sender, action, data): _publish(room)
+			if not room.is_empty() and LobbyRules.apply(room, sender, action, data):
+				if LobbyRules.all_ready(room):
+					room.phase = "voting"
+					room["vote"] = ArenaVote.new()
+					room.vote.setup(randi(), LobbyRules.roster(room))
+				_publish(room)
+		"vote":
+			if not room.is_empty() and room.phase == "voting" and room.vote.vote(sender, str(data.get("arena", ""))): _publish(room)
 		"social":
 			if room.is_empty(): return
 			var item := str(data.get("item", ""))

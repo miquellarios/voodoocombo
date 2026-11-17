@@ -22,6 +22,8 @@ var local_id := 2
 var wheel_index := 0
 var social_at := -1.0
 var connecting_action := ""
+var local_vote: ArenaVote
+var vote_view: ArenaVoteView
 var background := preload("res://assets/ui/lobby_mazmorra.png")
 
 func _ready() -> void:
@@ -107,7 +109,21 @@ func _room_changed(value: Dictionary) -> void:
 	if not local: local_id = multiplayer.get_unique_id()
 	roster = LobbyRules.roster(room)
 	_load_sheets()
-	_build_room()
+	if room.phase == "voting":
+		if not is_instance_valid(vote_view):
+			_new_view()
+			vote_view = ArenaVoteView.new()
+			vote_view.roster = roster
+			view.add_child(vote_view)
+			vote_view.voted.connect(func(id: String):
+				if local: local_vote.vote(local_id, id)
+				else: Net.lobby_action.rpc_id(1, "vote", {"arena": id})
+			)
+		vote_view.update_state(local_vote.snapshot() if local else room.vote_state)
+	elif room.phase == "loading":
+		if local: local_match_requested.emit({"mode": room.mode, "arena_id": room.arena_id, "seed": local_vote.seed_value, "players": roster})
+		else: online_match_requested.emit(room)
+	else: _build_room()
 
 func _load_sheets() -> void:
 	for index in roster.size():
@@ -156,7 +172,12 @@ func _display_order() -> Array[int]:
 
 func _action(action: String, data: Dictionary = {}) -> void:
 	if local:
-		if LobbyRules.apply(room, local_id, action, data): _room_changed(room)
+		if LobbyRules.apply(room, local_id, action, data):
+			if LobbyRules.all_ready(room):
+				local_vote = ArenaVote.new()
+				local_vote.setup(randi(), LobbyRules.roster(room))
+				room.phase = "voting"
+			_room_changed(room)
 	else: Net.lobby_action.rpc_id(1, action, data)
 
 func _leave() -> void:
@@ -205,7 +226,7 @@ func _close_wheel() -> void:
 	wheel = null
 
 func _unhandled_input(event: InputEvent) -> void:
-	if room.is_empty(): return
+	if room.is_empty() or room.phase != "lobby": return
 	if event is InputEventKey and not event.echo:
 		if event.keycode == KEY_Q:
 			if event.pressed: _open_wheel()
@@ -220,6 +241,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if local and room.get("phase") == "voting":
+		if local_vote.step(delta):
+			room.arena_id = local_vote.winner
+			room.phase = "loading"
+		_room_changed(room)
 	queue_redraw()
 
 func _draw() -> void:

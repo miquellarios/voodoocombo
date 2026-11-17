@@ -13,6 +13,12 @@ func _run() -> void:
 	lobby._open_wheel()
 	assert(lobby.wheel.get_child_count() == 8)
 	lobby._social("dance_0")
+	lobby._close_wheel()
+	lobby._action("ready")
+	assert(lobby.room.phase == "voting")
+	lobby.local_vote.vote(2, "cienaga")
+	for frame in 600: lobby._process(1.0 / 30.0)
+	assert(lobby.room.phase == "loading")
 	await process_frame
 	lobby.queue_free()
 	await process_frame

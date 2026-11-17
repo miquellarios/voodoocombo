@@ -102,7 +102,7 @@ func _build_online() -> void:
 	root.add_child(lobby)
 	lobby.exit_requested.connect(_build_menu)
 	lobby.locker_requested.connect(func(): lobby_return = true; _build_characters())
-	lobby.local_match_requested.connect(func(config: Dictionary): _begin_match(config.mode == "classic", str(config.arena_id)))
+	lobby.local_match_requested.connect(func(config: Dictionary): _begin_match(config.mode == "classic", str(config.arena_id), config))
 
 func _locker_back() -> void:
 	if lobby_return:
@@ -247,7 +247,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_start_countdown()
 		get_viewport().set_input_as_handled()
 
-func _begin_match(classic: bool = false, arena_id: String = "") -> void:
+func _begin_match(classic: bool = false, arena_id: String = "", overrides: Dictionary = {}) -> void:
 	simulation = MatchSim.new()
 	seed_value = int(Time.get_unix_time_from_system()) + randi()
 	var roster: Array[Dictionary] = [
@@ -256,7 +256,9 @@ func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 		{"name": "Conde Costura", "character": "gnomo", "is_bot": true},
 		{"name": "Dama del Pantano", "character": "nigro", "is_bot": true}
 	]
-	simulation.setup({"seed": seed_value, "mode": "classic" if classic else "voodoo", "arena_id": arena_id, "previous_arena": previous_arena_id, "players": roster})
+	var config := {"seed": seed_value, "mode": "classic" if classic else "voodoo", "arena_id": arena_id, "previous_arena": previous_arena_id, "players": roster}
+	config.merge(overrides, true)
+	simulation.setup(config)
 	_read_simulation()
 	rng.seed = seed_value
 	simulation_accumulator = 0.0
