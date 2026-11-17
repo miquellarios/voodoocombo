@@ -35,7 +35,7 @@
 ## Hito 0 · Lo que hay ahora (revisado por Claude)
 
 - Godot **4.7**, GDScript, renderizador Compatibility.
-- **Casi todo pasa en `scenes/main/main.gd`** (unas 2400 líneas tras la fase 10): estado de la partida, simulación, dibujo, HUD y menús juntos. Los jugadores son diccionarios en `players`, y los doblones y cofres son arrays.
+- **Casi todo pasa en `scenes/main/main.gd`** (unas 2200 líneas tras la fase 10): estado de la partida, simulación, dibujo, HUD y menús juntos. Los jugadores son diccionarios en `players`, y los doblones y cofres son arrays.
 - **Lógica reutilizable** que ya está separada en `core/`:
   - `arena_gen.gd`, `arena_physics.gd`, `hazard_rules.gd`, `scoring.gd`, `item_table.gd`, `ranking.gd`;
   - y `net/bot_brain.gd`.
@@ -214,7 +214,7 @@ Tiene que quedar como `docs/media/votacion_esquinas_referencia.png`.
 
 **Contra bots:** el mismo sistema.
 
-**Fase 10f:** si ya se hizo una pantalla de elegir arena en la fase 10, esta la sustituye a la de elegir arena. Las cartas (`carta_<arena>.png`) ya no se usan aquí; pueden servir para CÓMO SE JUEGA o la pantalla de carga.
+**Fase 10f:** esta votación sustituye a la pantalla de elegir arena de la fase 10 (elegir una o aleatoria); la arena preferida del perfil deja de usarse. Las cartas (`carta_<arena>.png`) ya no se usan aquí; pueden servir para CÓMO SE JUEGA o la pantalla de carga.
 
 ## 11g · Partida en red
 
