@@ -99,12 +99,12 @@
 
 ## 10f · Elegir el mapa
 
-- Después de JUGAR aparece la pantalla **ELIGE ARENA**:
-  - 4 tarjetas con `assets/ui/arena_<id>_mini.png`, el nombre de la arena y los iconos de sus trampas (`trampas_iconos.png`);
-  - una quinta tarjeta, **ALEATORIA**, que elige al azar sin repetir la anterior.
-- Se maneja con teclado, ratón y mando. Esc vuelve al menú.
-- `ArenaGen.generate()` acepta un `arena_id` concreto (vacío = aleatoria).
-- La arena elegida se recuerda en el perfil para la próxima vez.
+- Después de JUGAR aparece la pantalla de votación de arena descrita en `docs/codex/fase-11-online-lobby.md`, bloque **11e**:
+  - las 4 cartas con su premisa (`assets/ui/carta_<arena>.png`);
+  - votas con las flechas y los bots también votan;
+  - si hay empate, ruleta.
+- En esta fase solo hace falta para jugar contra bots; en la 11 se conecta con la red.
+- `ArenaGen.generate()` acepta un `arena_id` concreto.
 
 ## 10g · Pantalla de carga de 15 s
 

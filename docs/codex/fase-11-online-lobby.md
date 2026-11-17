@@ -3,7 +3,7 @@
 > **Para Codex.** Antes de esta fase tiene que estar terminada la fase 10.
 > Lee `docs/codex/plan-multijugador.md`, el plan del equipo: es la base de esta fase y sus reglas de seguridad y coste valen tal cual.
 > Aquí se concreta para VoodooCombo: no hay vida ni disparos; hay doblones, dash, hechizos y trampas.
-> Referencia visual del lobby: `docs/media/lobby_referencia.png`.
+> Referencias visuales: `docs/media/lobby_mazmorra_referencia.png` (lobby) y `docs/media/votacion_referencia.png` (votación de arena).
 
 ## Decisiones del equipo
 
@@ -14,6 +14,7 @@
   - **Oracle Cloud Always Free**, para jugar desde casa.
   - **De respaldo, un PC de clase** con el mismo ejecutable de servidor en la red local, por si falla internet.
 - **Cómo se entra:** solo con **código de sala**, de 5 letras. Sin partida rápida pública.
+- **La arena se vota** entre los 4 jugadores; si hay empate, ruleta.
 - **Puerto:** UDP **7777**, el que ya usa `autoload/net.gd` (el 2456 del plan era un ejemplo).
 - **Jugadores:** de 2 a 4 por sala. El anfitrión puede rellenar los huecos con bots.
 - **Coste 0 €:** no se activa nada de pago. Si una cuota gratuita no llega, se para y se avisa.
@@ -30,7 +31,7 @@
 
 ## Cómo trabajar esta fase
 
-- Son 8 bloques (**11a-11h**), en orden y con **un commit por bloque** (`Fase 11a: <resumen>`).
+- Son 9 bloques (**11a-11i**), en orden y con **un commit por bloque** (`Fase 11a: <resumen>`).
 - **No cambies las reglas del juego** para meter la red: la partida contra bots tiene que jugarse igual que antes.
 - Comprueba las APIs contra la documentación de Godot 4.7: `ENetMultiplayerPeer`, `@rpc`, `multiplayer.get_remote_sender_id()`, etc.
 - Después de cada bloque, apunta en la bitácora qué archivos has tocado, cómo se prueba y qué se tiene que ver.
@@ -79,28 +80,102 @@
 - Si el anfitrión se va, el siguiente que llegó pasa a serlo.
 - **Prueba:** 4 clientes en la misma sala; el quinto recibe "Sala llena".
 
-## 11d · Lobby estilo Fortnite
+## 11d · Lobby de mazmorra
 
-Tiene que quedar como `docs/media/lobby_referencia.png`, con el fondo `assets/ui/lobby_fondo.png`.
+Tiene que quedar como `docs/media/lobby_mazmorra_referencia.png`, con el fondo `assets/ui/lobby_mazmorra.png`.
 
-- **Entrar al online:** en el menú, JUGAR abre **JUGAR ONLINE**, con tres opciones: **CREAR SALA**, **UNIRSE CON CÓDIGO** (campo de 5 letras) y **CONTRA BOTS** (como ahora, sin red).
-- **Escenario:**
-  - 4 peanas en x = 420, 780, 1140 y 1500 (en 1920×1080).
-  - **Tú siempre en la segunda peana**, un poco más grande. Los demás, en el orden en que llegaron.
-  - Cada uno con su personaje en `idle`, su marco y una placa con su nombre y **LISTO** en verde o "…".
-  - El anfitrión, con la corona y "ANFITRIÓN" encima.
-- **Huecos libres:** silueta con "+ INVITAR" y el código. El anfitrión ve además **AÑADIR BOT**.
-- **Arriba a la izquierda:** el **código de sala** en grande y el botón **COPIAR** (`DisplayServer.clipboard_set`).
-- **Arriba a la derecha:** **MODO** y **ARENA** con flechas ‹ ›. Solo los cambia el anfitrión; los demás lo ven pero no pueden tocarlo.
-- **Abajo:**
-  - **TAQUILLA**: personaje, marco, estela y emotes, como en la fase 10. Los cambios se ven al momento en tu peana y en la de los demás;
-  - **¡LISTO!** (grande): cambia entre listo y no listo;
-  - **SALIR**.
-- **Emotes** con las teclas 1-4: el bocadillo lo ven todos.
-- **Empezar:** cuando todos los humanos están listos y hay al menos 2 jugadores (contando bots), cuenta atrás de 5 s en el lobby. Después, todos pasan a la **pantalla de carga de 15 s** (fase 10) al mismo tiempo.
-- Se usa entero con teclado y mando.
+**Ambiente:** una mazmorra de fantasía oscura, con muro de piedra, arcos con ojos brillando en la oscuridad, estandartes con runas, antorchas, cadenas, calaveras, telarañas y una araña colgando. Todo eso ya viene dibujado en el fondo; por encima, en código:
+- las antorchas parpadean (un brillo naranja que sube y baja);
+- la niebla se mueve despacio;
+- la araña baja y sube cada 8-12 s;
+- de vez en cuando cae polvo del techo.
+- Con "Reducir movimiento", todo quieto.
 
-## 11e · Partida en red
+**Entrar al online:** en el menú, JUGAR abre **JUGAR ONLINE**, con tres opciones:
+- **CREAR SALA**;
+- **UNIRSE CON CÓDIGO** (campo de 5 letras);
+- **CONTRA BOTS**: como ahora, sin red, pero con el mismo lobby y los huecos rellenos de bots.
+
+**Escenario:**
+- 4 estrados de piedra con runas, en x = 420, 780, 1140 y 1500 (en 1920×1080).
+- **Tú siempre en el segundo**, un poco más grande. Los demás, en el orden en que llegaron.
+- Cada personaje en `idle`, con su marco y una placa con su nombre y **LISTO** en verde o "…".
+- El anfitrión, con la corona.
+- **Huecos libres:** silueta con "+ INVITAR". El anfitrión ve además **AÑADIR BOT**.
+
+**Arriba:**
+- a la izquierda, el **código de sala** en grande y **COPIAR** (`DisplayServer.clipboard_set`);
+- a la derecha, el **MODO** con flechas ‹ ›, que solo cambia el anfitrión.
+- La arena no se elige aquí: se vota (11e).
+
+**Abajo:** **TAQUILLA** · **¡LISTO!** (grande) · **BAILES** · **SALIR**.
+
+### Emotes, bailes y gritos (para echarse unas risas)
+
+Un menú en rueda (mantener **Q** o el botón Y del mando) con 8 huecos que se configuran en la TAQUILLA: emotes, bailes y gritos. Las teclas 1-4 lanzan los cuatro primeros directamente. Todo lo ven los demás jugadores.
+
+- **Emotes:** `emotes.png` (8) y `emotes2.png` (8 más): dado de 20, jarra de hidromiel, rana, "Zzz", "¿?", "JA JA", pollito ("¡gallina!") y grito con hacha. El bocadillo dura 2 s.
+- **Bailes:** hechos en código sobre el sprite (escala, giro, saltos y `flip_h`), en bucle hasta que te mueves o lanzas otra cosa. Con notas musicales ♪ flotando y un ritmo sintetizado. Los cuatro bailes:
+
+  | Baile | Movimiento |
+  |---|---|
+  | Meneíto | Balanceo de ±15° a 4 Hz con botecitos |
+  | Trompo | Se voltea cada 0,12 s mientras da saltitos |
+  | Saltito Vudú | Saltos grandes, aplastándose al caer y estirándose al subir |
+  | Carcajada | Tiembla de risa con la animación `win` y suelta el emote "JA JA" |
+
+- **Gritos de guerra:** un cartel grande sobre tu personaje durante 2 s (New Rocker, oro viejo con sombra roja sangre) y un sonido de cuerno o tambor. Frases **propias del juego**, sin copiar las de otros juegos o libros:
+  - "¡A LA CARGA, CAMARADA!"
+  - "¡SANGRE Y DOBLONES!"
+  - "¡POR EL VUDÚ!"
+  - "¡QUE TIEMBLE LA MAZMORRA!"
+  - "¡HOY CENAMOS ORO!"
+  - "¡NADIE TOCA MIS DOBLONES!"
+- **Desbloqueos:** al principio, 4 emotes, 1 baile y 2 gritos. El resto se desbloquea con los niveles (amplía la tabla de la fase 10l).
+- **Límite:** uno cada 1 s por jugador; el servidor descarta el resto.
+
+### Empezar
+
+Cuando todos los humanos están listos y hay al menos 2 jugadores (contando bots): **votación de arena** (11e) → pantalla de carga de 15 s (fase 10), todos a la vez.
+
+Se usa entero con teclado y mando.
+
+## 11e · Votación de arena con ruleta
+
+Tiene que quedar como `docs/media/votacion_referencia.png`.
+
+**Cartas:** `assets/ui/carta_<arena>.png` (640×960), sin texto. El código escribe encima:
+- el **nombre** en la placa de arriba (New Rocker);
+- la **premisa** en el pergamino (Baloo 2, `#3A2A20`).
+
+Las zonas exactas y los textos de las premisas están en `assets/ui/fase11b.json`:
+
+| Arena | Premisa |
+|---|---|
+| Ciénaga | Aquí se hundió el tesoro de un rey avaro. El barro todavía tiene hambre… y las raíces, memoria. |
+| Cripta | Los muertos guardan sus doblones con celo. Pisa donde no brillan los pinchos y no despiertes al guardián. |
+| Taller | Un gnomo dejó todas sus máquinas encendidas y se fue de vacaciones. Lo que no explota, sale por la cinta. |
+| Biblioteca | Libros que muerden, portales que te escupen y un rayo que nunca duerme. Silencio, por favor. |
+
+**Votación:**
+1. Salen las 4 cartas en fila con "¡VOTAD LA ARENA!" y una cuenta atrás de **10 s**.
+2. Cada jugador elige una con las flechas (o el ratón) y confirma.
+   - Su retrato aparece debajo de la carta que ha votado.
+   - Puede cambiar el voto hasta que acabe el tiempo.
+   - Los bots votan al azar en los primeros 3 s.
+3. Si todos han votado, se acaba antes.
+4. **Gana la más votada**: se ilumina con `carta_brillo.png`, crece un poco y suena una fanfarria.
+5. **Empate:** **ruleta de verdad** entre las cartas empatadas.
+   - Un foco de luz salta de carta en carta con un *tic*: rápido al principio y frenando poco a poco (ease-out) durante unos 3 s.
+   - La última carta se queda iluminada, con destellos, *ding* y fanfarria.
+   - Si nadie vota, la ruleta va entre las 4.
+6. **El servidor** cuenta los votos y decide la ruleta con la semilla de la partida, y manda a todos los clientes el orden de los saltos, para que todos vean la misma animación.
+
+**Contra bots:** el mismo sistema (tú votas y los bots también).
+
+**Fase 10f:** esta pantalla sustituye a la de ELIGE ARENA. Si la fase 10 ya está hecha, cambia aquella pantalla por esta.
+
+## 11f · Partida en red
 
 - **Entrada:**
   - el cliente manda su entrada al servidor 30 veces por segundo, `unreliable_ordered`: `submit_input(seq, move, dash, spell)`;
@@ -117,7 +192,7 @@ Tiene que quedar como `docs/media/lobby_referencia.png`, con el fondo `assets/ui
 - **Trampas periódicas:** se calculan con el reloj de la partida que manda el servidor en cada snapshot, así que se ven igual en todos.
 - Arriba a la derecha, un indicador pequeño de ping (verde < 80 ms, amarillo < 150 ms, rojo).
 
-## 11f · Desconexiones y final
+## 11g · Desconexiones y final
 
 - **Si alguien se cae durante la partida:** "puff", su personaje desaparece y la partida sigue. Si queda 1 humano, gana él y se va al podio.
 - **Si se cae el servidor:** cartel "Se ha perdido la conexión con el servidor" y vuelta al menú.
@@ -126,7 +201,7 @@ Tiene que quedar como `docs/media/lobby_referencia.png`, con el fondo `assets/ui
   - el resultado se guarda en el servidor y se ve en `GET /results`;
   - **¡OTRA!** vuelve al lobby de la misma sala, con todos "no listos".
 
-## 11g · Exportar y desplegar
+## 11h · Exportar y desplegar
 
 Codex prepara los archivos; **el despliegue en Oracle lo hacen los humanos** siguiendo la guía.
 
@@ -148,7 +223,7 @@ Codex prepara los archivos; **el despliegue en Oracle lo hacen los humanos** sig
 - **En el juego:** AJUSTES → "Servidor": **Oracle** (dirección guardada en `GameConfig.ONLINE_HOST`), **Red local** (IP escrita a mano) o **Este PC** (`127.0.0.1`).
 - Un `.bat` / `.sh` de ejemplo para arrancar el servidor en el PC de clase.
 
-## 11h · Endurecer
+## 11i · Endurecer
 
 - Límite de frecuencia en todas las RPC del cliente y tamaño máximo de los datos.
 - Rechaza nombres de más de 12 caracteres o con caracteres de control, y cosméticos que no existan o no estén desbloqueados.
@@ -168,5 +243,7 @@ Codex prepara los archivos; **el despliegue en Oracle lo hacen los humanos** sig
 | Un cliente se cae en mitad de la partida | "Puff" y la partida sigue |
 | Se cierra el servidor | Todos ven el aviso y vuelven al menú |
 | Partida completa | Todos ven el mismo ganador y el mismo podio |
+| Votación con empate 2-2 | Todos ven la misma ruleta y la misma arena ganadora |
+| Un jugador baila en el lobby | Los otros 3 lo ven bailar |
 | Desde dos casas distintas contra Oracle | Partida completa con ping < 150 ms |
 | PC de clase como servidor en la red local | Partida completa sin internet |
