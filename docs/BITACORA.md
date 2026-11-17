@@ -170,3 +170,9 @@ Formato de cada entrada:
 - Decisiones: La opción aleatoria se conserva como preferencia, y la última arena concreta se guarda por separado para no repetirla.
 - Problemas encontrados y cómo se resolvieron: Ninguno; se copiaron las miniaturas e iconos del kit y pasan tests de selección explícita y aleatoria.
 - Qué tienen que probar los humanos: Elegir las cuatro tarjetas y aleatoria en ambos modos, volver con Esc, verificar los iconos, y reiniciar para confirmar que recuerda la preferencia y que aleatoria no repite el mapa anterior.
+
+### Fase 10g — Pantalla de carga (17/11/2026)
+- Qué se ha hecho: Entre la elección y la cuenta atrás se muestran durante 15 s el nombre y la miniatura de la arena, sus trampas con icono y efecto, los controles, el personaje/nombre/J1, un consejo que cambia cada 4 s y una barra de progreso. En práctica aparece Espacio para saltar desde el segundo 5.
+- Decisiones: La partida y las monedas se preparan antes de abrir la carga; saltar solo evita la espera y siempre conserva la cuenta atrás 3-2-1.
+- Problemas encontrados y cómo se resolvieron: Ninguno; el manifiesto `carga.json`, carga headless del editor, tests core y smoke test pasan.
+- Qué tienen que probar los humanos: Comprobar la carga de 15 s, el cambio de consejos, iconos/textos según cada arena y el salto con Espacio a partir de 5 s; verificarlo en ambos modos.

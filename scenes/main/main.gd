@@ -40,6 +40,7 @@ var roll_result := ""
 var frenzy_notified := false
 var arena_background: Texture2D
 var character_metadata: Dictionary = {}
+var loading_metadata: Dictionary = {}
 var character_sheets: Dictionary = {}
 var hazard_sheets: Dictionary = {}
 var item_metadata: Dictionary = {}
@@ -63,6 +64,8 @@ var character_idle := 0.0
 var spell_notice_time := 0.0
 var spell_notice_item := ""
 var last_input_controller := false
+var loading_elapsed := 0.0
+var loading_tip_index := -1
 
 func _ready() -> void:
 	get_window().title = "VoodooCombo 0.1"
@@ -70,6 +73,9 @@ func _ready() -> void:
 	var metadata: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/characters/characters.json"))
 	if metadata is Dictionary:
 		character_metadata = metadata
+	var loading_source: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/ui/carga.json"))
+	if loading_source is Dictionary:
+		loading_metadata = loading_source
 	var items_data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/items/items.json"))
 	if items_data is Dictionary:
 		item_metadata = items_data.get("items", {})
@@ -95,6 +101,19 @@ func _process(delta: float) -> void:
 	if state == "menu":
 		if not Settings.reduce_motion: character_idle += delta
 		if is_instance_valid(character_preview): _update_character_preview()
+		return
+	if state == "loading":
+		loading_elapsed = minf(GameConfig.LOADING_SECONDS, loading_elapsed + delta)
+		var next_tip := posmod(floori(loading_elapsed / GameConfig.LOADING_TIP_INTERVAL), GameConfig.LOADING_TIP_COUNT)
+		if next_tip != loading_tip_index:
+			loading_tip_index = next_tip
+			var tip_label := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
+			if tip_label: tip_label.text = I18n.t("loading_tip_%d" % (loading_tip_index + 1))
+		var progress := hud_root.get_node_or_null("LoadingProgress") as ProgressBar if is_instance_valid(hud_root) else null
+		if progress: progress.value = loading_elapsed / GameConfig.LOADING_SECONDS * GameConfig.LOADING_PERCENT_MAX
+		var skip_prompt := hud_root.get_node_or_null("LoadingSkip") as Label if is_instance_valid(hud_root) else null
+		if skip_prompt: skip_prompt.visible = loading_elapsed >= GameConfig.LOADING_SKIP_SECONDS and _is_practice_match()
+		if loading_elapsed >= GameConfig.LOADING_SECONDS: _start_countdown()
 		return
 	if state == "playing" and Input.is_action_just_pressed("dash"):
 		_start_dash(0)
@@ -163,6 +182,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		_build_hud()
 	elif state == "arena_select" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		_build_menu()
+	elif state == "loading" and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE and loading_elapsed >= GameConfig.LOADING_SKIP_SECONDS:
+		_start_countdown()
+		get_viewport().set_input_as_handled()
 
 func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 	mode = "classic" if classic else "voodoo"
@@ -196,6 +218,91 @@ func _begin_match(classic: bool = false, arena_id: String = "") -> void:
 	elapsed = 0.0
 	remaining = GameConfig.CLASSIC_SECONDS if mode == "classic" else GameConfig.MATCH_SECONDS
 	frenzy_notified = false
+	_build_loading()
+
+func _build_loading() -> void:
+	state = "loading"
+	loading_elapsed = 0.0
+	loading_tip_index = -1
+	_clear_hud()
+	var root := _new_overlay()
+	var backdrop := _screen_backdrop()
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	var title := _label(root, I18n.t("arena_" + String(arena.map_id)), Vector2(0.0, GameConfig.LOADING_TITLE_Y), GameConfig.LOADING_TITLE_SIZE, GameConfig.GOLD, true)
+	var title_font := load("res://assets/fonts/NewRocker-Regular.woff2") as Font
+	if title_font != null: title.add_theme_font_override("font", title_font)
+	var thumbnail := TextureRect.new()
+	thumbnail.texture = load(_arena_thumbnail_path(String(arena.map_id)))
+	thumbnail.position = GameConfig.LOADING_THUMB_POSITION
+	thumbnail.size = GameConfig.LOADING_THUMB_SIZE
+	thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	root.add_child(thumbnail)
+	var trap_keys: Array = GameConfig.ARENA_TRAP_KEYS.get(String(arena.map_id), [])
+	var trap_icons: Array = GameConfig.ARENA_TRAP_ICONS.get(String(arena.map_id), [])
+	for index in range(trap_keys.size()):
+		var trap_name := String(trap_keys[index])
+		var icon := TextureRect.new()
+		var atlas := AtlasTexture.new()
+		atlas.atlas = TRAP_ICONS_TEXTURE
+		var trap_manifest: Dictionary = loading_metadata.get("trampas_iconos", {})
+		var icon_frame := float(trap_manifest.get("frame_w", GameConfig.ARENA_ICON_FRAME_SIZE))
+		atlas.region = Rect2(float(trap_icons[index]) * icon_frame, 0.0, icon_frame, float(trap_manifest.get("frame_h", icon_frame)))
+		icon.texture = atlas
+		icon.position = GameConfig.LOADING_TRAP_POSITION + Vector2(0.0, index * GameConfig.LOADING_TRAP_ROW_GAP)
+		icon.size = Vector2.ONE * GameConfig.LOADING_TRAP_ICON_SIZE
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		root.add_child(icon)
+		var trap_text := _hud_label(root, icon.position + Vector2(GameConfig.LOADING_TRAP_TEXT_OFFSET, 0.0), GameConfig.LOADING_TRAP_TEXT_SIZE, GameConfig.LOADING_TRAP_TEXT_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+		trap_text.text = I18n.t("loading_trap_" + trap_name)
+	var controls := _hud_label(root, Vector2(48.0, GameConfig.LOADING_CONTROLS_Y), GameConfig.LOADING_CONTROLS_SIZE, GameConfig.LOADING_CONTROLS_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	controls.text = I18n.t("loading_controls")
+	var tip := _hud_label(root, GameConfig.LOADING_TIP_POSITION, GameConfig.LOADING_TIP_SIZE, GameConfig.LOADING_TIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+	tip.name = "LoadingTip"
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var portrait_path := "res://assets/ui/retrato_%s_coral.png" % String(players[0].character)
+	var portrait := TextureRect.new()
+	portrait.texture = load(portrait_path)
+	portrait.position = GameConfig.LOADING_CHARACTER_POSITION
+	portrait.size = GameConfig.LOADING_PORTRAIT_SIZE
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	root.add_child(portrait)
+	var player_text := _hud_label(root, GameConfig.LOADING_CHARACTER_POSITION + GameConfig.LOADING_PLAYER_TEXT_OFFSET, GameConfig.LOADING_PLAYER_TEXT_SIZE, GameConfig.LOADING_PLAYER_TEXT_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	player_text.text = "%s\n%s %d · %s" % [String(players[0].name), I18n.t("loading_player"), GameConfig.LOADING_LOCAL_PLAYER_NUMBER, String(players[0].character).capitalize()]
+	var progress := ProgressBar.new()
+	progress.name = "LoadingProgress"
+	progress.position = GameConfig.LOADING_PROGRESS_POSITION
+	progress.size = GameConfig.LOADING_PROGRESS_SIZE
+	progress.max_value = GameConfig.LOADING_PERCENT_MAX
+	progress.show_percentage = false
+	root.add_child(progress)
+	var skip_text := _hud_label(root, GameConfig.LOADING_SKIP_POSITION, GameConfig.LOADING_SKIP_SIZE, GameConfig.LOADING_SKIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	skip_text.name = "LoadingSkip"
+	skip_text.text = I18n.t("loading_skip")
+	skip_text.visible = false
+	_update_loading_text()
+
+func _update_loading_text() -> void:
+	var tip := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
+	if tip:
+		loading_tip_index = posmod(floori(loading_elapsed / GameConfig.LOADING_TIP_INTERVAL), GameConfig.LOADING_TIP_COUNT)
+		tip.text = I18n.t("loading_tip_%d" % (loading_tip_index + 1))
+
+func _is_practice_match() -> bool:
+	for index in range(1, players.size()):
+		if not bool(players[index].is_bot): return false
+	return true
+
+func _arena_thumbnail_path(arena_id: String) -> String:
+	var manifest: Dictionary = loading_metadata.get("arena_mini", {})
+	var filename := String(manifest.get("file", "arena_<id>_mini.png")).replace("<id>", arena_id)
+	return "res://assets/ui/" + filename
+
+func _start_countdown() -> void:
+	if state != "loading": return
 	countdown = 3.0
 	state = "countdown"
 	_build_hud()
@@ -825,7 +932,7 @@ func _build_arena_select(classic: bool) -> void:
 		)
 		root.add_child(card)
 		var thumbnail := TextureRect.new()
-		thumbnail.texture = load("res://assets/ui/arena_%s_mini.png" % arena_id)
+		thumbnail.texture = load(_arena_thumbnail_path(arena_id))
 		thumbnail.position = Vector2.ONE * GameConfig.ARENA_THUMB_MARGIN
 		thumbnail.size = GameConfig.ARENA_THUMB_SIZE
 		thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -839,7 +946,9 @@ func _build_arena_select(classic: bool) -> void:
 			var icon := TextureRect.new()
 			var icon_atlas := AtlasTexture.new()
 			icon_atlas.atlas = TRAP_ICONS_TEXTURE
-			icon_atlas.region = Rect2(float(GameConfig.ARENA_TRAP_ICONS[arena_id][icon_order]) * GameConfig.ARENA_ICON_FRAME_SIZE, 0.0, GameConfig.ARENA_ICON_FRAME_SIZE, GameConfig.ARENA_ICON_FRAME_SIZE)
+			var trap_manifest: Dictionary = loading_metadata.get("trampas_iconos", {})
+			var icon_frame := float(trap_manifest.get("frame_w", GameConfig.ARENA_ICON_FRAME_SIZE))
+			icon_atlas.region = Rect2(float(GameConfig.ARENA_TRAP_ICONS[arena_id][icon_order]) * icon_frame, 0.0, icon_frame, float(trap_manifest.get("frame_h", icon_frame)))
 			icon.texture = icon_atlas
 			icon.position = Vector2(GameConfig.ARENA_ICON_START.x + icon_order * GameConfig.ARENA_ICON_GAP, GameConfig.ARENA_ICON_START.y)
 			icon.size = Vector2.ONE * GameConfig.ARENA_ICON_SIZE
