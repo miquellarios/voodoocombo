@@ -12,6 +12,6 @@ Estilo **"Brasa minimal"** (ver `AGENTS.md` §7):
 | `Oswald-Bold.woff2` | Todo lo que salta en partida ("+N", "-N", "¡ROBO!"), marcador y tiempo |
 | `Oswald-Medium.woff2` | Resto del texto |
 
-Las fuentes viejas (`NewRocker`, `LilitaOne`, `Baloo2`) se borran en el bloque 11j, cuando el juego ya no las use.
+Las fuentes viejas (`NewRocker`, `LilitaOne`, `Baloo2`) se borran en el bloque 11a de la fase 11, cuando el juego ya no las use.
 
 Godot 4 importa `.woff2` directamente: se cargan como `FontFile` (`load("res://assets/fonts/...")`).

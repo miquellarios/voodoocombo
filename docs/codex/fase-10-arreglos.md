@@ -5,7 +5,7 @@
 > - `hud_v2_referencia.png`: partida con nombres, ranura nueva y la niebla cerrándose;
 > - `resultados_referencia.png`: podio con emotes.
 >
-> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11, igual que quitar el modo Clásico y los modos nuevos: aquí no toques el Clásico.
+> El lobby y el multijugador por internet **no** entran en esta fase: van en la fase 11, y quitar el modo Clásico y los modos nuevos van en la fase 12: aquí no toques el Clásico.
 
 ## Qué hemos visto al probar la versión 9
 
@@ -99,7 +99,7 @@
 
 ## 10f · Elegir el mapa
 
-- Después de JUGAR aparece la pantalla de votación de arena descrita en `docs/codex/fase-11-online-lobby-dopamina-modos.md`, bloque **11e**:
+- Después de JUGAR aparece la pantalla de votación de arena descrita en `docs/codex/fase-11/FASE-11.md`, bloque **11f**:
   - los 4 mapas, uno en cada esquina de la pantalla, con su premisa;
   - votas con las flechas y los bots también votan;
   - si hay empate, ruleta.
@@ -135,7 +135,7 @@
 
 - Usa las fuentes del proyecto con contorno (`draw_string_outline` y después `draw_string`, o `Label` con `outline_size`):
   - "+N": Oswald Bold de 30 px (36 px si vale 3 o más), plana, con contorno de 6 px `#0B0710`. Hueso `#EFE7DA` si vale 1 y brasa `#FF6A2B` si lleva bonus.
-  - Avisos de combo ("¡Combo!", "¡VOODOO COMBO!") y de trampa ("¡Atrapado!", "¡Zas!"): Cinzel Bold de 44-64 px, espaciada, en brasa `#FF6A2B` con resplandor suave (ver el bloque 11j del documento de la fase 11).
+  - Avisos de combo ("¡Combo!", "¡VOODOO COMBO!") y de trampa ("¡Atrapado!", "¡Zas!"): Cinzel Bold de 44-64 px, espaciada, en brasa `#FF6A2B` con resplandor suave (ver `docs/codex/fase-11/FASE-11.md`, bloque 11a).
 - **Duración:** "+N" 1,2 s; avisos 1,6 s. Entran con *pop* (escala 1,6 → 1 en 0,15 s), suben 40 px y se desvanecen solo en los últimos 0,3 s.
 - Junto a tu personaje, mientras dure la racha, un círculo pequeño con "x2" / "x3" y el número del combo, como en el tráiler.
 - Los avisos grandes de combo van en la capa del HUD, cerca del centro arriba, para que no los tape nada.
