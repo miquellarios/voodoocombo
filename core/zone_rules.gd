@@ -2,7 +2,7 @@ class_name ZoneRules
 extends RefCounted
 
 static func safe_rect(step: int) -> Rect2:
-	var bounded_step := clampi(step, 0, GameConfig.ZONE_MAX_STEPS)
+	var bounded_step := clampi(step, 0, GameConfig.SURVIVAL_ZONE_STEPS)
 	var inset_x := bounded_step * GameConfig.ZONE_COLUMNS_PER_SIDE * GameConfig.CELL_SIZE
 	var inset_y := bounded_step * GameConfig.ZONE_ROWS_PER_SIDE * GameConfig.CELL_SIZE
 	var width := GameConfig.ARENA_SIZE.x - inset_x * 2.0

@@ -99,6 +99,9 @@ var ping_ms := 0
 var ping_clock := 0.0
 var tension_second := -1
 var challenges: Array[String] = []
+var round_number := 1
+var round_wait := 0.0
+var sudden_death := false
 
 func _build_online() -> void:
 	_clear_hud()
@@ -380,6 +383,14 @@ func _handle_events(events: Array) -> void:
 			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
+			"round_over":
+				Fx.pop(I18n.t("round") % int(event.next_round), Vector2(640,300), GameConfig.EMBER)
+			"round_started":
+				_read_state(event.snapshot)
+				if network_match: client_match.setup(event.snapshot, multiplayer.get_unique_id())
+				_load_match_art()
+			"eliminated":
+				Fx.sparks(event.pos + OFFSET, GameConfig.BONE_TEXT, 24)
 			"challenge":
 				if int(event.player) == local_player:
 					Fx.pop(I18n.t("challenge_done") + " · " + I18n.t("challenge_" + str(event.challenge)), Vector2(640,170),GameConfig.EMBER)
@@ -1468,6 +1479,10 @@ func _draw() -> void:
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
+		if mode == "survival":
+			for stitch in GameConfig.SURVIVAL_LIVES:
+				var texture: Texture2D = load("res://assets/ui/costuras.png")
+				draw_texture_rect_region(texture,Rect2(pos + Vector2(-30 + stitch * 20,-75),Vector2(20,20)),Rect2(0 if stitch < int(player.lives) else 128,0,128,128))
 		if int(player.combo) > 0:
 			var combo_left := clampf(1.0 - (elapsed - float(player.last_pickup)) / GameConfig.COMBO_WINDOW, 0, 1)
 			var multiplier := Scoring.multiplier(int(player.combo))
@@ -1486,7 +1501,7 @@ func _draw() -> void:
 			var sprite_scale := 0.37
 			var face_left: bool = player.dash_dir.x < -0.1 if player.dash_left > 0.0 else player.vel.x < -0.1
 			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale) * Fx.squash_scale(i))
-			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height))
+			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height), Color(1,1,1,0.35) if bool(player.get("ghost",false)) else Color.WHITE)
 			draw_set_transform(OFFSET)
 		var name_color: Color = player.color if i == local_player else Color.WHITE
 		var name_text := (I18n.t("you") + " · " if i == local_player else "") + String(player.name)

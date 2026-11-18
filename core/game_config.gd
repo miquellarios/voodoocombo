@@ -26,6 +26,15 @@ const MEDAL_NEAR_PIXELS := 10.0
 const MEDAL_IDS := ["primera_sangre", "venganza", "remontada", "robo_maestro", "racha", "por_los_pelos", "intocable", "rey_combo"]
 const CHALLENGE_XP := 20
 const CHALLENGE_TARGETS := {"steal": 6, "combo": 12, "spells": 2, "collect": 15, "hits": 3}
+const SURVIVAL_LIVES := 3
+const SURVIVAL_ROUND_SECONDS := 90.0
+const SURVIVAL_ROUND_WINS := 2
+const SURVIVAL_BREAK_SECONDS := 4.0
+const SURVIVAL_CHEST_SECONDS := 5.0
+const SURVIVAL_ZONE_SECONDS := 15.0
+const SURVIVAL_ZONE_STEPS := 5
+const SURVIVAL_DRAIN_SECONDS := 3.0
+const SURVIVAL_GHOST_SPEED := 0.6
 
 # Red autoritativa.
 const NET_PORT := 7777

@@ -302,3 +302,8 @@ Formato de cada entrada:
 ### Fase 12i — Retirada de Clásico
 - Retirados selector, constantes, ramas de puntuación, generación y objetos, textos y tests específicos del modo Clásico. La entrada principal usa siempre lobby y votación.
 - Humanos: comprobar que no queda opción Clásico y que el modo VoodooCombo conserva sus reglas.
+
+### Fase 12j — Último en Pie
+- Tres costuras, fantasma sin colisión ni acciones, daño común, Costura Extra, zona de cinco pasos y muerte súbita, rondas con nueva arena y victoria al ganar dos. Bots persiguen rivales y huyen con una costura; vista recibe rondas por eventos fiables.
+- Test de tres impactos, cambio de arena, dos rondas ganadas y zona mínima pasa. Corregida llamada antigua del test local tras retirar Clásico y ubicación de predicción de fantasmas; regresión local pasa.
+- Humanos: partida completa en las cuatro arenas, empates a tiempo, espectador fantasma y cambio de arena en red.

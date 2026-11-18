@@ -13,7 +13,7 @@ static func apply(room: Dictionary, sender: int, action: String, data: Dictionar
 			if sender != int(room.host): return false
 			room.bots = clampi(int(data.get("count", 0)), 0, GameConfig.ROOM_CAPACITY - room.players.size())
 		"mode":
-			if sender != int(room.host) or not data.get("mode") in ["voodoo"]: return false
+			if sender != int(room.host) or not data.get("mode") in ["voodoo", "survival"]: return false
 			room.mode = data.mode
 			for player: Dictionary in room.players: player.ready = false
 		"cosmetics":

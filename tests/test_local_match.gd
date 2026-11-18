@@ -8,7 +8,7 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_process(false)
-	game.call("_begin_match", false, "cienaga")
+	game.call("_begin_match", "cienaga")
 	game.call("_start_countdown")
 	game.set("countdown", 0.01)
 	for _frame in range(61): game.call("_process", 1.0 / 30.0)
@@ -29,3 +29,4 @@ func run() -> void:
 	await process_frame
 	print("Local MatchSim integration passed")
 	quit(0)
+

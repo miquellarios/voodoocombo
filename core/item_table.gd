@@ -7,6 +7,9 @@ const TABLE := {
 	"last": {"magnet": 15, "boots": 15, "cloak": 5, "pin": 20, "frost": 15, "sheep": 20, "ring": 10}
 }
 
+static func display_key(item: String, mode: String) -> String:
+	return "spell_stitch" if item == "ring" and mode == "survival" else "spell_" + item
+
 static func roll(position: String, rng: RandomNumberGenerator) -> String:
 	var key := "middle" if position == "middle" else position
 	var weights: Dictionary = TABLE.get(key, TABLE["last"]).duplicate()

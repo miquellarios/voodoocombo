@@ -42,6 +42,7 @@ func receive(snapshot: Dictionary) -> void:
 
 func predict(move: Vector2, delta: float, dash: bool) -> void:
 	seq += 1
+	if float(state.get("round_wait",0)) > 0: return
 	var player: Dictionary = state.players[player_index]
 	if dash and float(player.dash_cd) <= 0 and float(player.stun) <= 0: dash_left = GameConfig.DASH_DURATION
 	predicted = _move(predicted, move, delta, dash_left > 0)
@@ -51,6 +52,8 @@ func predict(move: Vector2, delta: float, dash: bool) -> void:
 
 func _move(position: Vector2, move: Vector2, delta: float, dashing: bool) -> Vector2:
 	var player: Dictionary = state.players[player_index]
+	if bool(player.get("ghost",false)):
+		return (position + move.limit_length() * delta * GameConfig.PLAYER_SPEED * GameConfig.SURVIVAL_GHOST_SPEED).clamp(Vector2.ZERO,GameConfig.ARENA_SIZE)
 	if float(player.stun) > 0 or float(player.rooted_left) > 0: return position
 	var speed := GameConfig.PLAYER_SPEED
 	if SpellRules.is_active(player, "boots"): speed *= 1.6

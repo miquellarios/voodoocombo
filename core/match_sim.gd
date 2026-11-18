@@ -30,8 +30,16 @@ var achievements := MatchAchievements.new()
 var halfway_recorded := false
 var initial_duration := 90.0
 var challenges: Array[String] = []
+var round_config: Dictionary = {}
+var round_number := 1
+var round_wait := 0.0
+var sudden_death := false
 
 func setup(config: Dictionary) -> void:
+	round_config = config.duplicate(true)
+	round_number = 1
+	round_wait = 0.0
+	sudden_death = false
 	seed_value = int(config.get("seed", 1))
 	rng.seed = seed_value
 	mode = str(config.get("mode", "voodoo"))
@@ -79,14 +87,29 @@ func setup(config: Dictionary) -> void:
 		player["spells_used"] = 0
 		player["pickups"] = 0
 		player["challenge_xp"] = 0
+		player["lives"] = GameConfig.SURVIVAL_LIVES
+		player["ghost"] = false
+		player["round_wins"] = 0
+		player["life_drain"] = GameConfig.SURVIVAL_DRAIN_SECONDS
+	if mode == "survival":
+		coins.clear()
+		remaining = GameConfig.SURVIVAL_ROUND_SECONDS
 
 func step(delta: float, inputs: Array[Dictionary]) -> void:
 	if finished or delta <= 0.0 or players.is_empty(): return
+	if round_wait > 0:
+		round_wait = maxf(0, round_wait - delta)
+		if round_wait == 0: _next_round()
+		return
 	var event_start := events.size()
 	current_inputs = inputs.duplicate(true)
-	delta = minf(delta, remaining)
+	if not sudden_death: delta = minf(delta, remaining)
+	for index in players.size():
+		if bool(players[index].ghost) and not bool(players[index].get("disconnected", false)):
+			players[index].pos += _input_move(index) * GameConfig.PLAYER_SPEED * GameConfig.SURVIVAL_GHOST_SPEED * delta
+			players[index].pos = players[index].pos.clamp(Vector2.ZERO, GameConfig.ARENA_SIZE)
 	for index in range(players.size()):
-		if bool(players[index].get("disconnected", false)): continue
+		if bool(players[index].get("disconnected", false)) or bool(players[index].get("ghost", false)): continue
 		if bool(players[index].is_bot): continue
 		var entry: Dictionary = current_inputs[index] if index < current_inputs.size() else {}
 		if bool(entry.get("dash", false)): _start_dash(index)
@@ -103,11 +126,12 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 	if mode == "voodoo" and int(elapsed / GameConfig.COIN_RESPAWN_INTERVAL) != int((elapsed - delta) / GameConfig.COIN_RESPAWN_INTERVAL) and coins.size() < target: _spawn_coin()
 	for coin in coins: coin.lock = maxf(0.0, coin.lock - delta)
 	_update_opened_chests(delta)
-	if int(elapsed / 8.0) != int((elapsed - delta) / 8.0) and chests.size() < 2:
+	var chest_interval := GameConfig.SURVIVAL_CHEST_SECONDS if mode == "survival" else 8.0
+	if int(elapsed / chest_interval) != int((elapsed - delta) / chest_interval) and chests.size() < 2:
 		chests.append(_random_position_in_safe_zone())
 		chest_fade_alpha.append(1.0)
 	for index in range(players.size()):
-		if bool(players[index].get("disconnected", false)): continue
+		if bool(players[index].get("disconnected", false)) or bool(players[index].get("ghost", false)): continue
 		if bool(players[index].is_bot): _update_bot(index, delta)
 		else: _update_player(index, delta)
 	_update_arena_hazards(delta)
@@ -130,7 +154,8 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 			if not id in players[index].challenges_done: events.append({"type":"challenge","player":index,"challenge":id})
 		players[index].challenges_done = completed
 		players[index].challenge_xp = ChallengeRules.bonus(completed)
-	if remaining <= 0.000001:
+	if mode == "survival": _check_survival_round()
+	elif remaining <= 0.000001:
 		remaining = 0.0
 		_finish_match()
 
@@ -141,6 +166,9 @@ func snapshot() -> Dictionary:
 		result[key] = value.duplicate(true) if value is Array or value is Dictionary else value
 	result["finished"] = finished
 	result["challenges"] = challenges.duplicate()
+	result["round_number"] = round_number
+	result["round_wait"] = round_wait
+	result["sudden_death"] = sudden_death
 	return result
 
 func pop_events() -> Array[Dictionary]:
@@ -171,6 +199,8 @@ func _finish_match(winner_peer: int = 0) -> void:
 	finished = true
 	var active: Array[Dictionary] = players.filter(func(player: Dictionary): return not bool(player.get("disconnected", false)))
 	var ranking := MatchRanking.rank(active)
+	if mode == "survival":
+		ranking.sort_custom(func(a: Dictionary,b: Dictionary): return int(a.round_wins) > int(b.round_wins) if a.round_wins != b.round_wins else int(a.lives) > int(b.lives))
 	if winner_peer != 0:
 		for index in ranking.size():
 			if int(ranking[index].peer_id) == winner_peer:
@@ -267,6 +297,21 @@ func _update_bot(index: int, delta: float) -> void:
 		for chest in chests:
 			chest_positions.append(chest)
 	var direction := BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
+	if mode == "survival":
+		var target := -1
+		var nearest := INF
+		for other in players.size():
+			if other == index or bool(players[other].ghost) or bool(players[other].get("disconnected",false)) or float(players[other].invuln) > 0: continue
+			var distance: float = player.pos.distance_to(players[other].pos)
+			if distance < nearest: nearest = distance; target = other
+		if target >= 0:
+			var goal: Vector2 = players[target].pos
+			if int(player.lives) == 1 and nearest < 150: goal = player.pos + (player.pos - goal).normalized() * 160
+			var goals: Array[Vector2] = [goal]
+			direction = BotBrain.next_direction(player,goals,chest_positions,arena,players,index,delta,elapsed,rng)
+			if nearest < GameConfig.BOT_DASH_RANGE and player.dash_cd <= 0 and rng.randf() < GameConfig.BOT_DASH_CHANCE:
+				player.dash_dir = player.pos.direction_to(players[target].pos)
+				_start_dash(index)
 	if not ZoneRules.is_inside(player.pos, safe_zone_step):
 		coin_positions = [ZoneRules.safe_rect(safe_zone_step).get_center()]
 		chest_positions.clear()
@@ -304,6 +349,7 @@ func _update_bot(index: int, delta: float) -> void:
 
 
 func _start_dash(index: int) -> void:
+	if bool(players[index].get("ghost", false)): return
 	var player := players[index]
 	if player.dash_cd > 0.0 or player.dash_lock > 0.0 or player.stun > 0.0 or SpellRules.is_active(player, "sheep"): return
 	player.dash_left = GameConfig.DASH_DURATION
@@ -314,7 +360,7 @@ func _start_dash(index: int) -> void:
 
 func _update_pickups() -> void:
 	for i in range(players.size()):
-		if bool(players[i].get("disconnected", false)): continue
+		if bool(players[i].get("disconnected", false)) or bool(players[i].get("ghost", false)): continue
 		var player := players[i]
 		if SpellRules.is_active(player, "sheep"): continue
 		for c in range(coins.size() - 1, -1, -1):
@@ -352,10 +398,10 @@ func _update_pickups() -> void:
 
 func _update_dash_hits() -> void:
 	for i in range(players.size()):
-		if bool(players[i].get("disconnected", false)): continue
+		if bool(players[i].get("disconnected", false)) or bool(players[i].get("ghost", false)): continue
 		if players[i].dash_left <= 0.0: continue
 		for j in range(players.size()):
-			if bool(players[j].get("disconnected", false)): continue
+			if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
 			var distance: float = players[i].pos.distance_to(players[j].pos)
 			if i != j and distance > GameConfig.PLAYER_RADIUS * 2 and distance <= GameConfig.PLAYER_RADIUS * 2 + GameConfig.MEDAL_NEAR_PIXELS: events.append({"type": "near_miss", "player": j})
 			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > GameConfig.PLAYER_RADIUS * 2.0: continue
@@ -390,6 +436,18 @@ func _update_dash_hits() -> void:
 
 
 func _update_safe_zone(delta: float) -> void:
+	if mode == "survival":
+		safe_zone_step = GameConfig.SURVIVAL_ZONE_STEPS if sudden_death else mini(GameConfig.SURVIVAL_ZONE_STEPS, int(elapsed / GameConfig.SURVIVAL_ZONE_SECONDS))
+		for index in players.size():
+			var player: Dictionary = players[index]
+			if player.ghost or bool(player.get("disconnected", false)): continue
+			if ZoneRules.is_inside(player.pos, safe_zone_step): player.life_drain = GameConfig.SURVIVAL_DRAIN_SECONDS
+			else:
+				player.life_drain -= delta
+				if player.life_drain <= 0:
+					player.life_drain = GameConfig.SURVIVAL_DRAIN_SECONDS
+					_apply_hit(index,-1,0,0,0,0)
+		return
 	var thresholds: Array = GameConfig.VOODOO_ZONE_TIMES
 	for step_index in range(thresholds.size()):
 		var step := step_index + 1
@@ -417,7 +475,7 @@ func _update_safe_zone(delta: float) -> void:
 		elif chest_fade_alpha[chest_index] < 1.0:
 			chest_fade_alpha[chest_index] = minf(1.0, chest_fade_alpha[chest_index] + delta / GameConfig.ZONE_COIN_FADE_SECONDS)
 	for index in range(players.size()):
-		if bool(players[index].get("disconnected", false)): continue
+		if bool(players[index].get("disconnected", false)) or bool(players[index].get("ghost", false)): continue
 		var player: Dictionary = players[index]
 		if safe_rect.has_point(player.pos):
 			player.zone_drain_left = GameConfig.ZONE_DRAIN_INTERVAL
@@ -446,6 +504,7 @@ func _random_position_in_safe_zone() -> Vector2:
 
 
 func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum: int, maximum: int, stun_seconds: float, text_key: String = "trap_zap") -> Dictionary:
+	if bool(players[victim_index].get("ghost", false)): return {"applied":false,"blocked":false}
 	var previous_combo := int(players[victim_index].combo)
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
 	if result.blocked:
@@ -455,6 +514,12 @@ func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum
 	if not result.applied:
 		return result
 	players[victim_index] = result.victim
+	if mode == "survival":
+		players[victim_index].lives = maxi(0, int(players[victim_index].lives) - 1)
+		if players[victim_index].lives == 0:
+			players[victim_index].ghost = true
+			players[victim_index].dash_left = 0.0
+			events.append({"type":"eliminated","player":victim_index,"pos":players[victim_index].pos})
 	if previous_combo > 0: events.append({"type": "combo_lost", "player": victim_index, "combo": previous_combo, "pos": players[victim_index].pos})
 	var dropped := int(result.dropped)
 	events.append({"type": "player_hit", "victim": victim_index, "attacker": attacker_index, "dropped": dropped})
@@ -538,7 +603,7 @@ func _update_roots(runtime: Dictionary, delta: float) -> void:
 	if String(runtime.roots_state) != "active":
 		return
 	for player_index in range(players.size()):
-		if bool(players[player_index].get("disconnected", false)): continue
+		if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 		if players[player_index].rooted_left > 0.0 or players[player_index].pos.distance_to(runtime.roots_position) > GameConfig.ROOTS_RADIUS:
 			continue
 		var result := _apply_hit(player_index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, 0.0, "trap_root")
@@ -551,7 +616,7 @@ func _update_spikes(hazard: Dictionary) -> void:
 	if current_state != "up":
 		return
 	for player_index in range(players.size()):
-		if bool(players[player_index].get("disconnected", false)): continue
+		if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 		for tile in hazard.get("tiles", []):
 			var rect := _tile_rect(tile).grow(GameConfig.PLAYER_RADIUS)
 			if rect.has_point(players[player_index].pos):
@@ -563,7 +628,7 @@ func _update_ghost(hazard: Dictionary, runtime: Dictionary, delta: float) -> voi
 	var ghost_pos := _ghost_position(hazard)
 	var cooldowns: Array = runtime.player_cooldowns
 	for index in range(players.size()):
-		if bool(players[index].get("disconnected", false)): continue
+		if bool(players[index].get("disconnected", false)) or bool(players[index].get("ghost", false)): continue
 		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
 		if cooldowns[index] <= 0.0 and players[index].pos.distance_to(ghost_pos) <= GameConfig.PLAYER_RADIUS + GameConfig.GHOST_RADIUS:
 			_apply_hit(index, -1, GameConfig.TRAP_DROP_PCT, GameConfig.TRAP_DROP_MIN, GameConfig.TRAP_DROP_MAX, GameConfig.GHOST_STUN_SECONDS, "trap_ghost")
@@ -577,7 +642,7 @@ func _update_conveyor(hazard: Dictionary, delta: float) -> void:
 	for tile in hazard.get("tiles", []):
 		var rect := _tile_rect(tile)
 		for player_index in range(players.size()):
-			if bool(players[player_index].get("disconnected", false)): continue
+			if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 			if rect.has_point(players[player_index].pos):
 				players[player_index].pos = _move_player(players[player_index].pos, motion)
 		for coin in coins:
@@ -595,7 +660,7 @@ func _update_steam(hazard: Dictionary, runtime: Dictionary, _delta: float) -> vo
 	runtime.last_steam_cycle = cycle
 	var center := _json_point(hazard.get("center", []))
 	for player_index in range(players.size()):
-		if bool(players[player_index].get("disconnected", false)): continue
+		if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 		var offset: Vector2 = players[player_index].pos - center
 		if offset.length() > GameConfig.STEAM_RADIUS:
 			continue
@@ -610,7 +675,7 @@ func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 	var state_now := String(runtime.barrel_state)
 	if state_now == "idle":
 		for player_index in range(players.size()):
-			if bool(players[player_index].get("disconnected", false)): continue
+			if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 			if players[player_index].dash_left > 0.0 and players[player_index].pos.distance_to(center) <= GameConfig.BARREL_CONTACT_RADIUS:
 				runtime.barrel_state = "fusing"
 				runtime.barrel_timer = GameConfig.BARREL_FUSE_SECONDS
@@ -636,7 +701,7 @@ func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 
 func _explode_barrel(center: Vector2) -> void:
 	for player_index in range(players.size()):
-		if bool(players[player_index].get("disconnected", false)): continue
+		if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 		var offset: Vector2 = players[player_index].pos - center
 		if offset.length() > GameConfig.BARREL_RADIUS:
 			continue
@@ -649,7 +714,7 @@ func _explode_barrel(center: Vector2) -> void:
 func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> void:
 	var cooldowns: Array = runtime.player_cooldowns
 	for index in range(players.size()):
-		if bool(players[index].get("disconnected", false)): continue
+		if bool(players[index].get("disconnected", false)) or bool(players[index].get("ghost", false)): continue
 		cooldowns[index] = maxf(0.0, float(cooldowns[index]) - delta)
 		if cooldowns[index] > 0.0:
 			continue
@@ -677,7 +742,7 @@ func _update_ray(hazard: Dictionary) -> void:
 	var direction := Vector2.RIGHT.rotated(elapsed * TAU / GameConfig.RAY_PERIOD)
 	var ends := [center + direction * GameConfig.RAY_LENGTH, center - direction * GameConfig.RAY_LENGTH]
 	for player_index in range(players.size()):
-		if bool(players[player_index].get("disconnected", false)): continue
+		if bool(players[player_index].get("disconnected", false)) or bool(players[player_index].get("ghost", false)): continue
 		var hit := false
 		for endpoint in ends:
 			if HazardRules.ray_hits(players[player_index].pos, center, endpoint, GameConfig.RAY_HIT_RADIUS):
@@ -724,7 +789,11 @@ func _use_spell_for_bot(index: int) -> void:
 		if item == "magnet":
 			for coin in coins:
 				if player.pos.distance_to(coin.pos) <= GameConfig.SPELL_MAGNET_RADIUS: useful = true; break
-		if useful: player.item_time = SpellRules.duration(item)
+		if useful:
+			if mode == "survival" and item == "ring": _use_spell(index)
+			else:
+				player.item_time = SpellRules.duration(item)
+				events.append({"type":"item_used","player":index,"item":item})
 	elif _spell_is_useful(index, item):
 		_cast_instant_spell(index)
 
@@ -733,12 +802,12 @@ func _spell_is_useful(index: int, item: String) -> bool:
 	var player: Dictionary = players[index]
 	if item == "frost":
 		for j in range(players.size()):
-			if bool(players[j].get("disconnected", false)): continue
+			if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
 			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_FROST_RADIUS: return true
 	if item == "sheep": return _leader_index() != index
 	if item == "pin":
 		for j in range(players.size()):
-			if bool(players[j].get("disconnected", false)): continue
+			if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
 			if j != index and player.pos.distance_to(players[j].pos) <= GameConfig.SPELL_PIN_RANGE: return true
 	return false
 
@@ -749,7 +818,7 @@ func _cast_instant_spell(index: int) -> void:
 	match String(player.item):
 		"frost":
 			for j in range(players.size()):
-				if bool(players[j].get("disconnected", false)): continue
+				if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
 				if j == index or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
 				if SpellRules.is_active(players[j], "cloak"):
 					players[j].item = ""
@@ -769,7 +838,7 @@ func _cast_instant_spell(index: int) -> void:
 			var target := -1
 			var best := GameConfig.SPELL_PIN_RANGE * GameConfig.SPELL_PIN_RANGE
 			for j in range(players.size()):
-				if bool(players[j].get("disconnected", false)): continue
+				if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
 				if j != index and player.pos.distance_squared_to(players[j].pos) < best:
 					best = player.pos.distance_squared_to(players[j].pos)
 					target = j
@@ -784,7 +853,13 @@ func _cast_instant_spell(index: int) -> void:
 
 func _use_spell(index: int) -> void:
 	if players.is_empty() or index >= players.size() or not SpellRules.can_activate(players[index]): return
+	if bool(players[index].get("ghost", false)): return
 	var item := String(players[index].item)
+	if mode == "survival" and item == "ring":
+		players[index].lives = mini(GameConfig.SURVIVAL_LIVES, int(players[index].lives) + 1)
+		players[index].item = ""
+		events.append({"type":"item_used","player":index,"item":"stitch"})
+		return
 	if SpellRules.duration(item) > 0.0:
 		events.append({"type": "item_used", "player": index, "item": item})
 		players[index] = SpellRules.activate(players[index])
@@ -904,9 +979,9 @@ func _move_player(position: Vector2, motion: Vector2) -> Vector2:
 
 func _separate_players() -> void:
 	for first_index in range(players.size()):
-		if bool(players[first_index].get("disconnected", false)): continue
+		if bool(players[first_index].get("disconnected", false)) or bool(players[first_index].get("ghost", false)): continue
 		for second_index in range(first_index + 1, players.size()):
-			if bool(players[second_index].get("disconnected", false)): continue
+			if bool(players[second_index].get("disconnected", false)) or bool(players[second_index].get("ghost", false)): continue
 			var separated := ArenaPhysics.separate_pair(players[first_index].pos, players[second_index].pos, GameConfig.PLAYER_RADIUS, obstacle_rects)
 			players[first_index].pos = separated[0]
 			players[second_index].pos = separated[1]
@@ -921,8 +996,8 @@ func _leader_index() -> int:
 	if players.is_empty(): return -1
 	var best := -1
 	for i in range(players.size()):
-		if bool(players[i].get("disconnected", false)): continue
-		if best < 0 or players[i].score > players[best].score: best = i
+		if bool(players[i].get("disconnected", false)) or bool(players[i].get("ghost", false)): continue
+		if best < 0 or (int(players[i].lives) > int(players[best].lives) if mode == "survival" else players[i].score > players[best].score): best = i
 	return best
 
 
@@ -931,3 +1006,43 @@ func _score_order() -> Array[int]:
 	for i in range(players.size()): indices.append(i)
 	indices.sort_custom(func(a: int, b: int) -> bool: return players[a].score > players[b].score)
 	return indices
+func _check_survival_round() -> void:
+	var alive: Array[int] = []
+	for index in players.size():
+		if not bool(players[index].ghost) and not bool(players[index].get("disconnected",false)): alive.append(index)
+	if alive.size() <= 1:
+		_finish_round(alive[0] if alive.size() == 1 else -1)
+	elif remaining <= 0:
+		var maximum := 0
+		for index in alive: maximum = maxi(maximum,int(players[index].lives))
+		var leaders: Array[int] = []
+		for index in alive:
+			if int(players[index].lives) == maximum: leaders.append(index)
+		if leaders.size() == 1: _finish_round(leaders[0])
+		else: sudden_death = true
+
+func _finish_round(winner: int) -> void:
+	if round_wait > 0 or finished: return
+	if winner >= 0:
+		players[winner].round_wins += 1
+		if int(players[winner].round_wins) >= GameConfig.SURVIVAL_ROUND_WINS:
+			_finish_match()
+			return
+	round_wait = GameConfig.SURVIVAL_BREAK_SECONDS
+	events.append({"type":"round_over","winner":winner,"next_round":round_number + 1})
+
+func _next_round() -> void:
+	var old_players := players.duplicate(true)
+	var next_config := round_config.duplicate(true)
+	next_config.seed = rng.randi()
+	next_config["arena_id"] = ""
+	next_config["previous_arena"] = arena.map_id
+	var number := round_number + 1
+	setup(next_config)
+	round_number = number
+	for index in players.size():
+		players[index].round_wins = old_players[index].round_wins
+		players[index].medals = old_players[index].medals
+		players[index]["disconnected"] = old_players[index].get("disconnected",false)
+	events.append({"type":"round_started","snapshot":snapshot()})
+
