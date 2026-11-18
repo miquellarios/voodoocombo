@@ -1,6 +1,24 @@
 class_name GameConfig
 extends RefCounted
 
+# Juice
+const JUICE_HITSTOP := 0.06
+const JUICE_HEAVY_HITSTOP := 0.09
+const JUICE_TRAP_HITSTOP := 0.04
+const JUICE_HEAVY_COINS := 5
+const JUICE_SHAKE_SECONDS := 0.2
+const JUICE_ZOOM := 1.04
+const JUICE_ZOOM_SECONDS := 0.12
+const JUICE_SQUASH_SECONDS := 0.08
+const JUICE_SQUASH := Vector2(1.08, 0.92)
+const JUICE_SPARK_COUNT := 6
+const JUICE_SPARK_SECONDS := 0.4
+const JUICE_FLIGHT_SECONDS := 0.35
+const JUICE_COMBO_PITCH_STEPS := 12
+const JUICE_MEDAL_SECONDS := 1.5
+const JUICE_MUSIC_FADE := 0.5
+const JUICE_CURTAIN_SECONDS := 0.35
+
 # Red autoritativa.
 const NET_PORT := 7777
 const ONLINE_HOST := ""

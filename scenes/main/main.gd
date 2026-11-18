@@ -349,6 +349,7 @@ func _read_simulation() -> void:
 	_read_state(simulation.snapshot())
 
 func _read_state(data: Dictionary) -> void:
+	if Fx.hitstop > 0 and state == "playing" and not bool(data.get("finished", false)): return
 	for key in data:
 		if key not in ["finished", "ack"]: set(key, data[key])
 
@@ -363,6 +364,8 @@ func _show_simulation_events() -> void:
 
 func _handle_events(events: Array) -> void:
 	for event: Dictionary in events:
+		Fx.feedback(event, local_player)
+		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
 			"player_left":
 				Fx.pop("☁", event.pos + OFFSET, Color("b8a9d1"))
@@ -890,6 +893,14 @@ func _build_settings() -> void:
 	var server_button := _button(root, I18n.t("server"), Vector2.ZERO, _build_server_settings)
 	server_button.position = Vector2(980, 30)
 	server_button.size = Vector2(260, 55)
+	for index in 2:
+		var key: String = ["reduce_flashes", "vibration"][index]
+		var toggle := CheckButton.new()
+		toggle.text = I18n.t(key)
+		toggle.position = Vector2(35, 220 + index * 65)
+		toggle.button_pressed = bool(Settings.get(key))
+		toggle.toggled.connect(func(value: bool): Settings.set(key, value); Settings.save())
+		root.add_child(toggle)
 	_button(root, "%s: %s" % [I18n.t("settings_reduce_motion"), I18n.t("settings_yes") if Settings.reduce_motion else I18n.t("settings_no")], Vector2(0, 215), func():
 		Settings.reduce_motion = not Settings.reduce_motion
 		Settings.save()
@@ -1454,7 +1465,7 @@ func _draw() -> void:
 		if sheet != null:
 			var sprite_scale := 0.37
 			var face_left: bool = player.dash_dir.x < -0.1 if player.dash_left > 0.0 else player.vel.x < -0.1
-			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale))
+			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale) * Fx.squash_scale(i))
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height))
 			draw_set_transform(OFFSET)
 		var name_color: Color = player.color if i == local_player else Color.WHITE
@@ -1745,8 +1756,15 @@ func _animate_score(label: Label, old_value: int, value: int) -> void:
 
 func _on_shake(amount: float) -> void:
 	if not Settings.reduce_motion:
-		position = Vector2(randf_range(-amount, amount), randf_range(-amount, amount))
-		get_tree().create_timer(0.15).timeout.connect(func(): position = Vector2.ZERO)
+		var tween := create_tween()
+		tween.tween_method(func(t: float): position = Vector2(sin(t * 80), cos(t * 93)) * amount * (1-t), 0.0, 1.0, GameConfig.JUICE_SHAKE_SECONDS)
+		tween.tween_callback(func(): position = Vector2.ZERO)
+
+func _camera_punch() -> void:
+	if Settings.reduce_motion: return
+	scale = Vector2.ONE * GameConfig.JUICE_ZOOM
+	var tween := create_tween()
+	tween.tween_property(self, "scale", Vector2.ONE, GameConfig.JUICE_ZOOM_SECONDS)
 
 func _animate_floating(delta: float) -> void:
 	for i in range(floating.size() - 1, -1, -1):

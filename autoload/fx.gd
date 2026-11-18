@@ -4,6 +4,50 @@ signal floating_text(text: String, position: Vector2, tint: Color)
 signal shake(amount: float)
 
 var text_layer: CanvasLayer
+var canvas: Node2D
+var hitstop := 0.0
+var squash: Dictionary = {}
+
+func _process(delta: float) -> void:
+	hitstop = maxf(0, hitstop - delta)
+	for index in squash.keys():
+		squash[index] = maxf(0, float(squash[index]) - delta)
+
+func _canvas() -> Node2D:
+	if not is_instance_valid(canvas):
+		var layer := CanvasLayer.new()
+		layer.layer = 19
+		add_child(layer)
+		canvas = load("res://ui/juice_canvas.gd").new()
+		layer.add_child(canvas)
+	return canvas
+
+func sparks(at: Vector2, color: Color, count: int = GameConfig.JUICE_SPARK_COUNT) -> void:
+	var target := _canvas()
+	for index in count:
+		target.particles.append({"pos": at, "vel": Vector2.from_angle(TAU * index / count) * randf_range(40,110), "color": color, "time": GameConfig.JUICE_SPARK_SECONDS})
+
+func vibrate(strength: float) -> void:
+	if Settings.vibration:
+		for device in Input.get_connected_joypads(): Input.start_joy_vibration(device, strength * 0.5, strength, 0.1)
+
+func squash_scale(index: int) -> Vector2:
+	if Settings.reduce_motion: return Vector2.ONE
+	return Vector2.ONE.lerp(GameConfig.JUICE_SQUASH, clampf(float(squash.get(index,0)) / GameConfig.JUICE_SQUASH_SECONDS,0,1))
+
+func feedback(event: Dictionary, local_player: int) -> void:
+	if event.type == "coin_taken":
+		squash[int(event.player)] = GameConfig.JUICE_SQUASH_SECONDS
+		sparks(event.pos + Vector2(40,60), GameConfig.GOLD)
+		if int(event.combo) >= 12 and not Settings.reduce_motion: shake.emit(4.0)
+		if int(event.player) == local_player and int(event.combo) >= 5: vibrate(0.2)
+	elif event.type == "player_hit":
+		var heavy := int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS
+		if not Settings.reduce_motion:
+			hitstop = GameConfig.JUICE_TRAP_HITSTOP if int(event.attacker) < 0 else (GameConfig.JUICE_HEAVY_HITSTOP if heavy else GameConfig.JUICE_HITSTOP)
+			shake.emit(6.0)
+		if int(event.victim) == local_player: vibrate(0.8)
+		elif int(event.attacker) == local_player: vibrate(0.5)
 
 func render_pop(text: String, position: Vector2, tint: Color) -> void:
 	if not is_instance_valid(text_layer):

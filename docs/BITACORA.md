@@ -266,3 +266,7 @@ Formato de cada entrada:
 - RPC con lista cerrada, esquema de tipos, límite de tamaño/frecuencia, movimientos finitos y cosméticos existentes y desbloqueados según XP calculada por el servidor. El perfil local no autoriza cosméticos online: sin cuentas autenticadas, la progresión online se conserva durante la conexión; no se confía en una XP enviada por el cliente.
 - Test de esquemas y cosméticos pasa; prueba ENet de cinco procesos pasa sin errores. Se mantienen remitentes reales y autoridad de servidor en todos los eventos.
 - Humanos: probar nombres de control, versión diferente, cosméticos bloqueados y spam desde un cliente de desarrollo; verificar que otros jugadores continúan.
+
+### Fase 12a — Golpes y recogida
+- Actualizadas instrucciones a fase 12. Fx gestiona parón visual proporcional, chispas, aplastamiento y vibración; la simulación no se detiene. Sacudida amortiguada y zoom corto en golpes fuertes. Ajustes persistentes de destellos y mando.
+- Regresión local pasa. Humanos: comprobar intensidad con mando y reducir movimiento/destellos; verificar que el servidor no ralentiza durante golpes.

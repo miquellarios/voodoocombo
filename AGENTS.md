@@ -1,13 +1,13 @@
-# AGENTS.md — VoodooCombo (versión para la fase 11)
+# AGENTS.md — VoodooCombo (versión para la fase 12)
 
 > Instrucciones permanentes para el agente (Codex las lee en cada tarea). Es la fuente de verdad del proyecto:
 > si un prompt contradice este archivo, pregunta antes de programar.
-> **Esta versión describe cómo tiene que quedar el juego al terminar la fase 11:**
-> - ya incluye las reglas de la fase 10;
-> - también la letra "Brasa minimal", el online con salas y el lobby de mazmorra.
+> **Esta versión describe cómo tiene que quedar el juego al terminar la fase 12.** Incluye:
+> - todo lo de las fases 10 y 11: letra "Brasa minimal", online con salas, lobby y votación;
+> - la dopamina de la fase 12;
+> - los modos nuevos, sin el Clásico.
 >
-> Lo que llega en la fase 12 (dopamina, quitar el Clásico y los modos nuevos) **todavía no está aquí**.
-> Antes de empezar la fase 11, copia este archivo a la raíz del proyecto como `AGENTS.md`.
+> Antes de empezar la fase 12, copia este archivo a la raíz del proyecto como `AGENTS.md`. Sustituye a la versión de la fase 11.
 > Visión y referencias del diseño para humanos: `docs/DISENO.md`. Requisitos del enunciado y plan: `docs/PLAN.md`.
 
 ## 1. Qué es
@@ -15,14 +15,26 @@
 Party game **multijugador en tiempo real** de 2 a 4 jugadores, con partidas cortas en una sola pantalla y en una arena votada por los jugadores.
 Cada jugador elige un personaje (muñecos vudú de fantasía: Brasa, Colmillo, Tuerca o Cripta) y recoge doblones en una de las 4 arenas con trampas, encadena combos y golpea con el dash para robar.
 
-Tiene dos modos (§4.6):
+Tiene tres modos (§4.6):
 - **VoodooCombo** (por defecto): gana quien tenga más doblones a los 90 s.
-- **Clásico:** literal del enunciado. Hay 50 doblones repartidos y gana el primero en recoger 15. (Se quita en la fase 12; mientras tanto, no lo toques.)
+- **Último en Pie:** todos contra todos con 3 costuras, al mejor de 3 rondas (§4.9).
+- **Codicia 2v2:** por equipos; los doblones solo cuentan al guardarlos en el cofre del equipo (§4.10).
+
+El modo Clásico del enunciado se quitó por decisión del equipo (ver `docs/HISTORIA-IA.md`).
 
 Se juega online con **código de sala** contra un **servidor dedicado y autoritativo**, o contra bots sin red. El servidor gestiona la partida y anuncia al ganador a todos los jugadores.
 
 **Prioridad absoluta: que sea simple y que cada acción dé dopamina.**
 Si una funcionalidad añade reglas que no se entienden en 5 segundos, no entra.
+
+**Dopamina "de la buena":**
+- **Se recompensa** jugar bien y jugar con amigos: respuesta inmediata, sorpresas pequeñas, ver que mejoras y momentos para reírse juntos.
+- **Prohibido:**
+  - cajas de botín o cualquier cosa que se pague;
+  - rachas diarias que obliguen a entrar;
+  - temporizadores que dan prisa para comprar;
+  - notificaciones fuera del juego;
+  - recompensas al azar que sustituyan a la habilidad.
 
 ## 2. Reglas técnicas
 
@@ -112,8 +124,7 @@ res://
 - **Al empezar:** la partida arranca con **30 doblones** repartidos por la arena, a 35 px como mínimo entre ellos y de los obstáculos.
 - **Reposición:**
   - si quedan menos de 12, aparece uno cada 1,0 s;
-  - en el Frenesí, hasta mantener unos 18;
-  - en modo Clásico no se reponen.
+  - en el Frenesí, hasta mantener unos 18.
 - **Valor de cada doblón** = multiplicador de combo + 1 si es Frenesí + 1 si llevas el Anillo. **Máximo 5.** Los bonus se suman, nunca se multiplican.
 - **Combo:**
   - Sube en +1 por cada doblón recogido con menos de 1,5 s desde el anterior.
@@ -160,7 +171,7 @@ res://
 | sheep | 0 | 7 | 20 |
 | ring | 0 | 3 | 10 |
 
-### 4.5 Partida (modo VoodooCombo; las diferencias del Clásico están en §4.6)
+### 4.5 Partida (modo VoodooCombo; los otros modos, en §4.9 y §4.10)
 
 **Antes de jugar:** lobby (§5.4) → votación de arena (§5.5) → **pantalla de carga de 15 s**. La pantalla de carga hace de tutorial y enseña:
 - la arena con sus trampas y cuánto quitan;
@@ -198,20 +209,23 @@ Sin otros humanos, a partir de los 5 s se puede saltar con Espacio.
 | Intocable | Menos golpes recibidos |
 
 - **¡OTRA!:** vuelve al lobby de la misma sala, con todos "no listos". **MENÚ PRINCIPAL** sale. Si nadie pulsa nada en 15 s, vuelve solo al menú.
-- **Niveles:** la XP se gana por partida pero no se enseña. Cada nivel desbloquea un cosmético (marcos, estelas del dash, emotes, bailes y gritos; tabla en `docs/codex/fase-10-arreglos.md` 10l y fase 11). Los cosméticos se equipan en la **TAQUILLA**.
+- **Medallas:** también salen debajo de cada placa del podio (§4.11).
+- **Niveles:** la XP se gana por partida y por los retos (§4.11). En el podio se ve una barra que se llena. Cada nivel desbloquea un cosmético (marcos, estelas del dash, emotes, bailes y gritos; tabla en `docs/codex/fase-10-arreglos.md` 10l y fase 11). Los cosméticos se equipan en la **TAQUILLA**.
 
 ### 4.6 Modos (los elige el anfitrión en el lobby)
 
-| | VoodooCombo (por defecto) | Clásico (enunciado) |
-|---|---|---|
-| Doblones | 30 al empezar y reaparecen | 50 al empezar y no reaparecen |
-| Objetivo | Tener más doblones a los 90 s (60/90/120 a elegir) | **El primero en recoger 15 gana al instante**. Si a los 3 min nadie llega, gana quien tenga más |
-| Combo | Con multiplicador x1–x3 | Solo visual: cada doblón vale 1 |
-| Frenesí | Sí | No |
-| La zona se cierra | A los 45, 35 y 25 s del final | A los 120, 90 y 60 s del final |
-| Dash y robo | Sí | Sí |
-| Cofres y hechizos | Sí | Sí, menos el Anillo |
-| Punto de partido | Aviso en los últimos 15 s | Aviso cuando alguien llega a 12 |
+| | VoodooCombo (por defecto) | Último en Pie | Codicia 2v2 |
+|---|---|---|---|
+| Objetivo | Más doblones a los 90 s (60/90/120 a elegir) | Ser el último con costuras; al mejor de 3 rondas | Más doblones guardados en el cofre del equipo a los 90 s |
+| Doblones | 30 al empezar; reaparecen | No hay | 40 al empezar; reaparecen |
+| Combo | Multiplicador x1–x3 | No | No |
+| Frenesí | Últimos 15 s | No | Últimos 15 s: cada doblón vale 2 |
+| La zona se cierra | A los 45, 35 y 25 s | Un paso cada 15 s, hasta 10×5 casillas | No |
+| Hechizos | Los 7 | Los 7; el Anillo pasa a ser Costura Extra | Los 7 |
+
+- **Al cambiar de modo en el lobby:** sale una tarjeta con 3 líneas de reglas.
+- **En la pantalla de carga:** se enseñan las reglas del modo.
+- **Al empezar cada partida o ronda:** un cartel de 2 s con el objetivo.
 
 ### 4.7 Bots
 - **Para qué:** jugar contra bots y rellenar huecos de una sala.
@@ -222,6 +236,7 @@ Sin otros humanos, a partir de los 5 s se puede saltar con Espacio.
   - Si tienen un rival a menos de 120 px y el dash listo, hacen dash el 30 % de las veces.
   - Guardan el hechizo y lo lanzan cuando les sirve.
   - Votan arena al azar en los primeros 3 s y lanzan algún emote en el lobby y el podio.
+  - En Último en Pie y Codicia 2v2 siguen su propia lógica (§4.9 y §4.10).
 
 ### 4.8 Trampas de arena
 
@@ -243,6 +258,65 @@ Sin otros humanos, a partir de los 5 s se puede saltar con Espacio.
 - **Capa Élfica:** bloquea el daño de las trampas.
 - **Avisos:** toda trampa periódica anuncia antes de hacer daño.
 - **Bots:** esquivan los pinchos levantados y el rayo, y usan los portales si les acercan a un doblón.
+
+### 4.9 Modo Último en Pie
+- **Costuras:** cada jugador tiene 3 (`assets/ui/costuras.png`). Se ven en su ficha y, en pequeño, sobre su cabeza.
+- **Pierdes una costura con:** el dash de un rival, el alfiler o una trampa que hace daño. Después tienes 1,5 s de invulnerabilidad.
+- **Sin costuras:** te descoses y pasas a ser un **fantasmita**. Vas a x0,6, no colisionas, no haces nada a nadie y puedes usar emotes.
+- **Hechizos:**
+  - cofres cada 5 s (máximo 2);
+  - la Oveja va contra quien tenga más costuras;
+  - el Anillo se cambia por **Costura Extra** (+1, máximo 3).
+- **Zona:** fuera de ella pierdes una costura cada 3 s.
+- **Rondas:**
+  - al mejor de 3, con 90 s como máximo cada una;
+  - si se acaba el tiempo, gana quien tenga más costuras; si hay empate, muerte súbita con la zona al mínimo;
+  - entre rondas, cartel "RONDA N" de 4 s, otra arena al azar y todos con 3 costuras otra vez.
+- **Podio:** por rondas ganadas; si hay empate, por las costuras de la última ronda.
+- **Bots:** van a por el rival más cercano que no sea invulnerable (o al cofre si no tienen hechizo) y huyen cuando les queda 1 costura.
+
+### 4.10 Modo Codicia 2v2
+- **Equipos:**
+  - estrados 1-2 del lobby = equipo **coral**, y 3-4 = equipo **azul**;
+  - el anfitrión puede cambiar a alguien de equipo y los huecos se rellenan con bots;
+  - cada jugador usa el color de su equipo y su forma de siempre.
+- **Cofres de equipo:**
+  - `assets/items/cofre_equipo_coral.png` y `cofre_equipo_azul.png`;
+  - en `GameConfig.TEAM_BASES`: coral en (80, 300) y azul en (1120, 300);
+  - zona de entrega de radio 56 px.
+- **Llevar doblones:** lo que coges va encima, en una pila sobre la cabeza. Cada doblón te frena un 2 % (máximo 40 %) y te agranda un 1 % (máximo 20 %).
+- **Guardar:** al entrar en tu zona, los doblones vuelan uno a uno al cofre y ya están a salvo.
+- **Golpes:**
+  - el dash de un rival o una trampa te hacen soltar **todo lo que llevas**;
+  - lo que está en el cofre no se pierde;
+  - entre compañeros no hay golpes.
+- **Doblones:** si quedan menos de 20, aparece uno cada 0,8 s. Cada doblón vale 1 (2 en el Frenesí).
+- **Hechizos:** la Oveja va contra el rival que más lleva encima.
+- **Marcador:** los dos cofres con su total arriba, uno a cada lado del tiempo. Las fichas individuales enseñan lo que lleva encima cada jugador.
+- **Bots:**
+  - llevan entre 6 y 10 doblones y vuelven a guardar;
+  - persiguen al rival más cargado si está a menos de 160 px;
+  - protegen al compañero cuando lleva mucho.
+
+### 4.11 Medallas y retos
+- **Medallas en plena partida** (`assets/ui/medallas.png`). Salen 1,5 s junto a la ficha del jugador, con sonido, y las ven todos:
+
+  | Medalla | Cuándo |
+  |---|---|
+  | Primera sangre | El primer golpe de la partida |
+  | Venganza | Golpeas a quien te golpeó en los 5 s anteriores |
+  | Remontada | Pasas de último a primero |
+  | Robo maestro | Robas 8 o más doblones de un golpe |
+  | Racha | 3 golpes seguidos sin que te den |
+  | Por los pelos | Una trampa o un dash te pasa a menos de 10 px y no te da |
+  | Intocable | 30 s sin recibir ningún golpe |
+  | Rey del combo | Llegas a x3 dos veces en la misma partida |
+
+  Las decide el servidor y se guardan en el perfil (HISTORIAL).
+- **Retos de partida:**
+  - 3 por partida, que se ven en la pantalla de carga (por ejemplo, "Roba 6 doblones");
+  - dan XP extra;
+  - se renuevan cada partida, **nunca cada día**.
 
 ## 5. Red (tiempo real)
 
@@ -337,16 +411,38 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
 | Evento | Qué tiene que pasar |
 |---|---|
-| Recoger | Texto "+N" que salta (§7), 6 chispas, *pop* del marcador y un *cling* que sube un semitono por cada paso de combo |
-| Subir de multiplicador | El número tiembla y pasa de hueso a brasa; aparece el aviso del multiplicador y suena un acorde |
+| Recoger | "+N" que salta (§7), 6 chispas, el personaje se aplasta un poco y un *cling* que sube un semitono por cada paso de combo (hasta 12). Un doblón pequeño vuela en arco a tu ficha, y el número sube contando y hace *pop* |
+| Combo | Anillo junto al personaje que se vacía en 1,5 s (hueso en x2, brasa en x3). Al perderlo, se rompe con un *pff* suave; si era de 10 o más, sale "¡Combo de N!" en gris |
+| Subir de multiplicador | El número tiembla y pasa de hueso a brasa, aparece el aviso y suena un acorde que sube |
+| "¡VOODOO COMBO!" | Cartel grande, golpe de cámara (+4 %), flash corto (si se permiten) y chispas por el borde 1 s; aura de brasa en el personaje |
 | Dash | Aplastamiento, estela del color del jugador (o la equipada), polvo y *whoosh* |
-| Golpe | Parón de 60 ms, vibración de 6 px durante 150 ms, doblones en abanico, "-N" en rojo, *boing* y monedas cayendo |
+| Golpe | Parón (*hitstop*) de 60 ms (90 ms si quitas 5 o más), sacudida de 6 px, doblones en abanico, "-N" en rojo, *boing* y vibración del mando |
+| Robo | Los doblones vuelan de la ficha del otro a la tuya y sale "¡ROBO!" en brasa |
+| Medalla | Icono de 1,5 s junto a la ficha, con sonido |
 | Ruleta del cofre | 0,8 s de iconos girando sobre el muñeco con *tic* y un *ding* final |
 | Hechizo guardado | Tarjeta de 2 s sobre la ranura y la ranura empieza a latir |
 | La niebla se cierra | Borde morado parpadeando, aviso sonoro y "¡LA NIEBLA SE CIERRA!" |
-| Frenesí | Cartel "¡FRENESÍ!", borde de brasa latiendo, lluvia de doblones y música un 25 % más rápida |
+| Frenesí | Cartel "¡FRENESÍ!", borde de brasa latiendo, lluvia de doblones y música un 25 % más rápida y un tono más alta |
+| Final ajustado | Si en los últimos 5 s el primero y el segundo están a 3 o menos: cámara lenta x0,7, latido de corazón y sus fichas parpadeando |
 | Últimos 5 s | Números gigantes en el centro, con un tambor en cada uno |
-| Final | Cámara lenta de 0,5 s y confeti de doblones. Después, el podio |
+| Final | Cámara lenta de 0,5 s, zoom al ganador y confeti de doblones. Medio segundo de silencio, fanfarria y el podio |
+| Subir de nivel | La barra explota en chispas. Si se desbloquea algo, una caja de la taquilla (ganada jugando, nunca comprada) se abre y lo enseña |
+
+- **Música por capas** (entran y salen en 0,5 s):
+
+  | Situación | Capas |
+  |---|---|
+  | Base | Tambor y bajo |
+  | Combo x2 o más | + Percusión rápida |
+  | Combo x3 | + Melodía |
+  | Últimos 10 s | + Tambor grave en cada segundo |
+
+- **Menús:**
+  - los botones se agrandan al pasar por encima y se aplastan al pulsar, con sonido;
+  - las pantallas cambian con un telón de tela de 0,35 s;
+  - el cursor es un alfiler vudú;
+  - el logo late cada 4 s.
+- **Números:** todos los números del *juice* van en `GameConfig`, en un bloque `# Juice`.
 
 **Sonido:** todo sintetizado en código como `AudioStreamWAV`, más un bucle de tambores y bajo.
 
@@ -425,7 +521,8 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 - **Menús:** se usan del todo con teclado y mando, con foco visible.
 - **Nunca solo color:** formas ● ▲ ■ ◆ e iconos.
 - **Ajustes:**
-  - reducir movimiento;
+  - reducir movimiento y reducir destellos;
+  - vibración del mando;
   - escala de UI 100/125/150 %;
   - pantalla (ventana o pantalla completa) y tamaño de ventana;
   - volumen de música y de efectos;
@@ -434,7 +531,7 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
 ## 9. Cómo trabajar
 
-- **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 11a: <resumen>`).
+- **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 12a: <resumen>`).
 - **Antes de programar:** resume en 3-5 líneas qué vas a hacer.
 - **Tests:** si hay Godot en el PATH como `godot`, ejecuta `godot --headless --path . --script res://tests/run_tests.gd` y arregla lo que falle. Si no está, dilo.
 - **Al terminar cada bloque:**

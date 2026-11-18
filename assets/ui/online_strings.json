@@ -50,7 +50,9 @@
     "premise_biblioteca": "Portales y un rayo que nunca duerme. Silencio, por favor.",
     "server_oracle": "Oracle",
     "server_lan": "Red local",
-    "server_pc": "Este PC"
+    "server_pc": "Este PC",
+    "reduce_flashes": "Reducir destellos",
+    "vibration": "Vibración"
   },
   "ca": {
     "online": "JUGAR EN LÍNIA",
@@ -103,7 +105,9 @@
     "premise_biblioteca": "Portals i un llamp que mai dorm. Silenci, si us plau.",
     "server_oracle": "Oracle",
     "server_lan": "Xarxa local",
-    "server_pc": "Aquest PC"
+    "server_pc": "Aquest PC",
+    "reduce_flashes": "Redueix flaixos",
+    "vibration": "Vibració"
   },
   "en": {
     "online": "PLAY ONLINE",
@@ -156,6 +160,8 @@
     "premise_biblioteca": "Portals and a ray that never sleeps. Silence, please.",
     "server_oracle": "Oracle",
     "server_lan": "Local network",
-    "server_pc": "This PC"
+    "server_pc": "This PC",
+    "reduce_flashes": "Reduce flashes",
+    "vibration": "Vibration"
   }
 }
