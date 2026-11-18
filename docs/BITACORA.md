@@ -286,3 +286,7 @@ Formato de cada entrada:
 ### Fase 12e — Música por capas
 - Tres bucles sintetizados (tambor/bajo, percusión, melodía), mezcla gradual de medio segundo por combo, aceleración y tono de Frenesí, tambor final y silencio antes de fanfarria. Regresión local pasa.
 - Humanos: escuchar bucles y transiciones sin cortes y verificar volumen de música independiente de efectos.
+
+### Fase 12f — Tensión y final
+- Latido y cuenta atrás central al final, suavizado visual en finales ajustados, confeti y zoom del ganador con pausa previa al podio. La simulación registra quién iba último a mitad para anunciar remontada.
+- Humanos: empate cercano en los últimos cinco segundos y remontada desde último; comprobar que los relojes de red siguen sincronizados.

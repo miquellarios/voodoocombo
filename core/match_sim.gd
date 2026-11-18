@@ -27,6 +27,8 @@ var events: Array[Dictionary] = []
 var current_inputs: Array[Dictionary] = []
 var finished := false
 var achievements := MatchAchievements.new()
+var halfway_recorded := false
+var initial_duration := 90.0
 
 func setup(config: Dictionary) -> void:
 	seed_value = int(config.get("seed", 1))
@@ -45,6 +47,8 @@ func setup(config: Dictionary) -> void:
 	elapsed = 0.0
 	remaining = float(config.get("duration", GameConfig.CLASSIC_SECONDS if mode == "classic" else GameConfig.MATCH_SECONDS))
 	finished = false
+	halfway_recorded = false
+	initial_duration = remaining
 	frenzy_notified = false
 	bots_dash_global_left = 0.0
 	roll_time = 0.0
@@ -105,6 +109,10 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 	_update_safe_zone(delta)
 	_update_pickups()
 	_update_roll(delta)
+	if not halfway_recorded and remaining <= initial_duration * 0.5:
+		halfway_recorded = true
+		var order := _score_order()
+		if not order.is_empty(): players[order.back()]["last_at_half"] = true
 	events.append_array(achievements.update(players, events.slice(event_start), elapsed))
 	if remaining <= 0.000001:
 		remaining = 0.0

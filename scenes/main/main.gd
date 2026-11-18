@@ -98,6 +98,7 @@ var local_player := 0
 var client_match: ClientMatch
 var ping_ms := 0
 var ping_clock := 0.0
+var tension_second := -1
 
 func _build_online() -> void:
 	_clear_hud()
@@ -350,6 +351,11 @@ func _read_simulation() -> void:
 
 func _read_state(data: Dictionary) -> void:
 	if Fx.hitstop > 0 and state == "playing" and not bool(data.get("finished", false)): return
+	if not Settings.reduce_motion and state == "playing" and remaining <= 5 and players.size() >= 2:
+		var order := _score_order()
+		if int(players[order[0]].score) - int(players[order[1]].score) <= 3:
+			data = data.duplicate(true)
+			for index in mini(players.size(), data.players.size()): data.players[index].pos = players[index].pos.lerp(data.players[index].pos, 0.7)
 	for key in data:
 		if key not in ["finished", "ack"]: set(key, data[key])
 
@@ -516,6 +522,10 @@ func _start_countdown() -> void:
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
 	if state == "playing" and not players.is_empty(): Sfx.music(int(players[local_player].combo), frenzy_notified, remaining)
+	if state == "playing" and remaining <= 5 and ceili(remaining) != tension_second:
+		tension_second = ceili(remaining)
+		Fx.pop(str(tension_second), Vector2(640,330), GameConfig.EMBER)
+		Sfx.play_tone(50,0.2,0.22)
 	if network_match:
 		var ping := hud_root.get_node_or_null("Ping") as Label
 		if ping == null:
@@ -1180,9 +1190,11 @@ func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -
 	if file: file.store_string(JSON.stringify(record, "\t"))
 	HttpEndpoint.add_result(record)
 	_clear_hud()
-	_end_match_cleanup()
 	state = "match_end"
-	end_wait = 1.0
+	end_wait = 0.5
+	if not results_ranking.is_empty():
+		Fx.sparks(results_ranking[0].pos + OFFSET, GameConfig.GOLD, 60)
+		_camera_punch()
 	var root := _new_overlay()
 	_label(root, I18n.t("time_up"), Vector2(0, 285), 64, GameConfig.GOLD, true)
 
@@ -1211,6 +1223,7 @@ func _show_results() -> void:
 	podium.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(podium)
 	_label(root, I18n.t("winner_named") % String(results_ranking[0].get("name", "")), Vector2(0, 26), 44, GameConfig.GOLD, true)
+	if bool(results_ranking[0].get("last_at_half", false)): _label(root, I18n.t("comeback"), Vector2(0,90),30,GameConfig.EMBER,true)
 	var podium_rank_for_player: Array[int] = []
 	for place_index in range(results_ranking.size()):
 		var player: Dictionary = results_ranking[place_index]
@@ -1455,7 +1468,7 @@ func _screen_backdrop() -> ColorRect:
 	return backdrop
 
 func _draw() -> void:
-	if state in ["menu", "results", "match_end", "nickname"]:
+	if state in ["menu", "results", "nickname"]:
 		draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
 		return
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), GameConfig.BACKGROUND)
