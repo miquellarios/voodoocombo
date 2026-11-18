@@ -45,6 +45,8 @@ const TEAM_CARRY_SLOW := 0.02
 const TEAM_CARRY_SLOW_MAX := 0.4
 const TEAM_CARRY_GROW := 0.01
 const TEAM_CARRY_GROW_MAX := 0.2
+const MODES := ["voodoo","survival","greed"]
+const MATCH_DURATIONS := [60,90,120]
 
 # Red autoritativa.
 const NET_PORT := 7777

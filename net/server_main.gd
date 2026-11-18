@@ -79,7 +79,7 @@ func _request(sender: int, action: String, data: Dictionary) -> void:
 			room.erase("vote")
 			for player: Dictionary in room.players: player.ready = false
 			_publish(room)
-		"ready", "bots", "mode", "cosmetics", "team":
+		"ready", "bots", "mode", "cosmetics", "team", "duration":
 			if not room.is_empty() and LobbyRules.apply(room, sender, action, data):
 				if LobbyRules.all_ready(room):
 					room.phase = "voting"

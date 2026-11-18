@@ -393,6 +393,7 @@ func _handle_events(events: Array) -> void:
 				_read_state(event.snapshot)
 				if network_match: client_match.setup(event.snapshot, multiplayer.get_unique_id())
 				_load_match_art()
+				Fx.pop(I18n.t("objective_" + mode),Vector2(640,230),GameConfig.EMBER)
 			"eliminated":
 				Fx.sparks(event.pos + OFFSET, GameConfig.BONE_TEXT, 24)
 			"challenge":
@@ -515,6 +516,7 @@ func _build_loading() -> void:
 	var challenge_text := ""
 	for id in challenges: challenge_text += I18n.t("challenge_" + id) + "   "
 	_label(root, challenge_text, Vector2(0,620),18,GameConfig.BONE_TEXT,false)
+	_label(root,I18n.t("rules_" + mode),Vector2(820,350),20,GameConfig.BONE_TEXT,false)
 
 func _update_loading_text() -> void:
 	var tip := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
@@ -538,6 +540,7 @@ func _start_countdown() -> void:
 	countdown = 3.0
 	state = "countdown"
 	_build_hud()
+	Fx.pop(I18n.t("objective_" + mode),Vector2(640,240),GameConfig.EMBER)
 	queue_redraw()
 
 func _update_hud() -> void:

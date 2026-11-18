@@ -121,7 +121,7 @@ func _room_changed(value: Dictionary) -> void:
 			)
 		vote_view.update_state(local_vote.snapshot() if local else room.vote_state)
 	elif room.phase == "loading":
-		if local: local_match_requested.emit({"mode": room.mode, "arena_id": room.arena_id, "seed": local_vote.seed_value, "players": roster})
+		if local: local_match_requested.emit({"mode": room.mode, "arena_id": room.arena_id, "seed": local_vote.seed_value, "players": roster, "duration": room.duration})
 		else: online_match_requested.emit(room)
 	else: _build_room()
 
@@ -134,8 +134,11 @@ func _build_room() -> void:
 	_new_view()
 	_label(I18n.t("room_code") + "  " + ("—" if local else str(room.code)), Vector2(20, 30), Vector2(540, 60), 30)
 	_button("copy", Vector2(40, 94), Vector2(180, 45), func(): DisplayServer.clipboard_set(str(room.code)))
-	var mode_button := _button(str(room.mode), Vector2(880, 40), Vector2(350, 55), func(): _action("mode", {"mode": "voodoo"}))
+	var mode_button := _button(str(room.mode), Vector2(850, 40), Vector2(400, 55), func(): _action("mode", {"mode": GameConfig.MODES[(GameConfig.MODES.find(str(room.mode)) + 1) % GameConfig.MODES.size()]}))
 	mode_button.disabled = int(room.host) != local_id
+	_label(I18n.t("rules_" + str(room.mode)), Vector2(850,105),Vector2(400,120),20)
+	var duration := _button(str(room.duration) + " s",Vector2(570,40),Vector2(220,55),func(): _action("duration",{"seconds":GameConfig.MATCH_DURATIONS[(GameConfig.MATCH_DURATIONS.find(int(room.duration))+1)%3]}))
+	duration.disabled = local_id != int(room.host) or room.mode == "survival"
 	var order := _display_order()
 	for slot in GameConfig.ROOM_CAPACITY:
 		var center: Vector2 = GameConfig.LOBBY_PEDESTALS[slot]
@@ -145,6 +148,9 @@ func _build_room() -> void:
 			if local_id == int(room.host): _button("add_bot", center + Vector2(-110, 50), Vector2(220, 45), func(): _action("bots", {"count": int(room.bots) + 1}))
 		else:
 			var player: Dictionary = roster[index]
+			if room.mode == "greed":
+				var team := _button("team_" + str(player.team),center + Vector2(-110,-245),Vector2(220,45),func(): _action("team",{"index":index}))
+				team.disabled = local_id != int(room.host) or bool(player.is_bot)
 			_label(str(player.name), center + Vector2(-115, 14), Vector2(230, 36), 24)
 			_label(I18n.t("lobby_ready") if bool(player.ready) else "…", center + Vector2(-115, 48), Vector2(230, 36), 22).modulate = Color("63a83a") if player.ready else Color.WHITE
 			if int(player.peer_id) == int(room.host):
@@ -161,6 +167,13 @@ func _build_room() -> void:
 	_label(I18n.t("wheel"), Vector2(300, 590), Vector2(680, 35), 18)
 
 func _display_order() -> Array[int]:
+	if room.get("mode") == "greed":
+		var teams: Array[int] = []
+		for team in 2:
+			for index in roster.size():
+				if int(roster[index].team) == team: teams.append(index)
+		while teams.size() < 4: teams.append(-1)
+		return teams
 	var order: Array[int] = [-1, -1, -1, -1]
 	var others: Array[int] = []
 	for index in roster.size():

@@ -11,7 +11,11 @@ static func apply(room: Dictionary, sender: int, action: String, data: Dictionar
 		"ready": room.players[index].ready = not bool(room.players[index].ready)
 		"bots":
 			if sender != int(room.host): return false
+			if room.mode == "greed": return false
 			room.bots = clampi(int(data.get("count", 0)), 0, GameConfig.ROOM_CAPACITY - room.players.size())
+		"duration":
+			if sender != int(room.host) or not int(data.get("seconds",0)) in GameConfig.MATCH_DURATIONS: return false
+			room.duration = int(data.seconds)
 		"mode":
 			if sender != int(room.host) or not data.get("mode") in ["voodoo", "survival", "greed"]: return false
 			room.mode = data.mode
@@ -32,6 +36,7 @@ static func apply(room: Dictionary, sender: int, action: String, data: Dictionar
 					room.players[other]["team"] = team
 					break
 			room.players[target]["team"] = 1 - team
+			for player: Dictionary in room.players: player.ready = false
 		_: return false
 	return true
 

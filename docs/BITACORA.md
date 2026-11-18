@@ -311,3 +311,7 @@ Formato de cada entrada:
 ### Fase 12k — Codicia 2v2
 - Equipos de dos, cuarenta doblones, valor sin multiplicador, carga que frena/agranda, depósito progresivo protegido, caída de toda la carga y bloqueo de daño aliado. Bots regresan al cofre y protegen al compañero; hechizos eligen rivales.
 - Tests de cofre correcto, banco protegido, daño aliado y velocidad x0,6 pasan; regresión local pasa. Humanos: equipo contra equipo en red, comprobar anillo/Frenesí y robar antes de depositar.
+
+### Fase 12l — Selección y explicación de modos
+- Selector de tres modos y duración, tarjetas de reglas traducidas, equipos visibles/cambiables por anfitrión, instrucciones en carga y objetivo al empezar ronda. Los huecos de Codicia se completan con bots.
+- Pruebas de lobby y vista online pasan. Humanos: recorrer los tres modos, cambiar equipos y jugar una partida local y otra en red por modo; comprobar desconexión entre rondas.
