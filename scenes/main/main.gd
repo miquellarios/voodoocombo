@@ -624,10 +624,11 @@ func _build_menu() -> void:
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(logo)
 	if not Settings.reduce_motion:
-		logo.position.y = -230
+		logo.pivot_offset = logo.size * 0.5
 		menu_logo_tween = create_tween()
-		menu_logo_tween.tween_property(logo, "position:y", 14.0, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		menu_logo_tween.tween_property(logo, "position:y", 18.0, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		menu_logo_tween.tween_property(logo, "scale", Vector2.ONE * 1.04, 0.2)
+		menu_logo_tween.tween_property(logo, "scale", Vector2.ONE, 0.3)
+		menu_logo_tween.tween_interval(3.5)
 		menu_logo_tween.set_loops()
 	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
 	var actions: Array[Callable] = [_build_online, func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
@@ -1760,6 +1761,7 @@ func _draw_ray_beams(center: Vector2, angle: float) -> void:
 	draw_set_transform(OFFSET)
 
 func _new_overlay() -> Control:
+	Fx.curtain()
 	hud = CanvasLayer.new()
 	hud.layer = 10
 	add_child(hud)

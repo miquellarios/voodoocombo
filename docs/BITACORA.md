@@ -294,3 +294,7 @@ Formato de cada entrada:
 ### Fase 12g — Progreso y retos
 - Tres retos por semilla, completados en servidor, con bonus de XP sin duplicados. Avisos, pantalla de carga y barra animada de XP con nivel y sonido; desbloqueos sociales y botón Equipar. Tests de selección, condiciones y XP pasan; regresión local pasa.
 - Humanos: cumplir tres retos, subir nivel y equipar el desbloqueo; comparar bonus entre clientes.
+
+### Fase 12h — Menús
+- Botones con sonido, escala al enfocar y aplastamiento al pulsar; alfiler dibujado, telón de tela al cambiar de pantalla y latido del logo cada cuatro segundos. Reducir movimiento deja los controles estáticos.
+- Regresión local pasa. Humanos: recorrer menús con ratón, teclado y mando y comprobar legibilidad de transiciones.

@@ -57,6 +57,24 @@ func flash() -> void:
 	tween.tween_property(rect, "modulate:a", 0.0, 0.12)
 	tween.tween_callback(rect.queue_free)
 
+func curtain() -> void:
+	if Settings.reduce_motion: return
+	var target := _canvas()
+	var cloth := ColorRect.new()
+	cloth.size = Vector2(1280,720)
+	cloth.color = Color("241838")
+	cloth.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	target.add_child(cloth)
+	for index in 32:
+		var seam := ColorRect.new()
+		seam.position = Vector2(index * 40,0)
+		seam.size = Vector2(3,720)
+		seam.color = Color(0.03,0.01,0.05,0.35)
+		cloth.add_child(seam)
+	var tween := create_tween()
+	tween.tween_property(cloth,"position:y",-720.0,GameConfig.JUICE_CURTAIN_SECONDS)
+	tween.tween_callback(cloth.queue_free)
+
 func squash_scale(index: int) -> Vector2:
 	if Settings.reduce_motion: return Vector2.ONE
 	return Vector2.ONE.lerp(GameConfig.JUICE_SQUASH, clampf(float(squash.get(index,0)) / GameConfig.JUICE_SQUASH_SECONDS,0,1))
