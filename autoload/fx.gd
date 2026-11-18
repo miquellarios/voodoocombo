@@ -45,6 +45,18 @@ func fly_coin(from: Vector2, to: Vector2) -> void:
 		Sfx.play_tone(1200, 0.035)
 	)
 
+func flash() -> void:
+	if Settings.reduce_flashes or Settings.reduce_motion: return
+	var target := _canvas()
+	var rect := ColorRect.new()
+	rect.size = Vector2(1280,720)
+	rect.color = Color(1,0.4,0.1,0.18)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	target.add_child(rect)
+	var tween := create_tween()
+	tween.tween_property(rect, "modulate:a", 0.0, 0.12)
+	tween.tween_callback(rect.queue_free)
+
 func squash_scale(index: int) -> Vector2:
 	if Settings.reduce_motion: return Vector2.ONE
 	return Vector2.ONE.lerp(GameConfig.JUICE_SQUASH, clampf(float(squash.get(index,0)) / GameConfig.JUICE_SQUASH_SECONDS,0,1))

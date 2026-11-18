@@ -323,6 +323,7 @@ func _update_pickups() -> void:
 				chest_fade_alpha.remove_at(chest_i)
 				break
 		if player.combo > 0 and elapsed - player.last_pickup > GameConfig.COMBO_WINDOW:
+			events.append({"type": "combo_lost", "player": i, "combo": player.combo, "pos": player.pos})
 			player.combo = 0
 
 
@@ -420,6 +421,7 @@ func _random_position_in_safe_zone() -> Vector2:
 
 
 func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum: int, maximum: int, stun_seconds: float, text_key: String = "trap_zap") -> Dictionary:
+	var previous_combo := int(players[victim_index].combo)
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
 	if result.blocked:
 		_pop(_message("trap_blocked"), players[victim_index].pos + OFFSET, Color("7fe7ff"))
@@ -428,6 +430,7 @@ func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum
 	if not result.applied:
 		return result
 	players[victim_index] = result.victim
+	if previous_combo > 0: events.append({"type": "combo_lost", "player": victim_index, "combo": previous_combo, "pos": players[victim_index].pos})
 	var dropped := int(result.dropped)
 	events.append({"type": "player_hit", "victim": victim_index, "attacker": attacker_index, "dropped": dropped})
 	_drop_coins(victim_index, dropped)

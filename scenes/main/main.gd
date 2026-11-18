@@ -374,6 +374,10 @@ func _handle_events(events: Array) -> void:
 			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
+			"combo_lost":
+				Fx.sparks(event.pos + OFFSET, Color("b8a9d1"), 8)
+				Sfx.play_tone(110, 0.06)
+				if int(event.combo) >= 10: Fx.pop(I18n.t("combo_lost") % int(event.combo), event.pos + OFFSET, Color.GRAY)
 			"player_left":
 				Fx.pop("☁", event.pos + OFFSET, Color("b8a9d1"))
 			"social":
@@ -387,6 +391,10 @@ func _handle_events(events: Array) -> void:
 				for token in expression.search_all(text):
 					text = text.replace(token.get_string(), I18n.t(token.get_string(1)))
 				Fx.pop(text, event.position, event.color)
+				if text == I18n.t("voodoo_combo"):
+					_camera_punch()
+					Fx.flash()
+					for edge in 20: Fx.sparks(Vector2(edge * 64, 5), GameConfig.EMBER, 3)
 			"tone":
 				Sfx.play_tone(event.frequency, event.duration)
 			"hit_feedback":
@@ -1463,6 +1471,14 @@ func _draw() -> void:
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
+		if int(player.combo) > 0:
+			var combo_left := clampf(1.0 - (elapsed - float(player.last_pickup)) / GameConfig.COMBO_WINDOW, 0, 1)
+			var multiplier := Scoring.multiplier(int(player.combo))
+			draw_arc(pos + Vector2(0, 12), 27, -PI / 2, -PI / 2 + TAU * combo_left, 32, GameConfig.EMBER if multiplier >= 3 else GameConfig.BONE_TEXT, 3, true)
+			if multiplier >= 3:
+				for spark in 6:
+					var angle: float = spark * TAU / 6 + (0.0 if Settings.reduce_motion else elapsed * 2.0)
+					draw_circle(pos + Vector2.from_angle(angle) * 32, 3, Color("b06bff", 0.6))
 		var anim_name := "hurt" if player.stun > 0.0 else ("dash" if player.dash_left > 0.0 else ("walk" if player.vel.length() > 10.0 else "idle"))
 		var animation: Dictionary = character_metadata.get("animations", {}).get(anim_name, {"row": 0, "frames": 1, "fps": 1})
 		var frame_width := int(character_metadata.get("frame_w", 224))

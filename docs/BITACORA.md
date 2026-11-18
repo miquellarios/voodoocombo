@@ -274,3 +274,7 @@ Formato de cada entrada:
 ### Fase 12b — Doblones al marcador
 - Arcos de recogida y robo hacia las fichas con tic al llegar; tono de recogida por semitonos, limitado a doce pasos. Reducir movimiento sustituye los vuelos por una señal breve en destino.
 - Humanos: comprobar vuelos simultáneos, correspondencia de fichas en clientes distintos y conteo animado del marcador.
+
+### Fase 12c — Medidor de combo
+- Anillo de tiempo, aura x3 y destellos regulables. Pérdida autoritativa de combo con fragmentos y aviso del combo conseguido.
+- Corregido un tipo no inferible en el ángulo de partículas. Regresión local pasa; humanos: verificar duración de 1,5 s y accesibilidad.
