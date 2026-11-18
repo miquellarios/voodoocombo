@@ -49,8 +49,9 @@ static func all_ready(room: Dictionary) -> bool:
 static func roster(room: Dictionary) -> Array[Dictionary]:
 	var players: Array[Dictionary] = []
 	for player: Dictionary in room.players: players.append(player.duplicate(true))
+	var bot_names := ["Mordisquitos", "Conde Costura", "Dama del Pantano"]
 	for index in int(room.bots):
-		players.append({"peer_id": -index - 1, "name": "Bot %d" % (index + 1), "character": ["mago", "trol", "gnomo", "nigro"][players.size()], "is_bot": true, "ready": true, "cosmetics": {}})
+		players.append({"peer_id": -index - 1, "name": bot_names[posmod(index, bot_names.size())], "character": ["mago", "trol", "gnomo", "nigro"][players.size()], "is_bot": true, "ready": true, "cosmetics": {}})
 	var counts := [0,0]
 	for index in players.size():
 		var team := clampi(int(players[index].get("team",index / 2)),0,1)

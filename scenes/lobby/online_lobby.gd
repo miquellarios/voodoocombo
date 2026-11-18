@@ -127,7 +127,8 @@ func _room_changed(value: Dictionary) -> void:
 
 func _load_sheets() -> void:
 	for index in roster.size():
-		var key := "%s_%s" % [roster[index].character, ["coral", "azul", "lima", "hueso"][index]]
+		var color_index := int(roster[index].team) if room.get("mode") == "greed" else index
+		var key := "%s_%s" % [roster[index].character, ["coral", "azul", "lima", "hueso"][color_index]]
 		if not sheets.has(key): sheets[key] = load("res://assets/characters/" + key + ".png")
 
 func _build_room() -> void:
@@ -155,6 +156,7 @@ func _build_room() -> void:
 			_label(I18n.t("lobby_ready") if bool(player.ready) else "…", center + Vector2(-115, 48), Vector2(230, 36), 22).modulate = Color("63a83a") if player.ready else Color.WHITE
 			if int(player.peer_id) == int(room.host):
 				var crown := TextureRect.new()
+				crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				crown.texture = load("res://assets/characters/crown.png")
 				crown.position = center + Vector2(-24, -190)
 				crown.size = Vector2(48, 32)
@@ -281,7 +283,8 @@ func _draw() -> void:
 		if index < 0: continue
 		var player: Dictionary = roster[index]
 		var center: Vector2 = GameConfig.LOBBY_PEDESTALS[slot]
-		var key := "%s_%s" % [player.character, ["coral", "azul", "lima", "hueso"][index]]
+		var color_index := int(player.team) if room.get("mode") == "greed" else index
+		var key := "%s_%s" % [player.character, ["coral", "azul", "lima", "hueso"][color_index]]
 		var sheet: Texture2D = sheets.get(key)
 		if sheet == null: continue
 		var pose: Dictionary = social.get(int(player.peer_id), {})

@@ -1,11 +1,11 @@
 VOODOO COMBO 0.1 — WINDOWS
 
 Inicia el juego con VoodooCombo-0.1.exe.
-No separes estos archivos:
+Mantén juntos estos archivos:
 - VoodooCombo-0.1.exe
 - VoodooCombo-0.1.pck
 - Godot_v4.7.2-stable_win64_console.exe
+- Godot_v4.7.2-stable_win64.exe
 
-El ejecutable pequeño inicia el juego empaquetado con el runtime Godot 4.7.2.
-Este paquete se generó porque las plantillas oficiales de exportación de Godot no estaban instaladas.
-El runtime de consola incluido es el que utiliza el lanzador; no hace falta el ejecutable normal del editor.
+El lanzador abre el juego empaquetado con Godot 4.7.2. La distribución incluye ambos ejecutables del motor para que el runtime de consola pueda iniciar la ventana del juego.
+El paquete se generó porque las plantillas oficiales de exportación de Godot no estaban instaladas.

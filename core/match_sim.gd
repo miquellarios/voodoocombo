@@ -79,6 +79,7 @@ func setup(config: Dictionary) -> void:
 		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1, "zone_drain_left": GameConfig.ZONE_DRAIN_INTERVAL})
 		players[i].is_bot = bool(entry.get("is_bot", i > 0))
 		players[i]["peer_id"] = int(entry.get("peer_id", i + 1))
+		players[i]["cosmetics"] = entry.get("cosmetics", {}).duplicate(true)
 		players[i]["team"] = clampi(int(entry.get("team", i / 2)),0,1)
 		players[i]["deposit_left"] = 0.0
 		players[i]["deposited"] = 0

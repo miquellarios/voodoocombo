@@ -39,6 +39,7 @@ func fly_coin(from: Vector2, to: Vector2) -> void:
 	var flight := {"pos": from}
 	target.flights.append(flight)
 	var tween := create_tween()
+	flight["tween"] = tween
 	tween.tween_method(func(t: float): flight.pos = from.lerp(to, t) + Vector2(0, -sin(t * PI) * 70), 0.0, 1.0, GameConfig.JUICE_FLIGHT_SECONDS)
 	tween.tween_callback(func():
 		target.flights.erase(flight)
@@ -149,8 +150,16 @@ func render_pop(text: String, position: Vector2, tint: Color) -> void:
 
 func clear_text() -> void:
 	if is_instance_valid(text_layer):
-		text_layer.queue_free()
+		text_layer.free()
 		text_layer = null
+	hitstop = 0.0
+	squash.clear()
+	if is_instance_valid(canvas):
+		canvas.particles.clear()
+		for flight: Dictionary in canvas.flights:
+			var tween := flight.get("tween") as Tween
+			if is_instance_valid(tween): tween.kill()
+		canvas.flights.clear()
 
 func pop(text: String, position: Vector2, tint: Color = Color.WHITE) -> void:
 	floating_text.emit(text, position, tint)

@@ -315,3 +315,11 @@ Formato de cada entrada:
 ### Fase 12l — Selección y explicación de modos
 - Selector de tres modos y duración, tarjetas de reglas traducidas, equipos visibles/cambiables por anfitrión, instrucciones en carga y objetivo al empezar ronda. Los huecos de Codicia se completan con bots.
 - Pruebas de lobby y vista online pasan. Humanos: recorrer los tres modos, cambiar equipos y jugar una partida local y otra en red por modo; comprobar desconexión entre rondas.
+
+### Revisión final de fase 12 — interfaz, regresión y paquete
+- Corregidos los tamaños de las texturas de menú, votación, HUD y podio; se limpian vuelos y textos al cambiar de partida. El marcador del podio ahora muestra monedas y medallas, y la pantalla de resultados enseña el nivel y el progreso de XP.
+- Último en Pie usa las costuras del asset en las fichas. Codicia pinta los retratos y marcadores de cada equipo con su color y separa los dos totales. Los bots usan nombres propios. Ajustes incluye deslizadores persistentes para música y efectos.
+- Votación cubre el lobby, recorta las cuatro cartas y enseña medallón, trampas y retratos de voto. El historial muestra el total de medallas del perfil.
+- Godot 4.7: `tests/run_tests.gd` pasa sin avisos de instancias filtradas; `test_full_modes.gd` completa VoodooCombo, tres rondas de Último en Pie y Codicia. La prueba ENet con cuatro clientes y un quinto rechazado pasa en los tres modos; los cuatro clientes coinciden en el resultado y `/results` indica el modo correcto. Capturas gráficas de menú, ajustes, lobby, votación, los tres modos y podio sin errores.
+- Primer intento de la prueba ENet desde el aislamiento local agotó el tiempo al no poder conectar los procesos; repetida con permiso para sockets locales pasa en los tres modos.
+- Humanos: abrir el paquete Windows 0.1; probar ajustes de audio, resolución y controles; perder costuras hasta ser fantasma; jugar Codicia con dos equipos y confirmar color, carga, cofre y marcador; revisar retratos de voto y medallas del podio; probar Otra y Menú principal en dos clientes.

@@ -12,6 +12,9 @@ func _init() -> void:
 	if online is Dictionary:
 		for locale: String in online: strings[locale].merge(online[locale], true)
 	strings.es.merge({
+		"settings_music": "Volumen de música",
+		"settings_sfx": "Volumen de efectos",
+		"history_medals": "Medallas conseguidas: %d",
 		"settings_reduce_motion": "Reducir movimiento",
 		"settings_yes": "Sí",
 		"settings_no": "No",
@@ -51,6 +54,8 @@ func _init() -> void:
 		"loading_tip_9": "Los portales emparejados te transportan al instante.",
 		"loading_tip_10": "Recoge los doblones cerca del centro antes de que acabe la partida."
 	}, true)
+	strings.ca.merge({"settings_music": "Volum de música", "settings_sfx": "Volum d'efectes", "history_medals": "Medalles aconseguides: %d"}, true)
+	strings.en.merge({"settings_music": "Music volume", "settings_sfx": "Effects volume", "history_medals": "Medals earned: %d"}, true)
 	strings.ca.merge({
 		"settings_reduce_motion": "Reduir moviment",
 		"settings_yes": "Sí",

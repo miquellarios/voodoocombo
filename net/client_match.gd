@@ -69,7 +69,8 @@ func _move(position: Vector2, move: Vector2, delta: float, dashing: bool) -> Vec
 	if dashing:
 		speed *= GameConfig.DASH_MULTIPLIER
 		if move.length() < 0.1: move = player.dash_dir
-	return ArenaPhysics.move_circle(position, move.limit_length() * speed * delta, GameConfig.PLAYER_RADIUS, state.player_hitbox_rects)
+	var feet := position + Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
+	return ArenaPhysics.move_circle(feet, move.limit_length() * speed * delta, GameConfig.PLAYER_FOOT_RADIUS, state.player_hitbox_rects) - Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
 
 func render(delta: float) -> Dictionary:
 	clock += delta

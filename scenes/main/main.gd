@@ -9,6 +9,9 @@ const SPELL_TEXTURE := preload("res://assets/items/hechizos.png")
 const SPELL_SLOT_TEXTURE := preload("res://assets/ui/hechizo_ranura.png")
 const SPELL_GLOW_TEXTURE := preload("res://assets/ui/hechizo_brillo.png")
 const SPELL_KEY_E_TEXTURE := preload("res://assets/ui/tecla_e.png")
+const STITCHES_TEXTURE := preload("res://assets/ui/costuras.png")
+const TEAM_CHEST_TEXTURES := [preload("res://assets/items/cofre_equipo_coral.png"), preload("res://assets/items/cofre_equipo_azul.png")]
+const MEDALS_TEXTURE := preload("res://assets/ui/medallas.png")
 const SPELL_KEY_B_TEXTURE := preload("res://assets/ui/tecla_b.png")
 const TRAP_ICONS_TEXTURE := preload("res://assets/ui/trampas_iconos.png")
 const SAFE_ZONE_FOG_TEXTURE := preload("res://assets/ui/zona_niebla.png")
@@ -59,6 +62,7 @@ var spell_atlases: Array[AtlasTexture] = []
 var score_name_labels: Array[Label] = []
 var score_tag_labels: Array[Label] = []
 var score_number_labels: Array[Label] = []
+var score_life_icons: Array = []
 var score_portraits: Array[TextureRect] = []
 var score_frames: Array[TextureRect] = []
 var score_frame_skulls: Array[Label] = []
@@ -321,6 +325,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _begin_match(arena_id: String = "", overrides: Dictionary = {}) -> void:
+	Fx.clear_text()
 	network_match = false
 	local_player = 0
 	simulation = MatchSim.new()
@@ -403,6 +408,7 @@ func _handle_events(events: Array) -> void:
 				var index := int(event.player)
 				if index < score_number_labels.size():
 					var badge := TextureRect.new()
+					badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 					var atlas := AtlasTexture.new()
 					atlas.atlas = load("res://assets/ui/medallas.png")
 					atlas.region = Rect2(GameConfig.MEDAL_IDS.find(str(event.medal)) * 128,0,128,128)
@@ -462,6 +468,7 @@ func _build_loading() -> void:
 	var title_font := ThemeBuilder.font("Cinzel-Bold.woff2")
 	if title_font != null: title.add_theme_font_override("font", title_font)
 	var thumbnail := TextureRect.new()
+	thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	thumbnail.texture = load(_arena_thumbnail_path(String(arena.map_id)))
 	thumbnail.position = GameConfig.LOADING_THUMB_POSITION
 	thumbnail.size = GameConfig.LOADING_THUMB_SIZE
@@ -473,6 +480,7 @@ func _build_loading() -> void:
 	for index in range(trap_keys.size()):
 		var trap_name := String(trap_keys[index])
 		var icon := TextureRect.new()
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		var atlas := AtlasTexture.new()
 		atlas.atlas = TRAP_ICONS_TEXTURE
 		var trap_manifest: Dictionary = loading_metadata.get("trampas_iconos", {})
@@ -493,6 +501,7 @@ func _build_loading() -> void:
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var portrait_path := "res://assets/ui/retrato_%s_coral.png" % String(players[local_player].character)
 	var portrait := TextureRect.new()
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.texture = load(portrait_path)
 	portrait.position = GameConfig.LOADING_CHARACTER_POSITION
 	portrait.size = GameConfig.LOADING_PORTRAIT_SIZE
@@ -545,13 +554,24 @@ func _start_countdown() -> void:
 
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
+	if fog_material != null and mode != "greed":
+		var bounds := ZoneRules.safe_rect(safe_zone_step)
+		fog_material.set_shader_parameter("safe_bounds", Vector4(OFFSET.x + bounds.position.x, OFFSET.y + bounds.position.y, OFFSET.x + bounds.end.x, OFFSET.y + bounds.end.y))
+		fog_material.set_shader_parameter("scroll_time",0.0 if Settings.reduce_motion else elapsed * GameConfig.ZONE_FOG_SCROLL_SPEED)
 	if state == "playing" and not players.is_empty(): Sfx.music(int(players[local_player].combo), frenzy_notified, remaining)
 	if mode == "greed":
-		var teams := hud_root.get_node_or_null("Teams") as Label
-		if teams == null:
-			teams = _hud_label(hud_root,Vector2(430,80),Vector2(420,40),26,HORIZONTAL_ALIGNMENT_CENTER)
-			teams.name = "Teams"
-		teams.text = "● %d     ◆ %d" % [team_scores[0],team_scores[1]]
+		var coral_score := hud_root.get_node_or_null("TeamCoral") as Label
+		if coral_score == null:
+			coral_score = _hud_label(hud_root, Vector2(420, 66), Vector2(190, 36), 24, HORIZONTAL_ALIGNMENT_CENTER)
+			coral_score.name = "TeamCoral"
+		var blue_score := hud_root.get_node_or_null("TeamBlue") as Label
+		if blue_score == null:
+			blue_score = _hud_label(hud_root, Vector2(670, 66), Vector2(190, 36), 24, HORIZONTAL_ALIGNMENT_CENTER)
+			blue_score.name = "TeamBlue"
+		coral_score.text = "● %d" % team_scores[0]
+		blue_score.text = "◆ %d" % team_scores[1]
+		coral_score.add_theme_color_override("font_color", GameConfig.COLORS[0])
+		blue_score.add_theme_color_override("font_color", GameConfig.COLORS[1])
 	if state == "playing" and remaining <= 5 and ceili(remaining) != tension_second:
 		tension_second = ceili(remaining)
 		Fx.pop(str(tension_second), Vector2(640,330), GameConfig.EMBER)
@@ -570,9 +590,12 @@ func _update_hud() -> void:
 		time_label.add_theme_color_override("font_color", GameConfig.GOLD if remaining <= 15.0 and mode == "voodoo" else Color.WHITE)
 	var leader := _leader_index() if not players.is_empty() else -1
 	for slot in range(score_name_labels.size()):
-		var active := slot < players.size()
-		for control in [score_name_labels[slot], score_tag_labels[slot], score_number_labels[slot], score_portraits[slot], score_frames[slot], score_frame_skulls[slot]]:
+		var active := slot < players.size() and not bool(players[slot].get("disconnected",false))
+		for control in [score_name_labels[slot], score_tag_labels[slot], score_portraits[slot], score_frames[slot], score_frame_skulls[slot]]:
 			control.visible = active
+		score_number_labels[slot].visible = active and mode != "survival"
+		for stitch in GameConfig.SURVIVAL_LIVES:
+			score_life_icons[slot][stitch].visible = active and mode == "survival"
 		score_crowns[slot].visible = active and slot == leader
 		if not active: continue
 		var player: Dictionary = players[slot]
@@ -583,16 +606,21 @@ func _update_hud() -> void:
 		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
 		var portrait_texture: Texture2D = load(portrait_path)
 		if portrait_texture != null: score_portraits[slot].texture = portrait_texture
-		var frame_id := String(Profile.cosmetics.get("frame", "madera")) if slot == 0 else "madera"
+		var frame_id := str(player.get("cosmetics",{}).get("frame","madera"))
 		var frame_texture: Texture2D = load("res://assets/ui/marco_%s.png" % ("hueso" if frame_id == "calavera" else frame_id))
 		if frame_texture != null: score_frames[slot].texture = frame_texture
-		score_frame_skulls[slot].visible = slot == 0 and frame_id == "calavera"
+		score_frame_skulls[slot].visible = frame_id == "calavera"
 		var value := int(player.score)
 		if score_values[slot] != value:
 			var previous_value := maxi(0, score_values[slot])
 			score_values[slot] = value
 			score_change_times[slot] = Time.get_ticks_msec()
 			_animate_score(score_number_labels[slot], previous_value, value)
+		if mode == "survival":
+			for stitch in GameConfig.SURVIVAL_LIVES:
+				var atlas := score_life_icons[slot][stitch].texture as AtlasTexture
+				atlas.region = Rect2(0.0 if stitch < int(player.lives) else 128.0, 0.0, 128.0, 128.0)
+			if score_number_labels[slot].has_meta("score_tween"): (score_number_labels[slot].get_meta("score_tween") as Tween).kill()
 	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
 	var spell_name := hud_root.get_node_or_null("SpellName") as Label
 	var spell_glow := hud_root.get_node_or_null("SpellGlow") as TextureRect
@@ -608,7 +636,7 @@ func _update_hud() -> void:
 	if spell_name and not players.is_empty():
 		var item := String(players[local_player].item)
 		var is_active := float(players[local_player].item_time) > 0.0
-		spell_name.text = (I18n.t("spell_" + item) + "  %.1f" % float(players[local_player].item_time)) if is_active else (I18n.t("spell_" + item) if not item.is_empty() else I18n.t("spell"))
+		spell_name.text = (I18n.t(ItemTable.display_key(item,mode)) + "  %.1f" % float(players[local_player].item_time)) if is_active else (I18n.t(ItemTable.display_key(item,mode)) if not item.is_empty() else I18n.t("spell"))
 		spell_name.modulate.a = 1.0 if SpellRules.can_activate(players[local_player]) else 0.72
 	var notice := hud_root.get_node_or_null("SpellNotice") as Control
 	if notice:
@@ -630,6 +658,7 @@ func _build_menu() -> void:
 	state = "menu"
 	var root := _new_overlay()
 	var background := TextureRect.new()
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.texture = load("res://assets/ui/menu_fondo.png")
 	background.size = Vector2(1280, 720)
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -638,6 +667,7 @@ func _build_menu() -> void:
 	root.add_child(background)
 	root.move_child(background, 0)
 	var logo := TextureRect.new()
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.name = "MenuLogo"
 	logo.texture = load("res://assets/ui/logo_brasa.png")
 	logo.position = Vector2(360, 14)
@@ -686,6 +716,7 @@ func _build_locker(tab: String) -> void:
 	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
 	character_preview_id = Profile.character
 	character_preview = TextureRect.new()
+	character_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	character_preview.name = "CharacterPreview"
 	character_preview.position = Vector2(490, 145)
 	character_preview.size = Vector2(300, 300)
@@ -738,6 +769,7 @@ func _build_cosmetic_tab(root: Control, tab: String) -> void:
 		card.add_theme_stylebox_override("panel", style)
 		root.add_child(card)
 		var icon := TextureRect.new()
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.position = Vector2(82.0, 10.0)
 		icon.size = Vector2(66.0, 66.0)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -869,9 +901,12 @@ func _update_character_preview() -> void:
 func _build_history() -> void:
 	_clear_hud()
 	var root := _new_overlay()
-	_label(root, "HISTORIAL", Vector2(0, 95), 42, GameConfig.GOLD, true)
+	_label(root, I18n.t("history"), Vector2(0, 95), 42, GameConfig.GOLD, true)
 	var dir := DirAccess.open("user://matches")
-	var y := 170.0
+	var medal_count := 0
+	for count: Variant in Profile.medal_totals.values(): medal_count += int(count)
+	_label(root, I18n.t("history_medals") % medal_count, Vector2(0, 148), 20, GameConfig.BONE_TEXT, false)
+	var y := 202.0
 	if dir:
 		var files := dir.get_files()
 		files.sort()
@@ -910,6 +945,20 @@ func _build_settings() -> void:
 		Settings.ui_scale = 1.0 if Settings.ui_scale >= 1.5 else Settings.ui_scale + 0.25
 		Settings.save()
 		_build_settings())
+	for index in 2:
+		var audio_key := "music_volume" if index == 0 else "sfx_volume"
+		var title_key := "settings_music" if index == 0 else "settings_sfx"
+		var audio_label := _hud_label(root, Vector2(270.0, 340.0 + index * 55.0), Vector2(270.0, 36.0), 18, HORIZONTAL_ALIGNMENT_LEFT)
+		audio_label.text = I18n.t(title_key)
+		var slider := HSlider.new()
+		slider.position = Vector2(550.0, 340.0 + index * 55.0)
+		slider.size = Vector2(420.0, 36.0)
+		slider.min_value = 0.0
+		slider.max_value = 100.0
+		slider.value = float(Settings.get(audio_key)) * 100.0
+		slider.focus_mode = Control.FOCUS_ALL
+		slider.value_changed.connect(func(value: float): Settings.set(audio_key, value / 100.0); Settings.save())
+		root.add_child(slider)
 	var display_mode := I18n.t("settings_fullscreen") if Settings.window_fullscreen else I18n.t("settings_windowed")
 	_button(root, "%s: %s" % [I18n.t("settings_display_mode"), display_mode], Vector2(0, GameConfig.SETTINGS_DISPLAY_MODE_Y), func():
 		Settings.toggle_fullscreen()
@@ -963,7 +1012,7 @@ func _build_hud() -> void:
 	_clear_hud()
 	var root := _new_overlay()
 	if state == "menu": return
-	if state in ["playing", "countdown"]:
+	if state in ["playing", "countdown"] and mode != "greed":
 		var fog_rect := ColorRect.new()
 		fog_rect.position = Vector2.ZERO
 		fog_rect.size = Vector2(1280.0, 720.0)
@@ -981,6 +1030,7 @@ func _build_hud() -> void:
 	score_name_labels.clear()
 	score_tag_labels.clear()
 	score_number_labels.clear()
+	score_life_icons.clear()
 	score_portraits.clear()
 	score_frames.clear()
 	score_frame_skulls.clear()
@@ -999,6 +1049,7 @@ func _build_hud() -> void:
 		card.size = Vector2(280, 54)
 		root.add_child(card)
 		var portrait := TextureRect.new()
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait.position = Vector2(card_x[slot] + 6, 13)
 		portrait.size = Vector2(44, 44)
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1006,6 +1057,7 @@ func _build_hud() -> void:
 		portrait.texture = load("res://assets/ui/retrato_mago_coral.png")
 		root.add_child(portrait)
 		var frame := TextureRect.new()
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		frame.position = Vector2(card_x[slot] + 3.0, 10.0)
 		frame.size = Vector2(50.0, 50.0)
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1016,6 +1068,7 @@ func _build_hud() -> void:
 		skull_overlay.visible = false
 		score_frame_skulls.append(skull_overlay)
 		var crown := TextureRect.new()
+		crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		crown.position = Vector2(card_x[slot] + 11, 3)
 		crown.size = Vector2(34, 20)
 		crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1027,9 +1080,23 @@ func _build_hud() -> void:
 		var tag_label := _hud_label(root, Vector2(card_x[slot] + 58, 31), Vector2(158, 22), 13, HORIZONTAL_ALIGNMENT_LEFT)
 		tag_label.add_theme_color_override("font_color", Color("b8a9d1"))
 		var number := _hud_label(root, Vector2(card_x[slot] + 216, 6), Vector2(58, 48), 32, HORIZONTAL_ALIGNMENT_RIGHT)
+		var life_icons: Array[TextureRect] = []
+		for stitch in GameConfig.SURVIVAL_LIVES:
+			var icon := TextureRect.new()
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			var atlas := AtlasTexture.new()
+			atlas.atlas = STITCHES_TEXTURE
+			atlas.region = Rect2(0.0, 0.0, 128.0, 128.0)
+			icon.texture = atlas
+			icon.position = Vector2(card_x[slot] + 209.0 + stitch * 18.0, 15.0)
+			icon.size = Vector2(24.0, 24.0)
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			root.add_child(icon)
+			life_icons.append(icon)
 		score_name_labels.append(name_label)
 		score_tag_labels.append(tag_label)
 		score_number_labels.append(number)
+		score_life_icons.append(life_icons)
 		score_portraits.append(portrait)
 		score_frames.append(frame)
 		score_crowns.append(crown)
@@ -1046,6 +1113,7 @@ func _build_hud() -> void:
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
 	root.add_child(timer)
 	var slot_texture := TextureRect.new()
+	slot_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	slot_texture.name = "SpellSlot"
 	slot_texture.texture = SPELL_SLOT_TEXTURE
 	slot_texture.position = Vector2(12, 626)
@@ -1054,6 +1122,7 @@ func _build_hud() -> void:
 	slot_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	root.add_child(slot_texture)
 	var glow := TextureRect.new()
+	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	glow.name = "SpellGlow"
 	glow.texture = SPELL_GLOW_TEXTURE
 	glow.position = Vector2(12, 626)
@@ -1064,6 +1133,7 @@ func _build_hud() -> void:
 	glow.visible = false
 	root.add_child(glow)
 	var spell_icon := TextureRect.new()
+	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_icon.name = "SpellIcon"
 	spell_icon.position = Vector2(31, 645)
 	spell_icon.size = Vector2(42, 42)
@@ -1072,6 +1142,7 @@ func _build_hud() -> void:
 	spell_icon.visible = false
 	root.add_child(spell_icon)
 	var spell_key := TextureRect.new()
+	spell_key.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_key.name = "SpellKey"
 	spell_key.texture = SPELL_KEY_E_TEXTURE
 	spell_key.position = Vector2(65, 675)
@@ -1096,6 +1167,7 @@ func _build_hud() -> void:
 	notice.visible = false
 	root.add_child(notice)
 	var notice_icon := TextureRect.new()
+	notice_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	notice_icon.name = "SpellNoticeIcon"
 	notice_icon.position = Vector2(10, 12)
 	notice_icon.size = Vector2(58, 58)
@@ -1157,6 +1229,7 @@ func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -
 	_label(root, I18n.t("time_up"), Vector2(0, 285), 64, GameConfig.GOLD, true)
 
 func _show_results() -> void:
+	Fx.clear_text()
 	Sfx.fanfare()
 	_clear_hud()
 	state = "results"
@@ -1166,6 +1239,7 @@ func _show_results() -> void:
 	results_emote_cooldown = 0.0
 	var root := _new_overlay()
 	var backdrop := TextureRect.new()
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	backdrop.texture = load("res://assets/ui/resultados_fondo.png")
 	backdrop.size = Vector2(1280.0, 720.0)
 	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1174,6 +1248,7 @@ func _show_results() -> void:
 	root.add_child(backdrop)
 	root.move_child(backdrop, 0)
 	var podium := TextureRect.new()
+	podium.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	podium.texture = load("res://assets/ui/podio.png")
 	podium.position = Vector2(280.0, 413.0)
 	podium.size = Vector2(720.0, 267.0)
@@ -1188,6 +1263,7 @@ func _show_results() -> void:
 		var place := place_index + 1
 		var center: Vector2 = GameConfig.RESULTS_PODIUM_TOPS.get(place, Vector2(1100.0, 602.0))
 		var sprite := TextureRect.new()
+		sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		sprite.name = "ResultCharacter%d" % place_index
 		sprite.position = center - Vector2(GameConfig.RESULTS_CHARACTER_SIZE.x * 0.5, GameConfig.RESULTS_CHARACTER_SIZE.y)
 		sprite.size = GameConfig.RESULTS_CHARACTER_SIZE
@@ -1212,9 +1288,23 @@ func _show_results() -> void:
 		root.add_child(plaque)
 		var name_label := _hud_label(plaque, Vector2(8.0, 0.0), Vector2(120.0, 48.0), 17, HORIZONTAL_ALIGNMENT_LEFT)
 		name_label.text = String(player.get("name", ""))
-		var medal_text := _hud_label(plaque, Vector2(0,48), Vector2(192,24), 18, HORIZONTAL_ALIGNMENT_CENTER)
-		medal_text.text = "★".repeat(player.get("medals", []).size())
+		var medals: Array = player.get("medals", [])
+		var medal_row_width := float(medals.size()) * 24.0
+		for medal_index in medals.size():
+			var medal_id := GameConfig.MEDAL_IDS.find(str(medals[medal_index]))
+			if medal_id < 0: continue
+			var medal_icon := TextureRect.new()
+			medal_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			var medal_atlas := AtlasTexture.new()
+			medal_atlas.atlas = MEDALS_TEXTURE
+			medal_atlas.region = Rect2(medal_id * 128.0, 0.0, 128.0, 128.0)
+			medal_icon.texture = medal_atlas
+			medal_icon.position = Vector2((192.0 - medal_row_width) * 0.5 + medal_index * 24.0, 49.0)
+			medal_icon.size = Vector2(24.0, 24.0)
+			medal_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			plaque.add_child(medal_icon)
 		var coin_icon := TextureRect.new()
+		coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		var coin_atlas := AtlasTexture.new()
 		coin_atlas.atlas = COIN_TEXTURE
 		coin_atlas.region = Rect2(0.0, 0.0, 64.0, 64.0)
@@ -1229,6 +1319,7 @@ func _show_results() -> void:
 		score_label.add_theme_color_override("font_color", GameConfig.GOLD)
 		if place == 1:
 			var crown := TextureRect.new()
+			crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			crown.texture = load("res://assets/characters/crown.png")
 			crown.position = center + Vector2(-24.0, -GameConfig.RESULTS_CHARACTER_SIZE.y - 30.0)
 			crown.size = Vector2(48.0, 32.0)
@@ -1243,9 +1334,12 @@ func _show_results() -> void:
 	progress.max_value = GameConfig.PROFILE_XP_PER_LEVEL
 	root.add_child(progress)
 	var start_xp := Profile.xp - results_xp
+	var level_label := _hud_label(root, Vector2(390, 115), Vector2(500, 30), 18, HORIZONTAL_ALIGNMENT_CENTER)
+	level_label.text = "%s · %d/%d XP" % [I18n.t("unlock_level") % Profile.level(), posmod(Profile.xp, GameConfig.PROFILE_XP_PER_LEVEL), GameConfig.PROFILE_XP_PER_LEVEL]
 	var xp_tween := progress.create_tween()
 	xp_tween.tween_method(func(value: float):
 		progress.value = int(value) % GameConfig.PROFILE_XP_PER_LEVEL
+		level_label.text = "%s · %d/%d XP" % [I18n.t("unlock_level") % mini(GameConfig.PROFILE_MAX_LEVEL, floori(value / GameConfig.PROFILE_XP_PER_LEVEL) + 1), posmod(int(value), GameConfig.PROFILE_XP_PER_LEVEL), GameConfig.PROFILE_XP_PER_LEVEL]
 		var tick := int(value) / 10
 		if tick != int(progress.get_meta("tick", -1)):
 			progress.set_meta("tick",tick)
@@ -1256,14 +1350,16 @@ func _show_results() -> void:
 			Sfx.fanfare()
 	, float(start_xp), float(Profile.xp), 1.5)
 	var main_button := _button(root, I18n.t("main_menu"), Vector2(0.0, 600.0), _build_menu)
-	main_button.position = Vector2(920.0, 632.0)
-	main_button.size = Vector2(170.0, 54.0)
+	main_button.position = GameConfig.RESULTS_MAIN_BUTTON_POSITION
+	main_button.size = GameConfig.RESULTS_MAIN_BUTTON_SIZE
+	main_button.add_theme_font_size_override("font_size", GameConfig.RESULTS_BUTTON_FONT_SIZE)
 	var again_button := _button(root, I18n.t("again"), Vector2(0.0, 600.0), func():
 		if network_match: Net.lobby_action.rpc_id(1, "rematch")
 		else: _build_online()
 	)
-	again_button.position = Vector2(1100.0, 632.0)
-	again_button.size = Vector2(150.0, 54.0)
+	again_button.position = GameConfig.RESULTS_AGAIN_BUTTON_POSITION
+	again_button.size = GameConfig.RESULTS_AGAIN_BUTTON_SIZE
+	again_button.add_theme_font_size_override("font_size", GameConfig.RESULTS_BUTTON_FONT_SIZE)
 	main_button.grab_focus()
 	result_bot_emote_at.clear()
 	for player in results_ranking:
@@ -1306,6 +1402,7 @@ func _build_result_emote_bar(root: Control) -> void:
 
 func _result_emote_icon(emote_id: String) -> TextureRect:
 	var icon := TextureRect.new()
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	var atlas := AtlasTexture.new()
 	atlas.atlas = load("res://assets/ui/emotes.png")
 	var ids := ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
@@ -1376,6 +1473,7 @@ func _add_unlock_card(root: Control, unlock: Dictionary) -> void:
 	title.text = I18n.t("unlock_new")
 	if String(unlock.type) == "frame":
 		var frame := TextureRect.new()
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		frame.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if String(unlock.id) == "calavera" else unlock.id))
 		frame.position = Vector2(80, 35)
 		frame.size = Vector2(68, 68)
@@ -1422,6 +1520,7 @@ func _end_match_cleanup() -> void:
 	score_name_labels.clear()
 	score_tag_labels.clear()
 	score_number_labels.clear()
+	score_life_icons.clear()
 	score_portraits.clear()
 	score_frames.clear()
 	score_frame_skulls.clear()
@@ -1466,7 +1565,7 @@ func _draw() -> void:
 		for team in 2:
 			var base: Vector2 = GameConfig.TEAM_BASES[team]
 			draw_arc(base,GameConfig.TEAM_DEPOSIT_RADIUS,0,TAU,48,GameConfig.COLORS[team],2,true)
-			var chest: Texture2D = load("res://assets/items/cofre_equipo_%s.png" % ["coral","azul"][team])
+			var chest: Texture2D = TEAM_CHEST_TEXTURES[team]
 			var frame_size := Vector2(chest.get_width() / 2.0,chest.get_height())
 			var depositing := false
 			for player in players:
@@ -1506,7 +1605,7 @@ func _draw() -> void:
 			draw_string(floating_coin_font,pos + Vector2(-25,-80),str(player.coins),HORIZONTAL_ALIGNMENT_CENTER,50,24,GameConfig.GOLD)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
-				var texture: Texture2D = load("res://assets/ui/costuras.png")
+				var texture: Texture2D = STITCHES_TEXTURE
 				draw_texture_rect_region(texture,Rect2(pos + Vector2(-30 + stitch * 20,-75),Vector2(20,20)),Rect2(0 if stitch < int(player.lives) else 128,0,128,128))
 		if int(player.combo) > 0:
 			var combo_left := clampf(1.0 - (elapsed - float(player.last_pickup)) / GameConfig.COMBO_WINDOW, 0, 1)
@@ -1808,8 +1907,7 @@ func _animate_score(label: Label, old_value: int, value: int) -> void:
 	label.add_theme_color_override("font_color", GameConfig.BONE_TEXT if tint == GameConfig.GOLD else tint)
 	var tween := label.create_tween().set_parallel(true)
 	label.set_meta("score_tween", tween)
-	if value > old_value and not Settings.reduce_motion: tween.tween_interval(GameConfig.JUICE_FLIGHT_SECONDS)
-	tween.tween_method(func(display_value: float): label.text = str(roundi(display_value)), float(old_value), float(value), 0.3)
+	tween.tween_method(func(display_value: float): label.text = str(roundi(display_value)), float(old_value), float(value), 0.3).set_delay(GameConfig.JUICE_FLIGHT_SECONDS if value > old_value and not Settings.reduce_motion else 0.0)
 	tween.tween_method(func(color: Color): label.add_theme_color_override("font_color", color), tint, GameConfig.BONE_TEXT, 0.35)
 	if not Settings.reduce_motion:
 		label.scale = Vector2.ONE * 1.24

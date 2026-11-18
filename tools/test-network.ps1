@@ -1,4 +1,4 @@
-param([string]$Engine = "$PSScriptRoot/../build/Godot_v4.7.2-stable_win64_console.exe")
+param([string]$Engine = "$PSScriptRoot/../build/Godot_v4.7.2-stable_win64_console.exe", [ValidateSet('voodoo','survival','greed')][string]$Mode = 'voodoo')
 $ErrorActionPreference = 'Stop'
 $projectPath = (Resolve-Path "$PSScriptRoot/..").Path
 $env:APPDATA = Join-Path $projectPath '.godot-appdata'
@@ -13,7 +13,7 @@ try {
     $processes += $server
     Start-Sleep -Milliseconds 700
     foreach ($role in @('create', 'guest1', 'guest2', 'guest3', 'extra')) {
-        $client = Start-Process -FilePath $Engine -WorkingDirectory $projectPath -ArgumentList "--headless --path . --script res://tests/test_network_match.gd -- $role" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logPath/$role.log" -RedirectStandardError "$logPath/$role.err"
+        $client = Start-Process -FilePath $Engine -WorkingDirectory $projectPath -ArgumentList "--headless --path . --script res://tests/test_network_match.gd -- $role $Mode" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logPath/$role.log" -RedirectStandardError "$logPath/$role.err"
         $processes += $client
         if ($role -eq 'create') {
             for ($attempt = 0; $attempt -lt 30 -and -not (Test-Path -LiteralPath $codePath); $attempt++) { Start-Sleep -Milliseconds 100 }
@@ -38,6 +38,9 @@ try {
     $errors = Get-Content "$logPath/server.err"
     if ($errors -match 'SCRIPT ERROR|ERROR:') { throw ($errors -join [Environment]::NewLine) }
     'Four ENet clients agree; fifth rejected; social, vote, input clamp and full match passed.'
+    $results = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/results'
+    if ($results.Count -lt 1 -or $results[0].mode -ne $Mode) { throw 'HTTP results missing or wrong mode' }
+    "HTTP result verified: $Mode"
 } finally {
     foreach ($process in $processes) { if (-not $process.HasExited) { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue } }
 }

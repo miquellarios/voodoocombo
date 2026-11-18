@@ -11,12 +11,15 @@ var saw_social := false
 var sequence := 0
 var input_clock := 0.0
 var code_path := "res://.godot-tmp/test-room-code.txt"
+var test_mode := "voodoo"
+var mode_sent := false
 
 func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
 	role = OS.get_cmdline_user_args()[0]
+	if OS.get_cmdline_user_args().size() > 1: test_mode = OS.get_cmdline_user_args()[1]
 	net = root.get_node("Net")
 	net.connected.connect(func():
 		if role == "create": net.create_room.rpc_id(1, "Host", "mago", {}, GameConfig.NET_VERSION)
@@ -42,6 +45,9 @@ func _room(value: Dictionary) -> void:
 	if role == "create":
 		var file := FileAccess.open(code_path, FileAccess.WRITE)
 		file.store_string(str(room.code))
+		if not mode_sent:
+			mode_sent = true
+			net.lobby_action.rpc_id(1, "mode", {"mode":test_mode})
 	if room.phase == "voting" and not vote_sent:
 		vote_sent = true
 		var slot := 0

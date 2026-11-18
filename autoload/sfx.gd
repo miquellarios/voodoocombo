@@ -18,6 +18,14 @@ func _ready() -> void:
 		layers.append(layer)
 		layer.play()
 
+func _exit_tree() -> void:
+	for layer in layers:
+		layer.stop()
+		layer.stream = null
+	if is_instance_valid(player):
+		player.stop()
+		player.stream = null
+
 func _music_loop(layer: int) -> AudioStreamWAV:
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
