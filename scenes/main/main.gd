@@ -102,6 +102,7 @@ var challenges: Array[String] = []
 var round_number := 1
 var round_wait := 0.0
 var sudden_death := false
+var team_scores: Array[int] = [0,0]
 
 func _build_online() -> void:
 	_clear_hud()
@@ -383,6 +384,9 @@ func _handle_events(events: Array) -> void:
 			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
+			"deposit":
+				Fx.fly_coin(event.pos + OFFSET, event.base + OFFSET)
+				Sfx.play_tone(420,0.04)
 			"round_over":
 				Fx.pop(I18n.t("round") % int(event.next_round), Vector2(640,300), GameConfig.EMBER)
 			"round_started":
@@ -539,6 +543,12 @@ func _start_countdown() -> void:
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
 	if state == "playing" and not players.is_empty(): Sfx.music(int(players[local_player].combo), frenzy_notified, remaining)
+	if mode == "greed":
+		var teams := hud_root.get_node_or_null("Teams") as Label
+		if teams == null:
+			teams = _hud_label(hud_root,Vector2(430,80),Vector2(420,40),26,HORIZONTAL_ALIGNMENT_CENTER)
+			teams.name = "Teams"
+		teams.text = "● %d     ◆ %d" % [team_scores[0],team_scores[1]]
 	if state == "playing" and remaining <= 5 and ceili(remaining) != tension_second:
 		tension_second = ceili(remaining)
 		Fx.pop(str(tension_second), Vector2(640,330), GameConfig.EMBER)
@@ -1449,6 +1459,16 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(Vector2.ZERO, GameConfig.ARENA_SIZE), Color("2b3a2a"))
 	_draw_arena_hazards()
+	if mode == "greed":
+		for team in 2:
+			var base: Vector2 = GameConfig.TEAM_BASES[team]
+			draw_arc(base,GameConfig.TEAM_DEPOSIT_RADIUS,0,TAU,48,GameConfig.COLORS[team],2,true)
+			var chest: Texture2D = load("res://assets/items/cofre_equipo_%s.png" % ["coral","azul"][team])
+			var frame_size := Vector2(chest.get_width() / 2.0,chest.get_height())
+			var depositing := false
+			for player in players:
+				if int(player.team) == team and player.coins > 0 and player.pos.distance_to(base) <= GameConfig.TEAM_DEPOSIT_RADIUS: depositing = true
+			draw_texture_rect_region(chest,Rect2(base - Vector2(44,54),Vector2(88,88)),Rect2(Vector2(frame_size.x if depositing else 0,0),frame_size))
 	for trail in dash_trails:
 		var alpha := clampf(float(trail.time) / GameConfig.DASH_TRAIL_LIFETIME, 0.0, 1.0)
 		var color: Color = trail.color
@@ -1479,6 +1499,8 @@ func _draw() -> void:
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
+		if mode == "greed" and int(player.coins) > 0:
+			draw_string(floating_coin_font,pos + Vector2(-25,-80),str(player.coins),HORIZONTAL_ALIGNMENT_CENTER,50,24,GameConfig.GOLD)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
 				var texture: Texture2D = load("res://assets/ui/costuras.png")
@@ -1499,6 +1521,7 @@ func _draw() -> void:
 		var sheet: Texture2D = character_sheets.get("%s_%s" % [player.character, player.sprite_color])
 		if sheet != null:
 			var sprite_scale := 0.37
+			if mode == "greed": sprite_scale *= TeamRules.scale_for(int(player.coins))
 			var face_left: bool = player.dash_dir.x < -0.1 if player.dash_left > 0.0 else player.vel.x < -0.1
 			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale) * Fx.squash_scale(i))
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height), Color(1,1,1,0.35) if bool(player.get("ghost",false)) else Color.WHITE)

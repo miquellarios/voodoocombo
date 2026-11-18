@@ -307,3 +307,7 @@ Formato de cada entrada:
 - Tres costuras, fantasma sin colisión ni acciones, daño común, Costura Extra, zona de cinco pasos y muerte súbita, rondas con nueva arena y victoria al ganar dos. Bots persiguen rivales y huyen con una costura; vista recibe rondas por eventos fiables.
 - Test de tres impactos, cambio de arena, dos rondas ganadas y zona mínima pasa. Corregida llamada antigua del test local tras retirar Clásico y ubicación de predicción de fantasmas; regresión local pasa.
 - Humanos: partida completa en las cuatro arenas, empates a tiempo, espectador fantasma y cambio de arena en red.
+
+### Fase 12k — Codicia 2v2
+- Equipos de dos, cuarenta doblones, valor sin multiplicador, carga que frena/agranda, depósito progresivo protegido, caída de toda la carga y bloqueo de daño aliado. Bots regresan al cofre y protegen al compañero; hechizos eligen rivales.
+- Tests de cofre correcto, banco protegido, daño aliado y velocidad x0,6 pasan; regresión local pasa. Humanos: equipo contra equipo en red, comprobar anillo/Frenesí y robar antes de depositar.

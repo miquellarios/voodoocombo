@@ -34,6 +34,7 @@ var round_config: Dictionary = {}
 var round_number := 1
 var round_wait := 0.0
 var sudden_death := false
+var team_scores: Array[int] = [0,0]
 
 func setup(config: Dictionary) -> void:
 	round_config = config.duplicate(true)
@@ -43,7 +44,8 @@ func setup(config: Dictionary) -> void:
 	seed_value = int(config.get("seed", 1))
 	rng.seed = seed_value
 	mode = str(config.get("mode", "voodoo"))
-	arena = ArenaGen.generate(seed_value, str(config.get("previous_arena", "")), str(config.get("arena_id", "")))
+	arena = ArenaGen.generate(seed_value, str(config.get("previous_arena", "")), str(config.get("arena_id", "")), GameConfig.TEAM_STARTING_COINS if mode == "greed" else GameConfig.STARTING_COINS)
+	team_scores = [0,0]
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
 	player_hitbox_rects = _get_obstacle_hitboxes(arena.get("obstacles", []))
 	players.clear()
@@ -77,6 +79,12 @@ func setup(config: Dictionary) -> void:
 		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1, "zone_drain_left": GameConfig.ZONE_DRAIN_INTERVAL})
 		players[i].is_bot = bool(entry.get("is_bot", i > 0))
 		players[i]["peer_id"] = int(entry.get("peer_id", i + 1))
+		players[i]["team"] = clampi(int(entry.get("team", i / 2)),0,1)
+		players[i]["deposit_left"] = 0.0
+		players[i]["deposited"] = 0
+		if mode == "greed":
+			players[i].sprite_color = ["coral","azul"][players[i].team]
+			players[i].color = GameConfig.COLORS[players[i].team]
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 	achievements.setup(players.size())
@@ -117,13 +125,14 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 	bots_dash_global_left = maxf(0.0, bots_dash_global_left - delta)
 	elapsed += delta
 	remaining = maxf(0.0, remaining - delta)
-	if not frenzy_notified and mode == "voodoo" and remaining <= GameConfig.FRENZY_SECONDS:
+	if not frenzy_notified and mode in ["voodoo","greed"] and remaining <= GameConfig.FRENZY_SECONDS:
 		frenzy_notified = true
 		events.append({"type": "frenzy_started"})
 		_pop(_message("frenzy"), Vector2(640, 150), GameConfig.GOLD)
 		_tone(520.0, 0.35)
 	var target := GameConfig.FRENZY_COIN_TARGET if remaining <= GameConfig.FRENZY_SECONDS else GameConfig.COIN_RESPAWN_THRESHOLD
 	if mode == "voodoo" and int(elapsed / GameConfig.COIN_RESPAWN_INTERVAL) != int((elapsed - delta) / GameConfig.COIN_RESPAWN_INTERVAL) and coins.size() < target: _spawn_coin()
+	if mode == "greed" and coins.size() < GameConfig.TEAM_RESPAWN_THRESHOLD and int(elapsed / GameConfig.TEAM_RESPAWN_SECONDS) != int((elapsed - delta) / GameConfig.TEAM_RESPAWN_SECONDS): _spawn_coin()
 	for coin in coins: coin.lock = maxf(0.0, coin.lock - delta)
 	_update_opened_chests(delta)
 	var chest_interval := GameConfig.SURVIVAL_CHEST_SECONDS if mode == "survival" else 8.0
@@ -139,6 +148,7 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 	_separate_players()
 	_update_safe_zone(delta)
 	_update_pickups()
+	if mode == "greed": _deposit(delta)
 	_update_roll(delta)
 	if not halfway_recorded and remaining <= initial_duration * 0.5:
 		halfway_recorded = true
@@ -169,6 +179,7 @@ func snapshot() -> Dictionary:
 	result["round_number"] = round_number
 	result["round_wait"] = round_wait
 	result["sudden_death"] = sudden_death
+	result["team_scores"] = team_scores.duplicate()
 	return result
 
 func pop_events() -> Array[Dictionary]:
@@ -201,6 +212,11 @@ func _finish_match(winner_peer: int = 0) -> void:
 	var ranking := MatchRanking.rank(active)
 	if mode == "survival":
 		ranking.sort_custom(func(a: Dictionary,b: Dictionary): return int(a.round_wins) > int(b.round_wins) if a.round_wins != b.round_wins else int(a.lives) > int(b.lives))
+	elif mode == "greed":
+		ranking.sort_custom(func(a: Dictionary,b: Dictionary):
+			if team_scores[int(a.team)] != team_scores[int(b.team)]: return team_scores[int(a.team)] > team_scores[int(b.team)]
+			return int(a.team) < int(b.team) if a.team != b.team else int(a.deposited) > int(b.deposited)
+		)
 	if winner_peer != 0:
 		for index in ranking.size():
 			if int(ranking[index].peer_id) == winner_peer:
@@ -250,6 +266,7 @@ func _update_player(index: int, delta: float) -> void:
 		player.dash_dir = direction
 	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
 	var speed := GameConfig.PLAYER_SPEED * (1.6 if SpellRules.is_active(player, "boots") else 1.0) * _terrain_speed(player.pos) * zone_speed
+	if mode == "greed": speed *= TeamRules.speed(int(player.coins))
 	if SpellRules.is_active(player, "sheep"): speed *= 0.6
 	var motion: Vector2
 	if player.dash_left > 0.0:
@@ -297,6 +314,29 @@ func _update_bot(index: int, delta: float) -> void:
 		for chest in chests:
 			chest_positions.append(chest)
 	var direction := BotBrain.next_direction(player, coin_positions, chest_positions, arena, players, index, delta, elapsed, rng)
+	if mode == "greed":
+		var goal: Vector2 = player.pos
+		var force_goal := false
+		var enemy := -1
+		var nearest := INF
+		for other in players.size():
+			if players[other].team == player.team or bool(players[other].get("disconnected",false)): continue
+			var distance: float = player.pos.distance_to(players[other].pos)
+			if distance < nearest: nearest = distance; enemy = other
+		if int(player.coins) >= 6 + index or (player.coins > 0 and nearest < 120):
+			goal = GameConfig.TEAM_BASES[int(player.team)]
+			force_goal = true
+		elif enemy >= 0 and nearest < 160 and int(players[enemy].coins) > int(player.coins):
+			goal = players[enemy].pos
+			force_goal = true
+		else:
+			for ally in players:
+				if ally != player and ally.team == player.team and int(ally.coins) >= 8:
+					goal = ally.pos
+					force_goal = true
+		if force_goal:
+			var goals: Array[Vector2] = [goal]
+			direction = BotBrain.next_direction(player,goals,[],arena,players,index,delta,elapsed,rng)
 	if mode == "survival":
 		var target := -1
 		var nearest := INF
@@ -332,6 +372,7 @@ func _update_bot(index: int, delta: float) -> void:
 		player.bot_dash_target = -1
 	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
 	var speed_scale := (0.6 if SpellRules.is_active(player, "sheep") else (1.6 if SpellRules.is_active(player, "boots") else 1.0)) * _terrain_speed(player.pos) * zone_speed
+	if mode == "greed": speed_scale *= TeamRules.speed(int(player.coins))
 	var movement: Vector2 = player.dash_dir
 	if player.dash_left <= 0.0:
 		movement = direction
@@ -370,6 +411,7 @@ func _update_pickups() -> void:
 			player.combo = Scoring.next_combo(player.combo, elapsed - player.last_pickup)
 			player.max_combo = maxi(player.max_combo, player.combo)
 			value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, SpellRules.is_active(player, "ring"))
+			if mode == "greed": value = TeamRules.coin_value(remaining <= GameConfig.FRENZY_SECONDS, SpellRules.is_active(player,"ring"))
 			player.coins += value
 			player.score = player.coins
 			player.last_pickup = elapsed
@@ -402,6 +444,7 @@ func _update_dash_hits() -> void:
 		if players[i].dash_left <= 0.0: continue
 		for j in range(players.size()):
 			if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
+			if mode == "greed" and players[j].team == players[i].team: continue
 			var distance: float = players[i].pos.distance_to(players[j].pos)
 			if i != j and distance > GameConfig.PLAYER_RADIUS * 2 and distance <= GameConfig.PLAYER_RADIUS * 2 + GameConfig.MEDAL_NEAR_PIXELS: events.append({"type": "near_miss", "player": j})
 			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > GameConfig.PLAYER_RADIUS * 2.0: continue
@@ -436,6 +479,7 @@ func _update_dash_hits() -> void:
 
 
 func _update_safe_zone(delta: float) -> void:
+	if mode == "greed": return
 	if mode == "survival":
 		safe_zone_step = GameConfig.SURVIVAL_ZONE_STEPS if sudden_death else mini(GameConfig.SURVIVAL_ZONE_STEPS, int(elapsed / GameConfig.SURVIVAL_ZONE_SECONDS))
 		for index in players.size():
@@ -505,6 +549,11 @@ func _random_position_in_safe_zone() -> Vector2:
 
 func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum: int, maximum: int, stun_seconds: float, text_key: String = "trap_zap") -> Dictionary:
 	if bool(players[victim_index].get("ghost", false)): return {"applied":false,"blocked":false}
+	if mode == "greed":
+		if attacker_index >= 0 and players[victim_index].team == players[attacker_index].team: return {"applied":false,"blocked":false}
+		fraction = 1.0
+		minimum = 0
+		maximum = int(players[victim_index].coins)
 	var previous_combo := int(players[victim_index].combo)
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
 	if result.blocked:
@@ -819,13 +868,13 @@ func _cast_instant_spell(index: int) -> void:
 		"frost":
 			for j in range(players.size()):
 				if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
-				if j == index or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
+				if j == index or (mode == "greed" and players[j].team == player.team) or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
 				if SpellRules.is_active(players[j], "cloak"):
 					players[j].item = ""
 					players[j].item_time = 0.0
 				else: players[j].stun = GameConfig.SPELL_FROST_SECONDS
 		"sheep":
-			var leader := _leader_index()
+			var leader := _spell_target(index)
 			if leader != index:
 				if SpellRules.is_active(players[leader], "cloak"):
 					players[leader].item = ""
@@ -839,6 +888,7 @@ func _cast_instant_spell(index: int) -> void:
 			var best := GameConfig.SPELL_PIN_RANGE * GameConfig.SPELL_PIN_RANGE
 			for j in range(players.size()):
 				if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
+				if mode == "greed" and players[j].team == player.team: continue
 				if j != index and player.pos.distance_squared_to(players[j].pos) < best:
 					best = player.pos.distance_squared_to(players[j].pos)
 					target = j
@@ -1020,6 +1070,33 @@ func _check_survival_round() -> void:
 			if int(players[index].lives) == maximum: leaders.append(index)
 		if leaders.size() == 1: _finish_round(leaders[0])
 		else: sudden_death = true
+
+func _spell_target(caster: int) -> int:
+	var best := caster
+	var maximum := -1
+	for index in players.size():
+		if index == caster or bool(players[index].ghost) or bool(players[index].get("disconnected",false)): continue
+		if mode == "greed" and players[index].team == players[caster].team: continue
+		var value := int(players[index].lives) if mode == "survival" else int(players[index].coins)
+		if value > maximum: maximum = value; best = index
+	return best
+
+func _deposit(delta: float) -> void:
+	for index in players.size():
+		var player: Dictionary = players[index]
+		if bool(player.get("disconnected",false)) or int(player.coins) <= 0: continue
+		var base: Vector2 = GameConfig.TEAM_BASES[int(player.team)]
+		if player.pos.distance_to(base) > GameConfig.TEAM_DEPOSIT_RADIUS:
+			player.deposit_left = 0.0
+			continue
+		player.deposit_left -= delta
+		while player.deposit_left <= 0 and player.coins > 0:
+			player.deposit_left += GameConfig.TEAM_DEPOSIT_SECONDS
+			player.coins -= 1
+			player.score = player.coins
+			player.deposited += 1
+			team_scores[int(player.team)] += 1
+			events.append({"type":"deposit","player":index,"team":player.team,"pos":player.pos,"base":base,"value":1})
 
 func _finish_round(winner: int) -> void:
 	if round_wait > 0 or finished: return

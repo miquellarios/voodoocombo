@@ -56,6 +56,7 @@ func _move(position: Vector2, move: Vector2, delta: float, dashing: bool) -> Vec
 		return (position + move.limit_length() * delta * GameConfig.PLAYER_SPEED * GameConfig.SURVIVAL_GHOST_SPEED).clamp(Vector2.ZERO,GameConfig.ARENA_SIZE)
 	if float(player.stun) > 0 or float(player.rooted_left) > 0: return position
 	var speed := GameConfig.PLAYER_SPEED
+	if state.mode == "greed": speed *= TeamRules.speed(int(player.coins))
 	if SpellRules.is_active(player, "boots"): speed *= 1.6
 	if SpellRules.is_active(player, "sheep"): speed *= 0.6
 	if not ZoneRules.is_inside(position, int(state.safe_zone_step)): speed *= GameConfig.ZONE_SPEED_MULTIPLIER

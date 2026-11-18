@@ -6,7 +6,7 @@ const H := 15
 const SIZE := 40.0
 const DATA_PATH := "res://assets/arenas/arenas.json"
 
-static func generate(seed_value: int, previous_arena_id: String = "", arena_id: String = "") -> Dictionary:
+static func generate(seed_value: int, previous_arena_id: String = "", arena_id: String = "", coin_count: int = GameConfig.STARTING_COINS) -> Dictionary:
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
 	if not data is Dictionary or not data.has("arenas"):
 		push_error("No se pudo cargar %s" % DATA_PATH)
@@ -39,7 +39,7 @@ static func generate(seed_value: int, previous_arena_id: String = "", arena_id: 
 	for point in spawn_set:
 		spawns.append(Vector2(float(point[0]), float(point[1])))
 	_shuffle_points(spawns, rng)
-	var coins := coin_positions(rng, map_data, GameConfig.STARTING_COINS)
+	var coins := coin_positions(rng, map_data, coin_count)
 	return {
 		"seed": seed_value,
 		"biome": posmod(seed_value, 4),

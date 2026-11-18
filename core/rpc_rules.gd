@@ -26,6 +26,7 @@ static func valid(action: String, data: Dictionary, level: int = 1) -> bool:
 		"cosmetics": return data.get("character") is String and data.get("cosmetics") is Dictionary and cosmetics_valid(data.cosmetics, level)
 		"mode": return data.get("mode") is String
 		"bots": return data.get("count") is int
+		"team": return data.get("index") is int
 		"vote": return data.get("arena") is String
 		"social": return data.get("item") is String and (data.item == "stop" or (GameConfig.SOCIAL_LEVELS.has(data.item) and int(GameConfig.SOCIAL_LEVELS[data.item]) <= level))
 		"input": return data.get("seq") is int and data.get("move") is Vector2 and data.move.is_finite() and data.get("dash") is bool and data.get("spell") is bool

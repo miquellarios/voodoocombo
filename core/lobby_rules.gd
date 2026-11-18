@@ -13,14 +13,25 @@ static func apply(room: Dictionary, sender: int, action: String, data: Dictionar
 			if sender != int(room.host): return false
 			room.bots = clampi(int(data.get("count", 0)), 0, GameConfig.ROOM_CAPACITY - room.players.size())
 		"mode":
-			if sender != int(room.host) or not data.get("mode") in ["voodoo", "survival"]: return false
+			if sender != int(room.host) or not data.get("mode") in ["voodoo", "survival", "greed"]: return false
 			room.mode = data.mode
+			if room.mode == "greed": room.bots = 4 - room.players.size()
 			for player: Dictionary in room.players: player.ready = false
 		"cosmetics":
 			var character: String = str(data.get("character", ""))
 			if not character in ["mago", "trol", "gnomo", "nigro"]: return false
 			room.players[index].character = character
 			room.players[index].cosmetics = data.get("cosmetics", {}).duplicate(true)
+		"team":
+			if sender != int(room.host): return false
+			var target := int(data.get("index",-1))
+			if target < 0 or target >= room.players.size(): return false
+			var team := int(room.players[target].get("team",target / 2))
+			for other in room.players.size():
+				if other != target and int(room.players[other].get("team",other / 2)) != team:
+					room.players[other]["team"] = team
+					break
+			room.players[target]["team"] = 1 - team
 		_: return false
 	return true
 
@@ -35,4 +46,10 @@ static func roster(room: Dictionary) -> Array[Dictionary]:
 	for player: Dictionary in room.players: players.append(player.duplicate(true))
 	for index in int(room.bots):
 		players.append({"peer_id": -index - 1, "name": "Bot %d" % (index + 1), "character": ["mago", "trol", "gnomo", "nigro"][players.size()], "is_bot": true, "ready": true, "cosmetics": {}})
+	var counts := [0,0]
+	for index in players.size():
+		var team := clampi(int(players[index].get("team",index / 2)),0,1)
+		if counts[team] >= 2: team = 1 - team
+		players[index]["team"] = team
+		counts[team] += 1
 	return players
