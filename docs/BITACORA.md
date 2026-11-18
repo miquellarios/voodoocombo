@@ -270,3 +270,7 @@ Formato de cada entrada:
 ### Fase 12a — Golpes y recogida
 - Actualizadas instrucciones a fase 12. Fx gestiona parón visual proporcional, chispas, aplastamiento y vibración; la simulación no se detiene. Sacudida amortiguada y zoom corto en golpes fuertes. Ajustes persistentes de destellos y mando.
 - Regresión local pasa. Humanos: comprobar intensidad con mando y reducir movimiento/destellos; verificar que el servidor no ralentiza durante golpes.
+
+### Fase 12b — Doblones al marcador
+- Arcos de recogida y robo hacia las fichas con tic al llegar; tono de recogida por semitonos, limitado a doce pasos. Reducir movimiento sustituye los vuelos por una señal breve en destino.
+- Humanos: comprobar vuelos simultáneos, correspondencia de fichas en clientes distintos y conteo animado del marcador.

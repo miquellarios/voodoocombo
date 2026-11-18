@@ -365,6 +365,13 @@ func _show_simulation_events() -> void:
 func _handle_events(events: Array) -> void:
 	for event: Dictionary in events:
 		Fx.feedback(event, local_player)
+		if event.type == "coin_taken" and int(event.player) < score_number_labels.size():
+			var label := score_number_labels[int(event.player)]
+			Fx.fly_coin(event.pos + OFFSET, label.global_position + label.size * 0.5)
+			Sfx.play_tone(600.0 * pow(2.0, mini(int(event.combo), GameConfig.JUICE_COMBO_PITCH_STEPS) / 12.0), 0.09)
+		if event.type == "player_hit" and int(event.attacker) >= 0 and int(event.dropped) > 0 and score_number_labels.size() > int(event.victim):
+			Fx.fly_coin(score_number_labels[int(event.victim)].global_position, score_number_labels[int(event.attacker)].global_position)
+			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
 			"player_left":
@@ -1746,6 +1753,7 @@ func _animate_score(label: Label, old_value: int, value: int) -> void:
 	label.add_theme_color_override("font_color", GameConfig.BONE_TEXT if tint == GameConfig.GOLD else tint)
 	var tween := label.create_tween().set_parallel(true)
 	label.set_meta("score_tween", tween)
+	if value > old_value and not Settings.reduce_motion: tween.tween_interval(GameConfig.JUICE_FLIGHT_SECONDS)
 	tween.tween_method(func(display_value: float): label.text = str(roundi(display_value)), float(old_value), float(value), 0.3)
 	tween.tween_method(func(color: Color): label.add_theme_color_override("font_color", color), tint, GameConfig.BONE_TEXT, 0.35)
 	if not Settings.reduce_motion:

@@ -31,6 +31,20 @@ func vibrate(strength: float) -> void:
 	if Settings.vibration:
 		for device in Input.get_connected_joypads(): Input.start_joy_vibration(device, strength * 0.5, strength, 0.1)
 
+func fly_coin(from: Vector2, to: Vector2) -> void:
+	if Settings.reduce_motion:
+		sparks(to, GameConfig.GOLD, 2)
+		return
+	var target := _canvas()
+	var flight := {"pos": from}
+	target.flights.append(flight)
+	var tween := create_tween()
+	tween.tween_method(func(t: float): flight.pos = from.lerp(to, t) + Vector2(0, -sin(t * PI) * 70), 0.0, 1.0, GameConfig.JUICE_FLIGHT_SECONDS)
+	tween.tween_callback(func():
+		target.flights.erase(flight)
+		Sfx.play_tone(1200, 0.035)
+	)
+
 func squash_scale(index: int) -> Vector2:
 	if Settings.reduce_motion: return Vector2.ONE
 	return Vector2.ONE.lerp(GameConfig.JUICE_SQUASH, clampf(float(squash.get(index,0)) / GameConfig.JUICE_SQUASH_SECONDS,0,1))
