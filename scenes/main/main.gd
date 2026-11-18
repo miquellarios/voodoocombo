@@ -374,6 +374,22 @@ func _handle_events(events: Array) -> void:
 			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
+			"medal":
+				var index := int(event.player)
+				if index < score_number_labels.size():
+					var badge := TextureRect.new()
+					var atlas := AtlasTexture.new()
+					atlas.atlas = load("res://assets/ui/medallas.png")
+					atlas.region = Rect2(GameConfig.MEDAL_IDS.find(str(event.medal)) * 128,0,128,128)
+					badge.texture = atlas
+					badge.position = score_number_labels[index].global_position + Vector2(0,40)
+					badge.size = Vector2(40,40)
+					badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					hud_root.add_child(badge)
+					var tween := badge.create_tween()
+					tween.tween_interval(GameConfig.JUICE_MEDAL_SECONDS)
+					tween.tween_callback(badge.queue_free)
+					Sfx.play_tone(980,0.12)
 			"combo_lost":
 				Fx.sparks(event.pos + OFFSET, Color("b8a9d1"), 8)
 				Sfx.play_tone(110, 0.06)
@@ -1148,6 +1164,8 @@ func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -
 	for i in range(results_ranking.size()):
 		if results_ranking[i].name == Profile.nick: place = i + 1
 	results_xp = Profile.award_match(place, players[local_player].max_combo)
+	for medal: String in players[local_player].get("medals", []): Profile.medal_totals[medal] = int(Profile.medal_totals.get(medal, 0)) + 1
+	Profile.save()
 	results_awards = server_awards if not server_awards.is_empty() else MatchRanking.awards(players)
 	var directory := "user://matches"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
@@ -1219,6 +1237,8 @@ func _show_results() -> void:
 		root.add_child(plaque)
 		var name_label := _hud_label(plaque, Vector2(8.0, 0.0), Vector2(120.0, 48.0), 17, HORIZONTAL_ALIGNMENT_LEFT)
 		name_label.text = String(player.get("name", ""))
+		var medal_text := _hud_label(plaque, Vector2(0,48), Vector2(192,24), 18, HORIZONTAL_ALIGNMENT_CENTER)
+		medal_text.text = "★".repeat(player.get("medals", []).size())
 		var coin_icon := TextureRect.new()
 		var coin_atlas := AtlasTexture.new()
 		coin_atlas.atlas = COIN_TEXTURE

@@ -5,6 +5,7 @@ var character := "mago"
 var xp := 0
 var games := 0
 var wins := 0
+var medal_totals: Dictionary = {}
 var cosmetics := {"frame": "madera", "trail": "color", "emotes": ["risa", "enfado", "gg", "corazon"]}
 var new_unlocks: Array[Dictionary] = []
 
@@ -14,6 +15,7 @@ var last_arena_id := ""
 func _ready() -> void:
 	var config := ConfigFile.new()
 	if config.load("user://profile.cfg") == OK:
+		medal_totals = config.get_value("profile", "medals", {})
 		nick = str(config.get_value("profile", "nick", nick))
 		character = str(config.get_value("profile", "character", character))
 		xp = int(config.get_value("profile", "xp", 0))
@@ -80,6 +82,7 @@ func _normalize_cosmetics() -> void:
 func save() -> void:
 	_normalize_cosmetics()
 	var config := ConfigFile.new()
+	config.set_value("profile", "medals", medal_totals)
 	config.set_value("profile", "nick", nick)
 	config.set_value("profile", "character", character)
 	config.set_value("profile", "xp", xp)

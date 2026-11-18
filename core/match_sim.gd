@@ -26,6 +26,7 @@ var bots_dash_global_left := 0.0
 var events: Array[Dictionary] = []
 var current_inputs: Array[Dictionary] = []
 var finished := false
+var achievements := MatchAchievements.new()
 
 func setup(config: Dictionary) -> void:
 	seed_value = int(config.get("seed", 1))
@@ -65,9 +66,12 @@ func setup(config: Dictionary) -> void:
 		players[i]["peer_id"] = int(entry.get("peer_id", i + 1))
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
+	achievements.setup(players.size())
+	for player in players: player["medals"] = []
 
 func step(delta: float, inputs: Array[Dictionary]) -> void:
 	if finished or delta <= 0.0 or players.is_empty(): return
+	var event_start := events.size()
 	current_inputs = inputs.duplicate(true)
 	delta = minf(delta, remaining)
 	for index in range(players.size()):
@@ -101,6 +105,7 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 	_update_safe_zone(delta)
 	_update_pickups()
 	_update_roll(delta)
+	events.append_array(achievements.update(players, events.slice(event_start), elapsed))
 	if remaining <= 0.000001:
 		remaining = 0.0
 		_finish_match()
@@ -333,6 +338,8 @@ func _update_dash_hits() -> void:
 		if players[i].dash_left <= 0.0: continue
 		for j in range(players.size()):
 			if bool(players[j].get("disconnected", false)): continue
+			var distance: float = players[i].pos.distance_to(players[j].pos)
+			if i != j and distance > GameConfig.PLAYER_RADIUS * 2 and distance <= GameConfig.PLAYER_RADIUS * 2 + GameConfig.MEDAL_NEAR_PIXELS: events.append({"type": "near_miss", "player": j})
 			if i == j or players[j].invuln > 0.0 or players[i].pos.distance_to(players[j].pos) > GameConfig.PLAYER_RADIUS * 2.0: continue
 			if players[j].dash_left > 0.0:
 				var away: Vector2 = (players[i].pos - players[j].pos).normalized()

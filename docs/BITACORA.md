@@ -278,3 +278,7 @@ Formato de cada entrada:
 ### Fase 12c — Medidor de combo
 - Anillo de tiempo, aura x3 y destellos regulables. Pérdida autoritativa de combo con fragmentos y aviso del combo conseguido.
 - Corregido un tipo no inferible en el ángulo de partículas. Regresión local pasa; humanos: verificar duración de 1,5 s y accesibilidad.
+
+### Fase 12d — Medallas autoritativas
+- Detector puro de medallas, eventos fiables, insignias junto al marcador, recuento de perfil y marcas en podio. Las condiciones se calculan en MatchSim; eventos de cada tick se procesan una sola vez.
+- Test de primera sangre, robo maestro, venganza, intocable y dos picos x3 pasa. Humanos: provocar cada medalla y comparar en red, especialmente rozar un dash y remontar.
