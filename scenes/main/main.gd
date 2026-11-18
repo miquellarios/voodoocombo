@@ -515,6 +515,7 @@ func _start_countdown() -> void:
 
 func _update_hud() -> void:
 	if not is_instance_valid(hud_root): return
+	if state == "playing" and not players.is_empty(): Sfx.music(int(players[local_player].combo), frenzy_notified, remaining)
 	if network_match:
 		var ping := hud_root.get_node_or_null("Ping") as Label
 		if ping == null:
@@ -581,6 +582,7 @@ func _update_hud() -> void:
 		if notice_text: notice_text.text = I18n.t("spell_desc_" + spell_notice_item)
 
 func _build_menu() -> void:
+	Sfx.stop_music()
 	if network_match: Net.leave_server()
 	network_match = false
 	_clear_hud()
@@ -1159,6 +1161,7 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 
 func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -> void:
 	if state in ["match_end", "results"]: return
+	Sfx.stop_music()
 	results_ranking.assign(server_ranking if not server_ranking.is_empty() else MatchRanking.rank(players))
 	var place := 1
 	for i in range(results_ranking.size()):
@@ -1184,6 +1187,7 @@ func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -
 	_label(root, I18n.t("time_up"), Vector2(0, 285), 64, GameConfig.GOLD, true)
 
 func _show_results() -> void:
+	Sfx.fanfare()
 	_clear_hud()
 	state = "results"
 	results_elapsed = 0.0

@@ -282,3 +282,7 @@ Formato de cada entrada:
 ### Fase 12d — Medallas autoritativas
 - Detector puro de medallas, eventos fiables, insignias junto al marcador, recuento de perfil y marcas en podio. Las condiciones se calculan en MatchSim; eventos de cada tick se procesan una sola vez.
 - Test de primera sangre, robo maestro, venganza, intocable y dos picos x3 pasa. Humanos: provocar cada medalla y comparar en red, especialmente rozar un dash y remontar.
+
+### Fase 12e — Música por capas
+- Tres bucles sintetizados (tambor/bajo, percusión, melodía), mezcla gradual de medio segundo por combo, aceleración y tono de Frenesí, tambor final y silencio antes de fanfarria. Regresión local pasa.
+- Humanos: escuchar bucles y transiciones sin cortes y verificar volumen de música independiente de efectos.
