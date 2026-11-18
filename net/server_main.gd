@@ -194,7 +194,7 @@ func _save_result(room: Dictionary, event: Dictionary) -> void:
 	var ranking: Array[Dictionary] = []
 	for player: Dictionary in event.ranking:
 		var id := int(player.peer_id)
-		session_xp[id] = int(session_xp.get(id, 0)) + 50 + int(player.max_combo)
+		session_xp[id] = int(session_xp.get(id, 0)) + 50 + int(player.max_combo) + int(player.get("challenge_xp",0))
 		ranking.append({"name": player.name, "score": player.score, "max_combo": player.max_combo, "peer_id": player.peer_id})
 	if ranking.is_empty(): return
 	var record := {"date": Time.get_datetime_string_from_system(), "room": room.code, "mode": room.mode, "winner": ranking[0].name, "ranking": ranking, "awards": event.awards}

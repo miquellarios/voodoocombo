@@ -141,3 +141,6 @@
 - Decidimos:
 - Por qué:
 ```
+
+## Dopamina de la buena: recompensas por habilidad, sin cajas de pago
+La implementación premia combos, acciones y retos de cada partida. No introduce compras, rachas diarias ni notificaciones externas. Los retos y medallas se deciden en la simulación autoritativa.

@@ -99,6 +99,7 @@ var client_match: ClientMatch
 var ping_ms := 0
 var ping_clock := 0.0
 var tension_second := -1
+var challenges: Array[String] = []
 
 func _build_online() -> void:
 	_clear_hud()
@@ -380,6 +381,9 @@ func _handle_events(events: Array) -> void:
 			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
+			"challenge":
+				if int(event.player) == local_player:
+					Fx.pop(I18n.t("challenge_done") + " · " + I18n.t("challenge_" + str(event.challenge)), Vector2(640,170),GameConfig.EMBER)
 			"medal":
 				var index := int(event.player)
 				if index < score_number_labels.size():
@@ -494,6 +498,9 @@ func _build_loading() -> void:
 	skip_text.text = I18n.t("loading_skip")
 	skip_text.visible = false
 	_update_loading_text()
+	var challenge_text := ""
+	for id in challenges: challenge_text += I18n.t("challenge_" + id) + "   "
+	_label(root, challenge_text, Vector2(0,620),18,GameConfig.BONE_TEXT,false)
 
 func _update_loading_text() -> void:
 	var tip := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
@@ -1176,7 +1183,7 @@ func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -
 	var place := 1
 	for i in range(results_ranking.size()):
 		if results_ranking[i].name == Profile.nick: place = i + 1
-	results_xp = Profile.award_match(place, players[local_player].max_combo)
+	results_xp = Profile.award_match(place, players[local_player].max_combo, int(players[local_player].get("challenge_xp", 0)))
 	for medal: String in players[local_player].get("medals", []): Profile.medal_totals[medal] = int(Profile.medal_totals.get(medal, 0)) + 1
 	Profile.save()
 	results_awards = server_awards if not server_awards.is_empty() else MatchRanking.awards(players)
@@ -1279,6 +1286,24 @@ func _show_results() -> void:
 			root.add_child(crown)
 	if not Profile.new_unlocks.is_empty(): _add_unlock_card(root, Profile.new_unlocks[0])
 	_build_result_emote_bar(root)
+	var progress := ProgressBar.new()
+	progress.position = Vector2(390,150)
+	progress.size = Vector2(500,24)
+	progress.max_value = GameConfig.PROFILE_XP_PER_LEVEL
+	root.add_child(progress)
+	var start_xp := Profile.xp - results_xp
+	var xp_tween := progress.create_tween()
+	xp_tween.tween_method(func(value: float):
+		progress.value = int(value) % GameConfig.PROFILE_XP_PER_LEVEL
+		var tick := int(value) / 10
+		if tick != int(progress.get_meta("tick", -1)):
+			progress.set_meta("tick",tick)
+			Sfx.play_tone(900,0.025)
+		if int(value) / GameConfig.PROFILE_XP_PER_LEVEL > start_xp / GameConfig.PROFILE_XP_PER_LEVEL and not progress.has_meta("leveled"):
+			progress.set_meta("leveled",true)
+			Fx.sparks(Vector2(640,162), GameConfig.EMBER,30)
+			Sfx.fanfare()
+	, float(start_xp), float(Profile.xp), 1.5)
 	var main_button := _button(root, I18n.t("main_menu"), Vector2(0.0, 600.0), _build_menu)
 	main_button.position = Vector2(920.0, 632.0)
 	main_button.size = Vector2(170.0, 54.0)
@@ -1378,6 +1403,14 @@ func _update_result_emotes(delta: float) -> void:
 			result_bot_emote_at[index] = results_elapsed + rng.randf_range(4.0, 8.0)
 
 func _add_unlock_card(root: Control, unlock: Dictionary) -> void:
+	var equip := _button(root, I18n.t("equip"), Vector2.ZERO, func():
+		if str(unlock.type) == "social": Profile.cosmetics.social[7] = unlock.id
+		elif str(unlock.type) == "emote": Profile.cosmetics.social[7] = unlock.id
+		else: Profile.cosmetics[str(unlock.type)] = unlock.id
+		Profile.save()
+	)
+	equip.position = Vector2(25,450)
+	equip.size = Vector2(230,45)
 	var card := Panel.new()
 	card.position = Vector2(24.0, 505.0)
 	card.size = Vector2(230.0, 112.0)

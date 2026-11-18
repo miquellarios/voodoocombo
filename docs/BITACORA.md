@@ -290,3 +290,7 @@ Formato de cada entrada:
 ### Fase 12f — Tensión y final
 - Latido y cuenta atrás central al final, suavizado visual en finales ajustados, confeti y zoom del ganador con pausa previa al podio. La simulación registra quién iba último a mitad para anunciar remontada.
 - Humanos: empate cercano en los últimos cinco segundos y remontada desde último; comprobar que los relojes de red siguen sincronizados.
+
+### Fase 12g — Progreso y retos
+- Tres retos por semilla, completados en servidor, con bonus de XP sin duplicados. Avisos, pantalla de carga y barra animada de XP con nivel y sonido; desbloqueos sociales y botón Equipar. Tests de selección, condiciones y XP pasan; regresión local pasa.
+- Humanos: cumplir tres retos, subir nivel y equipar el desbloqueo; comparar bonus entre clientes.

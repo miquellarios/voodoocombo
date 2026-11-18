@@ -29,6 +29,7 @@ var finished := false
 var achievements := MatchAchievements.new()
 var halfway_recorded := false
 var initial_duration := 90.0
+var challenges: Array[String] = []
 
 func setup(config: Dictionary) -> void:
 	seed_value = int(config.get("seed", 1))
@@ -71,7 +72,13 @@ func setup(config: Dictionary) -> void:
 	for coin_pos in arena.coins:
 		coins.append({"pos": coin_pos, "owner": -1, "lock": 0.0, "phase": rng.randf_range(0.0, TAU)})
 	achievements.setup(players.size())
-	for player in players: player["medals"] = []
+	challenges = ChallengeRules.choose(rng)
+	for player in players:
+		player["medals"] = []
+		player["challenges_done"] = []
+		player["spells_used"] = 0
+		player["pickups"] = 0
+		player["challenge_xp"] = 0
 
 func step(delta: float, inputs: Array[Dictionary]) -> void:
 	if finished or delta <= 0.0 or players.is_empty(): return
@@ -114,6 +121,15 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 		var order := _score_order()
 		if not order.is_empty(): players[order.back()]["last_at_half"] = true
 	events.append_array(achievements.update(players, events.slice(event_start), elapsed))
+	for event: Dictionary in events.slice(event_start):
+		if event.type == "item_used": players[int(event.player)].spells_used += 1
+		if event.type == "coin_taken": players[int(event.player)].pickups += 1
+	for index in players.size():
+		var completed := ChallengeRules.completed(players[index], challenges)
+		for id in completed:
+			if not id in players[index].challenges_done: events.append({"type":"challenge","player":index,"challenge":id})
+		players[index].challenges_done = completed
+		players[index].challenge_xp = ChallengeRules.bonus(completed)
 	if remaining <= 0.000001:
 		remaining = 0.0
 		_finish_match()
@@ -124,6 +140,7 @@ func snapshot() -> Dictionary:
 		var value: Variant = get(key)
 		result[key] = value.duplicate(true) if value is Array or value is Dictionary else value
 	result["finished"] = finished
+	result["challenges"] = challenges.duplicate()
 	return result
 
 func pop_events() -> Array[Dictionary]:

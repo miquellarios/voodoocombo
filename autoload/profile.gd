@@ -27,9 +27,9 @@ func _ready() -> void:
 		last_arena_id = str(config.get_value("profile", "last_arena_id", last_arena_id))
 	_normalize_cosmetics()
 
-func award_match(place: int, combo: int) -> int:
+func award_match(place: int, combo: int, bonus: int = 0) -> int:
 	var old_level := level()
-	var gained := 50 + (30 if place == 1 else (20 if place == 2 else (10 if place == 3 else 0))) + combo
+	var gained := 50 + (30 if place == 1 else (20 if place == 2 else (10 if place == 3 else 0))) + combo + bonus
 	xp += gained
 	games += 1
 	if place == 1:
@@ -42,6 +42,9 @@ func award_match(place: int, combo: int) -> int:
 		if int(GameConfig.TRAIL_UNLOCK_LEVELS[cosmetic_id]) > old_level and int(GameConfig.TRAIL_UNLOCK_LEVELS[cosmetic_id]) <= level(): all_unlocks.append({"type": "trail", "id": cosmetic_id, "level": GameConfig.TRAIL_UNLOCK_LEVELS[cosmetic_id]})
 	for cosmetic_id in ["calavera", "llanto", "pulgar", "fuego"]:
 		if int(GameConfig.EMOTE_UNLOCK_LEVELS[cosmetic_id]) > old_level and int(GameConfig.EMOTE_UNLOCK_LEVELS[cosmetic_id]) <= level(): all_unlocks.append({"type": "emote", "id": cosmetic_id, "level": GameConfig.EMOTE_UNLOCK_LEVELS[cosmetic_id]})
+	for cosmetic_id: String in GameConfig.SOCIAL_LEVELS:
+		var required := int(GameConfig.SOCIAL_LEVELS[cosmetic_id])
+		if required > old_level and required <= level(): all_unlocks.append({"type":"social","id":cosmetic_id,"level":required})
 	if not all_unlocks.is_empty(): new_unlocks.append(all_unlocks[0])
 	var config := ConfigFile.new()
 	config.set_value("profile", "nick", nick)
