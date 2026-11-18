@@ -7,7 +7,7 @@ var levels := [0.0,0.0,0.0]
 var last_second := -1
 
 func _ready() -> void:
-	if "--server" in OS.get_cmdline_user_args() or OS.has_feature("dedicated_server"): return
+	if "--server" in OS.get_cmdline_user_args() or OS.has_feature("dedicated_server") or DisplayServer.get_name() == "headless": return
 	player = AudioStreamPlayer.new()
 	add_child(player)
 	for index in 3:
