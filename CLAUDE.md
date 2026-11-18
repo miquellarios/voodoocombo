@@ -27,8 +27,15 @@
 | Fase | Estado |
 |---|---|
 | 1-9 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
-| **10** | Escrita, pendiente de que Codex la haga: `docs/codex/fase-10-arreglos.md`. Arregla lo que falló al probar la 9 (bloques 10a-10l). |
-| **11** | Escrita, pendiente: `docs/codex/fase-11-online-lobby-dopamina-modos.md`. 22 bloques en tres partes, que se explican abajo. |
+| **10** | Hecha por Codex (10a-10l, 17/11/2026): `docs/codex/fase-10-arreglos.md`. Falta que la probéis. |
+| **11** | Escrita, pendiente: `docs/codex/fase-11/FASE-11.md` y su `AGENTS.md`. Letra "Brasa minimal" (11a) y online + lobby (11b-11j). |
+| **12** | Escrita, pendiente: `docs/codex/fase-12/FASE-12.md` y su `AGENTS.md`. Dopamina (12a-12h) y modos (12i-12l). |
+
+Cada fase de la 11 en adelante tiene su carpeta con dos archivos:
+- `FASE-N.md`: los bloques para Codex;
+- `AGENTS.md`: cómo queda el juego al terminar esa fase.
+
+Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 11, que ya incluye las reglas de la fase 10.
 
 Lo que falló al probar la fase 9 (todo está en la fase 10):
 - los hechizos se lanzaban solos, sin pulsar E;
@@ -38,14 +45,20 @@ Lo que falló al probar la fase 9 (todo está en la fase 10):
 - la cinta transportadora estaba girada;
 - los textos que saltan duraban muy poco y se veían borrosos.
 
-Partes de la fase 11:
-- **Parte 1 · Online y lobby (11a-11i):** servidor dedicado con ENet, salas con código de 5 letras, lobby de mazmorra con emotes, bailes y gritos de guerra, y votación de arena con 4 mapas en las esquinas y ruleta si hay empate.
-- **Parte 2 · Letra y dopamina (11j-11r):** letra "Brasa minimal", sensación de juego al pegar y recoger, medallas, música que reacciona y progreso.
-- **Parte 3 · Modos (11s-11v):** quitar el modo Clásico y añadir Último en Pie y Codicia 2v2.
+Qué trae cada fase:
+- **Fase 11:**
+  - letra nueva;
+  - servidor dedicado con ENet;
+  - salas con código de 5 letras;
+  - lobby de mazmorra con emotes, bailes y gritos de guerra;
+  - votación de arena con 4 mapas en las esquinas y ruleta si hay empate.
+- **Fase 12:**
+  - *game feel*, medallas, música por capas y progreso;
+  - quitar el modo Clásico y añadir Último en Pie y Codicia 2v2.
 
 `docs/codex/plan-multijugador.md` es el plan de red que escribió el equipo. Es la base de la parte 1.
 
-**Ojo:** `AGENTS.md` §1 todavía habla del modo Clásico. Se quita en el bloque 11s, y cuando Codex lo haga hay que actualizar `AGENTS.md`.
+**Ojo:** el `AGENTS.md` de la fase 11 todavía tiene el modo Clásico. Se quita en la fase 12 (bloque 12i), y su `AGENTS.md` ya está sin él.
 
 ## 4. Decisiones del equipo que no hay que volver a plantear
 
