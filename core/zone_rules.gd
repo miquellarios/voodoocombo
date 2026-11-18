@@ -20,8 +20,8 @@ static func advance_drain(timer: float, delta: float, interval: float) -> Dictio
 		remaining += interval
 	return {"ticks": ticks, "remaining": remaining}
 
-static func step_for_remaining(remaining: float, classic: bool) -> int:
-	var thresholds: Array = GameConfig.CLASSIC_ZONE_TIMES if classic else GameConfig.VOODOO_ZONE_TIMES
+static func step_for_remaining(remaining: float) -> int:
+	var thresholds: Array = GameConfig.VOODOO_ZONE_TIMES
 	var step := 0
 	for threshold in thresholds:
 		if remaining <= float(threshold): step += 1

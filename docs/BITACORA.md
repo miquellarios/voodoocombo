@@ -298,3 +298,7 @@ Formato de cada entrada:
 ### Fase 12h — Menús
 - Botones con sonido, escala al enfocar y aplastamiento al pulsar; alfiler dibujado, telón de tela al cambiar de pantalla y latido del logo cada cuatro segundos. Reducir movimiento deja los controles estáticos.
 - Regresión local pasa. Humanos: recorrer menús con ratón, teclado y mando y comprobar legibilidad de transiciones.
+
+### Fase 12i — Retirada de Clásico
+- Retirados selector, constantes, ramas de puntuación, generación y objetos, textos y tests específicos del modo Clásico. La entrada principal usa siempre lobby y votación.
+- Humanos: comprobar que no queda opción Clásico y que el modo VoodooCombo conserva sus reglas.

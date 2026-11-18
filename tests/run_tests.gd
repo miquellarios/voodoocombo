@@ -39,7 +39,6 @@ func _test_scoring() -> void:
 	_check(Scoring.coin_value(5, false, true) == 3, "ring adds one point")
 	_check(Scoring.coin_value(12, true, true) == 5, "maximum coin value is five")
 	_check(Scoring.coin_value(99, true, true) <= 5, "coin value never exceeds five")
-	_check(Scoring.coin_value(20, false, false, true) == 1, "classic coin value")
 	_check(Scoring.next_combo(7, 1.49) == 8 and Scoring.next_combo(7, 1.5) == 1, "combo timer")
 
 func _test_drop_limits() -> void:
@@ -57,7 +56,6 @@ func _test_arena() -> void:
 		_check(ArenaGen.is_arena_connected(arena.blocked), "arena connectivity")
 		_check(arena.coins.size() == GameConfig.STARTING_COINS, "Voodoo starts with 30 coins")
 		_check(ArenaGen.generate(seed_value, arena.map_id).map_id != arena.map_id, "random arena avoids the previous map")
-		_check(ArenaGen.generate(seed_value, "", "", true).coins.size() == GameConfig.CLASSIC_STARTING_COINS, "Classic starts with 50 coins")
 		for cell in arena.blocked:
 			_check(arena.blocked.has(Vector2i(29 - cell.x, cell.y)), "horizontal obstacle symmetry")
 			_check(arena.blocked.has(Vector2i(cell.x, 14 - cell.y)), "vertical obstacle symmetry")
@@ -165,9 +163,6 @@ func _test_items() -> void:
 	rng.seed = 9
 	for place in ["first", "middle", "last"]:
 		_check(ItemTable.probabilities_sum(place) == 100, "item probabilities sum to 100: " + place)
-	_check(ItemTable.probabilities_sum("middle", true) == 97, "classic excludes ring weights")
-	for _i in range(100):
-		_check(ItemTable.roll("first", rng, true) != "ring", "classic excludes ring")
 
 func _test_spell_rules() -> void:
 	var held := {"item": "boots", "item_time": 0.0}
@@ -185,7 +180,7 @@ func _test_nickname_rules() -> void:
 
 func _test_safe_zone() -> void:
 	_check(ZoneRules.safe_rect(GameConfig.ZONE_MAX_STEPS).size == Vector2(GameConfig.ZONE_FINAL_GRID_SIZE) * GameConfig.CELL_SIZE, "safe zone reaches 18 by 9 cells")
-	_check(ZoneRules.step_for_remaining(25.0, false) == 3 and ZoneRules.step_for_remaining(60.0, true) == 3, "zone uses mode-specific closing times")
+	_check(ZoneRules.step_for_remaining(25.0) == 3, "zone uses mode-specific closing times")
 	var drain := ZoneRules.advance_drain(GameConfig.ZONE_DRAIN_INTERVAL, 3.0, GameConfig.ZONE_DRAIN_INTERVAL)
 	_check(int(drain.ticks) == 4, "outside player loses four coins in three seconds")
 

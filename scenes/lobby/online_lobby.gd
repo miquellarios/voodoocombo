@@ -134,7 +134,7 @@ func _build_room() -> void:
 	_new_view()
 	_label(I18n.t("room_code") + "  " + ("—" if local else str(room.code)), Vector2(20, 30), Vector2(540, 60), 30)
 	_button("copy", Vector2(40, 94), Vector2(180, 45), func(): DisplayServer.clipboard_set(str(room.code)))
-	var mode_button := _button(str(room.mode), Vector2(880, 40), Vector2(350, 55), func(): _action("mode", {"mode": "classic" if room.mode == "voodoo" else "voodoo"}))
+	var mode_button := _button(str(room.mode), Vector2(880, 40), Vector2(350, 55), func(): _action("mode", {"mode": "voodoo"}))
 	mode_button.disabled = int(room.host) != local_id
 	var order := _display_order()
 	for slot in GameConfig.ROOM_CAPACITY:

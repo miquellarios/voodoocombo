@@ -35,7 +35,7 @@ func setup(config: Dictionary) -> void:
 	seed_value = int(config.get("seed", 1))
 	rng.seed = seed_value
 	mode = str(config.get("mode", "voodoo"))
-	arena = ArenaGen.generate(seed_value, str(config.get("previous_arena", "")), str(config.get("arena_id", "")), mode == "classic")
+	arena = ArenaGen.generate(seed_value, str(config.get("previous_arena", "")), str(config.get("arena_id", "")))
 	obstacle_rects = _get_obstacle_rects(arena.get("obstacles", []))
 	player_hitbox_rects = _get_obstacle_hitboxes(arena.get("obstacles", []))
 	players.clear()
@@ -46,7 +46,7 @@ func setup(config: Dictionary) -> void:
 	events.clear()
 	current_inputs.clear()
 	elapsed = 0.0
-	remaining = float(config.get("duration", GameConfig.CLASSIC_SECONDS if mode == "classic" else GameConfig.MATCH_SECONDS))
+	remaining = float(config.get("duration", GameConfig.MATCH_SECONDS))
 	finished = false
 	halfway_recorded = false
 	initial_duration = remaining
@@ -321,29 +321,22 @@ func _update_pickups() -> void:
 			var coin: Dictionary = coins[c]
 			if player.pos.distance_to(coin.pos) > 28.0 or (coin.owner == i and coin.lock > 0.0): continue
 			var value := 1
-			if mode == "classic":
-				player.collected += 1
-				player.coins += 1
-				player.score = player.coins
-			else:
-				player.combo = Scoring.next_combo(player.combo, elapsed - player.last_pickup)
-				player.max_combo = maxi(player.max_combo, player.combo)
-				value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, SpellRules.is_active(player, "ring"), false)
-				player.coins += value
-				player.score = player.coins
-				player.last_pickup = elapsed
-				if player.combo in [5, 12]:
-					var text := _message("combo") if player.combo == 5 else _message("voodoo_combo")
-					_pop(text, GameConfig.COMBO_NOTICE_POSITION, GameConfig.GOLD)
-					_tone(500.0 + player.combo * 14.0, 0.18)
-			var combo_multiplier := Scoring.multiplier(player.combo, mode == "classic")
+			player.combo = Scoring.next_combo(player.combo, elapsed - player.last_pickup)
+			player.max_combo = maxi(player.max_combo, player.combo)
+			value = Scoring.coin_value(player.combo, remaining <= GameConfig.FRENZY_SECONDS, SpellRules.is_active(player, "ring"))
+			player.coins += value
+			player.score = player.coins
+			player.last_pickup = elapsed
+			if player.combo in [5, 12]:
+				var text := _message("combo") if player.combo == 5 else _message("voodoo_combo")
+				_pop(text, GameConfig.COMBO_NOTICE_POSITION, GameConfig.GOLD)
+				_tone(500.0 + player.combo * 14.0, 0.18)
+			var combo_multiplier := Scoring.multiplier(player.combo)
 			var pickup_color := GameConfig.FLOAT_COLOR_VOODOO if combo_multiplier >= 3 else (GameConfig.FLOAT_COLOR_FRENZY if combo_multiplier == 2 else GameConfig.FLOAT_COLOR_BASE)
-			_pop("+%d" % (1 if mode == "classic" else value), player.pos + OFFSET, pickup_color)
+			_pop("+%d" % value, player.pos + OFFSET, pickup_color)
 			_tone(600.0 + player.combo * 18.0, 0.09)
 			events.append({"type": "coin_taken", "player": i, "value": value, "combo": player.combo, "pos": coin.pos})
 			coins.remove_at(c)
-			if mode == "classic" and player.coins >= GameConfig.CLASSIC_TARGET:
-				_finish_match()
 			break
 		for chest_i in range(chests.size() - 1, -1, -1):
 			if player.item == "" and player.pos.distance_to(chests[chest_i]) < 30.0 and roll_time <= 0.0:
@@ -397,7 +390,7 @@ func _update_dash_hits() -> void:
 
 
 func _update_safe_zone(delta: float) -> void:
-	var thresholds: Array = GameConfig.CLASSIC_ZONE_TIMES if mode == "classic" else GameConfig.VOODOO_ZONE_TIMES
+	var thresholds: Array = GameConfig.VOODOO_ZONE_TIMES
 	for step_index in range(thresholds.size()):
 		var step := step_index + 1
 		var threshold := float(thresholds[step_index])
@@ -699,7 +692,7 @@ func _start_roll(index: int) -> void:
 	var order := _score_order()
 	var place := order.find(index)
 	var player_position := "first" if place == 0 else ("last" if place == order.size() - 1 else "middle")
-	roll_result = ItemTable.roll(player_position, rng, mode == "classic")
+	roll_result = ItemTable.roll(player_position, rng)
 	roll_time = 0.8
 	_tone(420.0, 0.12)
 

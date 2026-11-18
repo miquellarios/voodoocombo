@@ -7,11 +7,9 @@ const TABLE := {
 	"last": {"magnet": 15, "boots": 15, "cloak": 5, "pin": 20, "frost": 15, "sheep": 20, "ring": 10}
 }
 
-static func roll(position: String, rng: RandomNumberGenerator, classic: bool = false) -> String:
+static func roll(position: String, rng: RandomNumberGenerator) -> String:
 	var key := "middle" if position == "middle" else position
 	var weights: Dictionary = TABLE.get(key, TABLE["last"]).duplicate()
-	if classic:
-		weights["ring"] = 0
 	var total := 0
 	for weight in weights.values():
 		total += int(weight)
@@ -22,9 +20,8 @@ static func roll(position: String, rng: RandomNumberGenerator, classic: bool = f
 			return str(item)
 	return "boots"
 
-static func probabilities_sum(position: String, classic: bool = false) -> int:
+static func probabilities_sum(position: String) -> int:
 	var total := 0
 	for item in TABLE.get(position, {}):
-		if classic and item == "ring": continue
 		total += int(TABLE[position][item])
 	return total

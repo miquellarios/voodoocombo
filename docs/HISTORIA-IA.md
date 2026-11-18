@@ -144,3 +144,6 @@
 
 ## Dopamina de la buena: recompensas por habilidad, sin cajas de pago
 La implementación premia combos, acciones y retos de cada partida. No introduce compras, rachas diarias ni notificaciones externas. Los retos y medallas se deciden en la simulación autoritativa.
+
+## Quitamos el modo Clásico
+Qué decidimos: [que lo completen los humanos]. Por qué: [que lo completen los humanos]. La IA advirtió que Clásico era el requisito literal del enunciado. La retirada se implementa por petición explícita de FASE-12.md.

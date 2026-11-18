@@ -113,7 +113,7 @@ func _allow(sender: int, action: String) -> bool:
 
 func _prepare_match(room: Dictionary) -> void:
 	room["sim"] = MatchSim.new()
-	room.sim.setup({"seed": room.vote.seed_value, "arena_id": room.arena_id, "mode": room.mode, "duration": GameConfig.CLASSIC_SECONDS if room.mode == "classic" else room.duration, "players": LobbyRules.roster(room)})
+	room.sim.setup({"seed": room.vote.seed_value, "arena_id": room.arena_id, "mode": room.mode, "duration": room.duration, "players": LobbyRules.roster(room)})
 	room["inputs"] = {}
 	room["sequences"] = {}
 	room["action_sequences"] = {}

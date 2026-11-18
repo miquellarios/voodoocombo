@@ -28,7 +28,6 @@ var seed_value := 0
 var arena: Dictionary = {}
 var previous_arena_id := ""
 var selected_arena_id := ""
-var arena_select_classic := false
 var safe_zone_step := 0
 var safe_zone_warning_step := 0
 var fog_material: ShaderMaterial
@@ -110,7 +109,7 @@ func _build_online() -> void:
 	lobby.exit_requested.connect(_build_menu)
 	lobby.online_match_requested.connect(_begin_online_match)
 	lobby.locker_requested.connect(func(): lobby_return = true; _build_characters())
-	lobby.local_match_requested.connect(func(config: Dictionary): _begin_match(config.mode == "classic", str(config.arena_id), config))
+	lobby.local_match_requested.connect(func(config: Dictionary): _begin_match(str(config.arena_id), config))
 
 func _locker_back() -> void:
 	if lobby_return:
@@ -317,7 +316,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_start_countdown()
 		get_viewport().set_input_as_handled()
 
-func _begin_match(classic: bool = false, arena_id: String = "", overrides: Dictionary = {}) -> void:
+func _begin_match(arena_id: String = "", overrides: Dictionary = {}) -> void:
 	network_match = false
 	local_player = 0
 	simulation = MatchSim.new()
@@ -328,7 +327,7 @@ func _begin_match(classic: bool = false, arena_id: String = "", overrides: Dicti
 		{"name": "Conde Costura", "character": "gnomo", "is_bot": true},
 		{"name": "Dama del Pantano", "character": "nigro", "is_bot": true}
 	]
-	var config := {"seed": seed_value, "mode": "classic" if classic else "voodoo", "arena_id": arena_id, "previous_arena": previous_arena_id, "players": roster}
+	var config := {"seed": seed_value, "mode": "voodoo", "arena_id": arena_id, "previous_arena": previous_arena_id, "players": roster}
 	config.merge(overrides, true)
 	simulation.setup(config)
 	_read_simulation()
@@ -630,8 +629,8 @@ func _build_menu() -> void:
 		menu_logo_tween.tween_property(logo, "scale", Vector2.ONE, 0.3)
 		menu_logo_tween.tween_interval(3.5)
 		menu_logo_tween.set_loops()
-	var labels := [I18n.t("play"), I18n.t("classic_mode"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
-	var actions: Array[Callable] = [_build_online, func(): _build_arena_select(true), _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
+	var labels := [I18n.t("play"), I18n.t("characters"), I18n.t("settings"), I18n.t("history"), I18n.t("exit")]
+	var actions: Array[Callable] = [_build_online, _build_characters, _build_settings, _build_history, func(): get_tree().quit()]
 	for index in range(labels.size()):
 		var button := _button(root, labels[index], Vector2(0, 302 + index * 59), actions[index])
 		if not Settings.reduce_motion:
@@ -640,79 +639,6 @@ func _build_menu() -> void:
 			tween.tween_interval(index * 0.05)
 			tween.tween_property(button, "modulate:a", 1.0, 0.2)
 	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
-
-func _build_arena_select(classic: bool) -> void:
-	_clear_hud()
-	arena_select_classic = classic
-	state = "arena_select"
-	var root := _new_overlay()
-	var backdrop := _screen_backdrop()
-	root.add_child(backdrop)
-	root.move_child(backdrop, 0)
-	_label(root, I18n.t("choose_arena"), Vector2(0, GameConfig.ARENA_SELECT_TITLE_Y), GameConfig.ARENA_SELECT_TITLE_SIZE, GameConfig.GOLD, true)
-	var preferred_button: Button
-	for index in range(GameConfig.ARENA_IDS.size()):
-		var arena_id: String = GameConfig.ARENA_IDS[index]
-		var card := Panel.new()
-		card.position = Vector2(GameConfig.ARENA_CARD_X + index * (GameConfig.ARENA_CARD_SIZE.x + GameConfig.ARENA_CARD_GAP), GameConfig.ARENA_CARD_Y)
-		card.size = GameConfig.ARENA_CARD_SIZE
-		var card_style := StyleBoxFlat.new()
-		card_style.bg_color = Color("241838")
-		card_style.border_color = Color("8A6B45")
-		card_style.set_border_width_all(2)
-		card_style.set_corner_radius_all(10)
-		card.add_theme_stylebox_override("panel", card_style)
-		card.gui_input.connect(func(event: InputEvent):
-			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-				_select_arena(arena_id)
-		)
-		root.add_child(card)
-		var thumbnail := TextureRect.new()
-		thumbnail.texture = load(_arena_thumbnail_path(arena_id))
-		thumbnail.position = Vector2.ONE * GameConfig.ARENA_THUMB_MARGIN
-		thumbnail.size = GameConfig.ARENA_THUMB_SIZE
-		thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		thumbnail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(thumbnail)
-		var arena_name := _hud_label(card, Vector2(8, GameConfig.ARENA_NAME_Y), GameConfig.ARENA_NAME_SIZE, GameConfig.ARENA_NAME_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
-		arena_name.text = I18n.t("arena_" + arena_id)
-		arena_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		for icon_order in range(GameConfig.ARENA_TRAP_ICONS[arena_id].size()):
-			var icon := TextureRect.new()
-			var icon_atlas := AtlasTexture.new()
-			icon_atlas.atlas = TRAP_ICONS_TEXTURE
-			var trap_manifest: Dictionary = loading_metadata.get("trampas_iconos", {})
-			var icon_frame := float(trap_manifest.get("frame_w", GameConfig.ARENA_ICON_FRAME_SIZE))
-			icon_atlas.region = Rect2(float(GameConfig.ARENA_TRAP_ICONS[arena_id][icon_order]) * icon_frame, 0.0, icon_frame, float(trap_manifest.get("frame_h", icon_frame)))
-			icon.texture = icon_atlas
-			icon.position = Vector2(GameConfig.ARENA_ICON_START.x + icon_order * GameConfig.ARENA_ICON_GAP, GameConfig.ARENA_ICON_START.y)
-			icon.size = Vector2.ONE * GameConfig.ARENA_ICON_SIZE
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			card.add_child(icon)
-		var select := Button.new()
-		select.text = I18n.t("play")
-		select.position = Vector2(GameConfig.ARENA_BUTTON_MARGIN, GameConfig.ARENA_BUTTON_Y)
-		select.size = GameConfig.ARENA_BUTTON_SIZE
-		select.focus_mode = Control.FOCUS_ALL
-		select.pressed.connect(_select_arena.bind(arena_id))
-		card.add_child(select)
-		if Profile.preferred_arena_id == arena_id:
-			preferred_button = select
-	var random_button := _button(root, I18n.t("random_arena"), Vector2(0, 520), func(): _select_arena(""))
-	random_button.size = GameConfig.ARENA_RANDOM_BUTTON_SIZE
-	random_button.position = GameConfig.ARENA_RANDOM_BUTTON_POSITION
-	if preferred_button != null:
-		preferred_button.grab_focus()
-	_button(root, I18n.t("menu"), Vector2(0, GameConfig.ARENA_MENU_BUTTON_Y), _build_menu)
-
-func _select_arena(arena_id: String) -> void:
-	selected_arena_id = arena_id
-	Profile.preferred_arena_id = arena_id if not arena_id.is_empty() else "random"
-	Profile.save()
-	_begin_match(arena_select_classic, arena_id)
 
 func _build_characters() -> void:
 	_build_locker("character")
@@ -1582,7 +1508,7 @@ func _draw() -> void:
 			draw_arc(badge_center, GameConfig.COMBO_BADGE_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, GameConfig.GOLD, GameConfig.COMBO_BADGE_OUTLINE_WIDTH, true)
 			var badge_text_position := badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_OFFSET_Y)
 			var badge_text_width := GameConfig.COMBO_BADGE_RADIUS * GameConfig.COMBO_BADGE_DIAMETER_FACTOR
-			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo, mode == "classic"), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, Color.WHITE)
+			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, Color.WHITE)
 			draw_string(ThemeDB.fallback_font, badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_BOTTOM_Y), str(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_COUNT_SIZE, GameConfig.GOLD)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
