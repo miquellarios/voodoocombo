@@ -188,7 +188,7 @@ func _ready() -> void:
 		if network_match and room.phase == "lobby" and state in ["results", "match_end"]: _build_online()
 	)
 	Net.pong_received.connect(func(stamp: int): ping_ms = Time.get_ticks_msec() - stamp)
-	get_window().title = "VoodooCombo 0.1"
+	get_window().title = "VoodooCombo " + GameConfig.PROJECT_VERSION
 	Settings.apply_display()
 	player_name_font = ThemeBuilder.font("Oswald-Medium.woff2")
 	floating_coin_font = ThemeBuilder.font("Oswald-Bold.woff2")
@@ -215,6 +215,9 @@ func _ready() -> void:
 		_build_nickname_dialog()
 	else:
 		_build_menu()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST: Net.stop_host_server()
 
 func _process(delta: float) -> void:
 	if state == "match_end":
@@ -653,6 +656,7 @@ func _update_hud() -> void:
 
 func _build_menu() -> void:
 	Sfx.stop_music()
+	Net.stop_host_server()
 	if network_match: Net.leave_server()
 	network_match = false
 	_clear_hud()
@@ -695,6 +699,8 @@ func _build_menu() -> void:
 			tween.tween_interval(index * 0.05)
 			tween.tween_property(button, "modulate:a", 1.0, 0.2)
 	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
+	var version_label := _hud_label(root, Vector2(1050, 674), Vector2(200, 28), 16, HORIZONTAL_ALIGNMENT_RIGHT)
+	version_label.text = "v" + GameConfig.PROJECT_VERSION
 
 func _build_characters() -> void:
 	_build_locker("character")

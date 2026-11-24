@@ -6,10 +6,13 @@
 # Filtros para Godot
 .godot/
 .import/
-export_presets.cfg
 
 # Arte generado (se regenera con tools/arte)
 tools/arte/out/
 __pycache__/
 *.pyc
 build/Godot_v4.7.2-stable_win64.exe
+/build/
+
+/.godot-local/
+docs/capturas/**/*.png.import

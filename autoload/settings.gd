@@ -4,6 +4,7 @@ var reduce_motion := false
 var reduce_flashes := false
 var vibration := true
 var server_host := "127.0.0.1"
+var join_host := ""
 var server_port := GameConfig.SETTINGS_PORT
 var server_choice := 2
 var ui_scale := 1.0
@@ -18,6 +19,7 @@ func _ready() -> void:
 		reduce_flashes = bool(config.get_value("accessibility", "reduce_flashes", false))
 		vibration = bool(config.get_value("accessibility", "vibration", true))
 		server_host = str(config.get_value("network", "host", server_host))
+		join_host = str(config.get_value("network", "join_host", join_host))
 		server_port = clampi(int(config.get_value("network", "port", server_port)), 1, 65535)
 		server_choice = int(config.get_value("network", "choice", server_choice))
 		reduce_motion = config.get_value("accessibility", "reduce_motion", false)
@@ -38,6 +40,7 @@ func _nearest_ui_scale(value: float) -> float:
 func save() -> void:
 	var config := ConfigFile.new()
 	config.set_value("network", "host", server_host)
+	config.set_value("network", "join_host", join_host)
 	config.set_value("network", "port", server_port)
 	config.set_value("network", "choice", server_choice)
 	config.set_value("accessibility", "reduce_motion", reduce_motion)

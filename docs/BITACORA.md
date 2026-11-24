@@ -8,6 +8,12 @@
 - Añadidas pruebas de persistencia de escala al subir y bajar, y de que accesibilidad no cambia el idioma. `tests/run_tests.gd` pasa en Godot 4.7.2. Capturas de las cuatro pestañas a 1280×720 y 1920×1080, con escalas 75 %, 100 % y 130 %, en `docs/capturas/fase-13/`.
 - Pruebas humanas pendientes: ratón, teclado y mando a 75 % y 150 %; probar ventana/pantalla completa, audio y el retorno desde pausa. No se ha probado todavía el tamaño de ventana en un monitor real.
 
+### Fase 13b — Servidor local y ejecutable de prueba
+- Añadido «Crear sala en este PC»: inicia el servidor dedicado desde el ejecutable, reintenta la conexión local hasta 5 s y termina el proceso al cerrar o abandonar. La pantalla de conexión admite IP y código de sala, recuerda la IP, muestra la IPv4 privada al anfitrión, permite copiarla y explica cómo conectar desde otra casa. Se muestran las versiones del cliente y servidor cuando no coinciden, y el menú indica v0.13.0.
+- Actualizados `NET_VERSION`, versión del proyecto y preset de Windows a 0.13.0, manteniendo los presets Linux existentes. Exportado `build/VoodooCombo.exe` con Godot 4.7.2; paquete `build/VoodooCombo-v0.13.0-Windows.zip` de 53,6 MB (PCK incrustado), con LEEME, servidor.bat y licencia. `build/` queda ignorado y los binarios antiguos se retiran del índice. No se pudo publicar un GitHub Release porque `gh` no está instalado ni hay un cliente de publicación disponible en este entorno; el ZIP queda local.
+- La regresión completa de lógica pasa. Prueba local autorizada de loopback inicia el servidor, conecta un cliente y verifica que el proceso muere al salir. El ejecutable exportado arranca en modo headless. No se ha podido comprobar entre dos PCs ni verificar el firewall/NAT.
+- Pruebas humanas: probar alojar y unirse por IP/código desde dos PCs en la misma wifi; repetir desde redes distintas con VPN, cerrar el anfitrión durante una partida y comprobar el aviso de desconexión.
+
 ## Registro humano
 
 Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el profesorado.

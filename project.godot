@@ -10,9 +10,9 @@ config_version=5
 
 [application]
 
-config/name="VoodooCombo 0.1"
+config/name="VoodooCombo 0.13.0"
 config/description="Party game vudú local: recoge doblones, encadena combos y golpea con el dash."
-config/version="0.1.0"
+config/version="0.13.0"
 run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"

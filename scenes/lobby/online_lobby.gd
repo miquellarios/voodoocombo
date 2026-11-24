@@ -16,12 +16,19 @@ var roster: Array[Dictionary] = []
 var view: Control
 var notice: Label
 var code_field: LineEdit
+var ip_field: LineEdit
 var wheel: Control
 var clock_label: Label
 var local_id := 2
 var wheel_index := 0
 var social_at := -1.0
 var connecting_action := ""
+var target_address := ""
+var connection_pending := false
+var connection_elapsed := 0.0
+var retry_elapsed := 0.0
+var hosting_here := false
+var local_host_ip := ""
 var local_vote: ArenaVote
 var vote_view: ArenaVoteView
 var background := preload("res://assets/ui/lobby_mazmorra.png")
@@ -29,6 +36,8 @@ var background := preload("res://assets/ui/lobby_mazmorra.png")
 func _ready() -> void:
 	size = Vector2(1280, 720)
 	theme = ThemeBuilder.build()
+	hosting_here = Net.hosted_server_pid > 0
+	local_host_ip = Net.hosted_server_ip
 	Net.connected.connect(_connected)
 	Net.room_changed.connect(_room_changed)
 	Net.room_failed.connect(_error)
@@ -68,29 +77,63 @@ func _button(key: String, at: Vector2, dimensions: Vector2, action: Callable) ->
 func _entry() -> void:
 	_new_view()
 	_label(I18n.t("online"), Vector2(0, 55), Vector2(1280, 65), 40)
-	_button("create_room", Vector2(390, 210), Vector2(500, 60), func(): _connect_to("create")).grab_focus()
+	_button("host_here", GameConfig.ONLINE_HOST_BUTTON_POSITION, GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _connect_to("create")).grab_focus()
+	ip_field = LineEdit.new()
+	ip_field.max_length = GameConfig.SETTINGS_INPUT_MAX_LENGTH
+	ip_field.placeholder_text = I18n.t("host_ip")
+	ip_field.text = Settings.join_host
+	ip_field.position = GameConfig.ONLINE_IP_FIELD_POSITION
+	ip_field.size = GameConfig.ONLINE_IP_FIELD_SIZE
+	ip_field.text_submitted.connect(func(value: String) -> void: Settings.join_host = value.strip_edges(); Settings.save(); _connect_to("join"))
+	view.add_child(ip_field)
 	code_field = LineEdit.new()
 	code_field.max_length = GameConfig.ROOM_CODE_LENGTH
 	code_field.placeholder_text = I18n.t("room_code")
-	code_field.position = Vector2(490, 292)
-	code_field.size = Vector2(300, 52)
+	code_field.position = GameConfig.ONLINE_CODE_FIELD_POSITION
+	code_field.size = GameConfig.ONLINE_CODE_FIELD_SIZE
 	code_field.text_changed.connect(func(value: String):
 		var caret := code_field.caret_column
 		code_field.text = value.to_upper()
 		code_field.caret_column = caret
 	)
 	view.add_child(code_field)
-	_button("join_room", Vector2(390, 360), Vector2(500, 60), func(): _connect_to("join"))
-	_button("bots", Vector2(390, 440), Vector2(500, 60), _local_room)
-	_button("menu", Vector2(390, 560), Vector2(500, 60), func(): exit_requested.emit())
+	_button("join_room", Vector2(390, 380), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _connect_to("join"))
+	_button("bots", Vector2(390, 455), GameConfig.ONLINE_ACTION_BUTTON_SIZE, _local_room)
+	_button("network_help", Vector2(390, 528), GameConfig.ONLINE_ACTION_BUTTON_SIZE, _open_network_help)
+	_button("menu", Vector2(390, 600), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): exit_requested.emit())
 
 func _connect_to(action: String) -> void:
+	if connection_pending: return
 	connecting_action = action
 	local = false
+	hosting_here = action == "create"
+	if hosting_here:
+		local_host_ip = _find_private_ipv4()
+		var server_pid := Net.start_host_server(Settings.server_port)
+		if server_pid <= 0:
+			hosting_here = false
+			_error("host_start_failed")
+			return
+		Net.hosted_server_ip = local_host_ip
+		target_address = "127.0.0.1"
+	else:
+		target_address = ip_field.text.strip_edges()
+		if target_address.is_empty(): target_address = Settings.server_host
+		Settings.join_host = ip_field.text.strip_edges()
+		Settings.save()
+	connection_pending = true
+	connection_elapsed = 0.0
+	retry_elapsed = 0.0
 	notice.text = I18n.t("connecting")
-	if Net.join_server(Settings.server_host) != OK: _error("connect_failed")
+	_attempt_connect()
+
+func _attempt_connect() -> void:
+	retry_elapsed = 0.0
+	Net.join_server(target_address, Settings.server_port)
 
 func _connected() -> void:
+	if not connection_pending: return
+	connection_pending = false
 	local_id = multiplayer.get_unique_id()
 	if connecting_action == "create":
 		Net.create_room.rpc_id(1, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION)
@@ -135,6 +178,11 @@ func _build_room() -> void:
 	_new_view()
 	_label(I18n.t("room_code") + "  " + ("—" if local else str(room.code)), Vector2(20, 30), Vector2(540, 60), 30)
 	_button("copy", Vector2(40, 94), Vector2(180, 45), func(): DisplayServer.clipboard_set(str(room.code)))
+	if hosting_here:
+		var address_text := local_host_ip if not local_host_ip.is_empty() else I18n.t("host_ip_none")
+		_label(I18n.t("hosting_ip") % address_text, GameConfig.ONLINE_HOSTING_LABEL_POSITION, GameConfig.ONLINE_HOSTING_LABEL_SIZE, 20)
+		_button("copy_ip", Vector2(445, 126), Vector2(170, 45), func(): if not local_host_ip.is_empty(): DisplayServer.clipboard_set(local_host_ip))
+		_button("network_help", Vector2(625, 126), Vector2(320, 45), _open_network_help)
 	var mode_button := _button(str(room.mode), Vector2(850, 40), Vector2(400, 55), func(): _action("mode", {"mode": GameConfig.MODES[(GameConfig.MODES.find(str(room.mode)) + 1) % GameConfig.MODES.size()]}))
 	mode_button.disabled = int(room.host) != local_id
 	_label(I18n.t("rules_" + str(room.mode)), Vector2(850,105),Vector2(400,120),20)
@@ -199,14 +247,56 @@ func _leave() -> void:
 	if not local and Net.peer != null:
 		Net.leave_room.rpc_id(1)
 	Net.leave_server()
+	Net.stop_host_server()
+	hosting_here = false
 	exit_requested.emit()
 
 func _error(reason: String) -> void:
+	if reason == "connect_failed" and connection_pending: return
+	if reason == "host_start_failed":
+		notice.text = I18n.t("host_start_failed")
+		return
+	if reason.begins_with("version:"):
+		notice.text = I18n.t("version_mismatch_detail") % [GameConfig.PROJECT_VERSION, reason.trim_prefix("version:")]
+		return
 	if reason == "server_lost":
 		room.clear()
 		roster.clear()
 		_entry()
-	notice.text = I18n.t(reason if reason in ["server_lost", "connect_failed"] else "room_" + reason)
+		return
+	notice.text = I18n.t("room_" + reason)
+
+func _connection_failed() -> void:
+	connection_pending = false
+	Net.leave_server()
+	if hosting_here:
+		Net.stop_host_server()
+		hosting_here = false
+		notice.text = I18n.t("host_start_failed")
+	else:
+		notice.text = I18n.t("connect_failed_detail") % [target_address, Settings.server_port]
+
+func _find_private_ipv4() -> String:
+	for address: String in IP.get_local_addresses():
+		var parts := address.split(".")
+		if parts.size() != 4: continue
+		var valid := true
+		for part in parts:
+			if not part.is_valid_int() or int(part) < 0 or int(part) > 255: valid = false
+		if not valid: continue
+		var first := int(parts[0])
+		var second := int(parts[1])
+		if first == 10 or (first == 172 and second >= 16 and second <= 31) or (first == 192 and second == 168): return address
+	return ""
+
+func _open_network_help() -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = I18n.t("network_help")
+	dialog.dialog_text = I18n.t("network_help_text")
+	get_tree().root.add_child(dialog)
+	dialog.confirmed.connect(func() -> void: dialog.queue_free())
+	dialog.close_requested.connect(func() -> void: dialog.queue_free())
+	dialog.popup_centered(Vector2i(700, 440))
 
 func _events(events: Array) -> void:
 	for event: Dictionary in events:
@@ -256,12 +346,24 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if connection_pending:
+		connection_elapsed += delta
+		retry_elapsed += delta
+		if hosting_here and connection_elapsed >= GameConfig.HOST_START_TIMEOUT_SECONDS:
+			_connection_failed()
+		elif connection_elapsed >= GameConfig.NET_CONNECT_TIMEOUT_SECONDS:
+			_connection_failed()
+		elif retry_elapsed >= GameConfig.NET_CONNECT_RETRY_SECONDS:
+			_attempt_connect()
 	if local and room.get("phase") == "voting":
 		if local_vote.step(delta):
 			room.arena_id = local_vote.winner
 			room.phase = "loading"
 		_room_changed(room)
 	queue_redraw()
+
+func _exit_tree() -> void:
+	if connection_pending and hosting_here: Net.stop_host_server()
 
 func _draw() -> void:
 	draw_texture_rect(background, Rect2(Vector2.ZERO, size), false)

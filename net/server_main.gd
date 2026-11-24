@@ -66,7 +66,10 @@ func _request(sender: int, action: String, data: Dictionary) -> void:
 				room = directory.create(sender, data.nick, data.character, data.cosmetics, data.version)
 			else:
 				room = directory.join(sender, data.code, data.nick, data.character, data.cosmetics, data.version)
-			if room.is_empty(): Net.room_error.rpc_id(sender, directory.error)
+			if room.is_empty():
+				var reason := directory.error
+				if reason == "version": reason = "version:" + GameConfig.NET_VERSION
+				Net.room_error.rpc_id(sender, reason)
 			else:
 				Net.room_joined.rpc_id(sender, room.code, directory.public_state(room))
 				_publish(room)

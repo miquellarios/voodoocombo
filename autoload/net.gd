@@ -15,8 +15,11 @@ var server_mode := false
 var snapshot_sequence := 0
 var incoming_sequence := -1
 var incoming_chunks: Dictionary = {}
+var hosted_server_pid := -1
+var hosted_server_ip := ""
 
 func _ready() -> void:
+	get_tree().root.tree_exiting.connect(stop_host_server, CONNECT_ONE_SHOT)
 	multiplayer.connected_to_server.connect(func(): connected.emit())
 	multiplayer.connection_failed.connect(func(): disconnected.emit("connect_failed"))
 	multiplayer.server_disconnected.connect(func(): room.clear(); disconnected.emit("server_lost"))
@@ -26,6 +29,17 @@ func _ready() -> void:
 			log_line("disconnect %d" % id)
 			peer_left.emit(id)
 	)
+
+func start_host_server(port: int = GameConfig.NET_PORT) -> int:
+	if hosted_server_pid > 0 and OS.is_process_running(hosted_server_pid): return hosted_server_pid
+	hosted_server_pid = OS.create_process(OS.get_executable_path(), ["--headless", "--", "--server", "--port", str(port)])
+	return hosted_server_pid
+
+func stop_host_server() -> void:
+	if hosted_server_pid > 0:
+		if OS.is_process_running(hosted_server_pid): OS.kill(hosted_server_pid)
+		hosted_server_pid = -1
+		hosted_server_ip = ""
 
 func start_server(port: int = GameConfig.NET_PORT) -> Error:
 	peer = ENetMultiplayerPeer.new()
