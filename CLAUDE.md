@@ -22,20 +22,20 @@
 
 **Claude normalmente no programa el juego.** Si hay que cambiarlo, escribe o amplía un bloque en `docs/codex/`, salvo que el equipo pida lo contrario.
 
-## 3. Estado actual (17/11/2026)
+## 3. Estado actual (24/11/2026)
 
 | Fase | Estado |
 |---|---|
-| 1-9 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
-| **10** | Hecha por Codex (10a-10l, 17/11/2026): `docs/codex/fase-10-arreglos.md`. Falta que la probéis. |
-| **11** | Escrita, pendiente: `docs/codex/fase-11/FASE-11.md` y su `AGENTS.md`. Letra "Brasa minimal" (11a) y online + lobby (11b-11j). |
-| **12** | Escrita, pendiente: `docs/codex/fase-12/FASE-12.md` y su `AGENTS.md`. Dopamina (12a-12h) y modos (12i-12l). |
+| 1-12 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
+| **13** | Escrita, pendiente: `docs/codex/fase-13/FASE-13.md` y su `AGENTS.md`. Arregla lo que falló al probar la 12 (ajustes, taquilla, demasiado texto, hechizos sin efecto, modos escondidos, carga y podio) y prepara el ejecutable para probar online alojando desde el juego. |
+
+Capturas de cómo quedó la fase 12: `docs/capturas/fase-12/`.
 
 Cada fase de la 11 en adelante tiene su carpeta con dos archivos:
 - `FASE-N.md`: los bloques para Codex;
 - `AGENTS.md`: cómo queda el juego al terminar esa fase.
 
-Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 11, que ya incluye las reglas de la fase 10.
+Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 12.
 
 Lo que falló al probar la fase 9 (todo está en la fase 10):
 - los hechizos se lanzaban solos, sin pulsar E;
@@ -58,7 +58,6 @@ Qué trae cada fase:
 
 `docs/codex/plan-multijugador.md` es el plan de red que escribió el equipo. Es la base de la parte 1.
 
-**Ojo:** el `AGENTS.md` de la fase 11 todavía tiene el modo Clásico. Se quita en la fase 12 (bloque 12i), y su `AGENTS.md` ya está sin él.
 
 ## 4. Decisiones del equipo que no hay que volver a plantear
 
@@ -137,6 +136,7 @@ python3 instalar_fuentes.py            # copia las fuentes de assets/fonts a ~/.
 | `export_fase11.py` y `export_fase11b.py` | Lobby y cartas |
 | `export_fase12.py` | Votación y medallas |
 | `export_tipografia.py` | Logo "Brasa minimal" y referencias de letra |
+| `export_fase13.py` | Efectos de hechizos y referencias de hechizos y ajustes |
 | `trailer.py` | Tráiler, que necesita `ffmpeg` |
 
 **Cómo se trabaja el arte**
@@ -145,6 +145,9 @@ python3 instalar_fuentes.py            # copia las fuentes de assets/fonts a ~/.
 3. Cuando lo aprueben, copiar a `assets/` y las referencias a `docs/media/`.
 
 **Capturas del juego en Godot sin pantalla**
+
+Para revisar pantallas concretas, Claude usa una escena `capture.tscn` (fuera del repositorio). Instancia `main.tscn`, llama a `_build_settings()`, `_begin_match()`, etc., y guarda el viewport con `get_viewport().get_texture().get_image().save_png()`. Se lanza con `--fixed-fps 30 --resolution 1280x720`.
+
 
 ```bash
 xvfb-run godot --path . --write-movie /ruta/absoluta/captura.png --fixed-fps 10 --quit-after N

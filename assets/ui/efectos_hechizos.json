@@ -1,0 +1,18 @@
+{
+ "frame_w": 192,
+ "frame_h": 192,
+ "scale": 0.5,
+ "order": [
+  "oveja_a",
+  "oveja_b",
+  "hielo",
+  "capa",
+  "iman",
+  "botas",
+  "anillo",
+  "alfiler",
+  "lanzar",
+  "escarcha"
+ ],
+ "note": "Centro del frame = centro del muñeco (su posición - 40 px en y). Dibujar a escala 0,5."
+}
