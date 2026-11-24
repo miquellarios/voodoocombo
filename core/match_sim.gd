@@ -229,8 +229,8 @@ func _finish_match(winner_peer: int = 0) -> void:
 func _message(key: String) -> String:
 	return "{" + key + "}"
 
-func _pop(text: String, position: Vector2, color: Color) -> void:
-	events.append({"type": "text", "text": text, "position": position, "color": color})
+func _pop(text: String, position: Vector2, color: Color, player_index: int = -1) -> void:
+	events.append({"type": "text", "text": text, "position": position, "color": color, "player": player_index})
 
 func _tone(frequency: float, duration: float) -> void:
 	events.append({"type": "tone", "frequency": frequency, "duration": duration})
@@ -416,13 +416,9 @@ func _update_pickups() -> void:
 			player.coins += value
 			player.score = player.coins
 			player.last_pickup = elapsed
-			if player.combo in [5, 12]:
-				var text := _message("combo") if player.combo == 5 else _message("voodoo_combo")
-				_pop(text, GameConfig.COMBO_NOTICE_POSITION, GameConfig.GOLD)
+			if player.combo == 12:
+				_pop(_message("voodoo_combo"), GameConfig.COMBO_NOTICE_POSITION, GameConfig.EMBER, i)
 				_tone(500.0 + player.combo * 14.0, 0.18)
-			var combo_multiplier := Scoring.multiplier(player.combo)
-			var pickup_color := GameConfig.FLOAT_COLOR_VOODOO if combo_multiplier >= 3 else (GameConfig.FLOAT_COLOR_FRENZY if combo_multiplier == 2 else GameConfig.FLOAT_COLOR_BASE)
-			_pop("+%d" % value, player.pos + OFFSET, pickup_color)
 			_tone(600.0 + player.combo * 18.0, 0.09)
 			events.append({"type": "coin_taken", "player": i, "value": value, "combo": player.combo, "pos": coin.pos})
 			coins.remove_at(c)
@@ -531,7 +527,7 @@ func _update_safe_zone(delta: float) -> void:
 			if int(player.coins) <= 0: continue
 			player.coins -= 1
 			player.score = player.coins
-			_pop("-1", player.pos + OFFSET, GameConfig.ZONE_DRAIN_COLOR)
+			_pop("-1", player.pos + OFFSET, GameConfig.ZONE_DRAIN_COLOR, index)
 
 func _random_position_in_safe_zone() -> Vector2:
 	var safe_rect := ZoneRules.safe_rect(safe_zone_step)
@@ -558,7 +554,7 @@ func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum
 	var previous_combo := int(players[victim_index].combo)
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
 	if result.blocked:
-		_pop(_message("trap_blocked"), players[victim_index].pos + OFFSET, Color("7fe7ff"))
+		_pop(_message("trap_blocked"), players[victim_index].pos + OFFSET, Color("7fe7ff"), victim_index)
 		_tone(720.0, 0.08)
 		return result
 	if not result.applied:
@@ -580,7 +576,7 @@ func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum
 	var text := _message(text_key)
 	if dropped > 0:
 		text += " -%d" % dropped
-	_pop(text, players[victim_index].pos + OFFSET, Color("ff7474"))
+	_pop(text, players[victim_index].pos + OFFSET, GameConfig.LOSS_TEXT, victim_index)
 	_tone(140.0, 0.16)
 	return result
 
@@ -729,7 +725,6 @@ func _update_barrel(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 			if players[player_index].dash_left > 0.0 and players[player_index].pos.distance_to(center) <= GameConfig.BARREL_CONTACT_RADIUS:
 				runtime.barrel_state = "fusing"
 				runtime.barrel_timer = GameConfig.BARREL_FUSE_SECONDS
-				_pop(_message("trap_barrel"), center + OFFSET, GameConfig.GOLD)
 				_tone(330.0, 0.12)
 				break
 	elif state_now == "fusing":
@@ -782,7 +777,7 @@ func _update_portal(hazard: Dictionary, runtime: Dictionary, delta: float) -> vo
 			direction = (destination - source).normalized()
 		players[index].pos = _move_player(destination + direction * GameConfig.PORTAL_EXIT_DISTANCE, Vector2.ZERO)
 		cooldowns[index] = GameConfig.PORTAL_COOLDOWN_SECONDS
-		_pop(_message("trap_portal"), players[index].pos + OFFSET, Color("7fe7ff"))
+		_pop(_message("trap_portal"), players[index].pos + OFFSET, Color("7fe7ff"), index)
 		_tone(760.0, 0.1)
 	runtime.player_cooldowns = cooldowns
 
@@ -826,7 +821,6 @@ func _update_roll(delta: float) -> void:
 		players[roll_player].item = roll_result
 		players[roll_player].item_time = 0.0
 		events.append({"type": "item_rolled", "player": roll_player, "item": roll_result})
-		_pop(_message("spell_" + roll_result), players[roll_player].pos + OFFSET + Vector2(0, -52), GameConfig.GOLD)
 		_tone(880.0, 0.16)
 
 

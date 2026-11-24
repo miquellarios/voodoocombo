@@ -61,6 +61,7 @@ var hazard_sheets: Dictionary = {}
 var item_metadata: Dictionary = {}
 var spell_atlases: Array[AtlasTexture] = []
 var score_name_labels: Array[Label] = []
+var score_cards: Array[NinePatchRect] = []
 var score_tag_labels: Array[Label] = []
 var score_number_labels: Array[Label] = []
 var score_life_icons: Array = []
@@ -115,6 +116,12 @@ var round_number := 1
 var round_wait := 0.0
 var sudden_death := false
 var team_scores: Array[int] = [0,0]
+var pickup_streak_value := 0
+var pickup_streak_count := 0
+var pickup_streak_time := 0.0
+var pickup_streak_position := Vector2.ZERO
+var last_leader_index := -1
+var leader_name_since := -100.0
 
 func _build_online() -> void:
 	_clear_hud()
@@ -137,6 +144,10 @@ func _locker_back() -> void:
 func _begin_online_match(room: Dictionary) -> void:
 	if network_match and state in ["loading", "countdown", "playing", "paused"]: return
 	network_match = true
+	pickup_streak_value = 0
+	pickup_streak_count = 0
+	pickup_streak_time = 0.0
+	last_leader_index = -1
 	simulation = null
 	client_match = ClientMatch.new()
 	client_match.setup(room.initial, multiplayer.get_unique_id())
@@ -226,6 +237,9 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST: Net.stop_host_server()
 
 func _process(delta: float) -> void:
+	if state == "playing" and pickup_streak_value > 0:
+		pickup_streak_time = maxf(0.0, pickup_streak_time - delta)
+		if pickup_streak_time <= 0.0: _finish_pickup_streak()
 	if state == "match_end":
 		end_wait = maxf(0.0, end_wait - delta)
 		if end_wait == 0.0: _show_results()
@@ -343,6 +357,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _begin_match(arena_id: String = "", overrides: Dictionary = {}) -> void:
 	Fx.clear_text()
+	pickup_streak_value = 0
+	pickup_streak_count = 0
+	pickup_streak_time = 0.0
+	last_leader_index = -1
 	network_match = false
 	local_player = 0
 	simulation = MatchSim.new()
@@ -401,9 +419,16 @@ func _handle_events(events: Array) -> void:
 			var label := score_number_labels[int(event.player)]
 			Fx.fly_coin(event.pos + OFFSET, label.global_position + label.size * 0.5)
 			Sfx.play_tone(600.0 * pow(2.0, mini(int(event.combo), GameConfig.JUICE_COMBO_PITCH_STEPS) / 12.0), 0.09)
+			if int(event.player) == local_player:
+				pickup_streak_value += int(event.value)
+				pickup_streak_count += 1
+				pickup_streak_time = GameConfig.PICKUP_STREAK_SECONDS
+				pickup_streak_position = players[local_player].pos
+				if int(event.combo) == 5: Fx.shake.emit(1.5)
 		if event.type == "player_hit" and int(event.attacker) >= 0 and int(event.dropped) > 0 and score_number_labels.size() > int(event.victim):
 			Fx.fly_coin(score_number_labels[int(event.victim)].global_position, score_number_labels[int(event.attacker)].global_position)
-			Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
+			if int(event.attacker) == local_player or int(event.victim) == local_player:
+				Fx.pop(I18n.t("steal"), players[int(event.attacker)].pos + OFFSET, GameConfig.EMBER)
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
 			"deposit":
@@ -441,21 +466,20 @@ func _handle_events(events: Array) -> void:
 			"combo_lost":
 				Fx.sparks(event.pos + OFFSET, Color("b8a9d1"), 8)
 				Sfx.play_tone(110, 0.06)
-				if int(event.combo) >= 10: Fx.pop(I18n.t("combo_lost") % int(event.combo), event.pos + OFFSET, Color.GRAY)
-			"player_left":
-				Fx.pop("☁", event.pos + OFFSET, Color("b8a9d1"))
+				if int(event.player) == local_player and pickup_streak_value > 0: _finish_pickup_streak()
 			"social":
 				if state == "results":
 					for index in results_ranking.size():
 						if int(results_ranking[index].get("peer_id", 0)) == int(event.peer_id): _add_result_emote(index, str(event.item))
 			"text":
+				if int(event.get("player", -1)) >= 0 and int(event.player) != local_player: continue
 				var text: String = event.text
 				var expression := RegEx.new()
 				expression.compile("\\{([^}]+)\\}")
 				for token in expression.search_all(text):
 					text = text.replace(token.get_string(), I18n.t(token.get_string(1)))
 				Fx.pop(text, event.position, event.color)
-				if text == I18n.t("voodoo_combo"):
+				if text == I18n.t("voodoo_combo") and int(event.get("player", -1)) == local_player:
 					_camera_punch()
 					Fx.flash()
 					for edge in 20: Fx.sparks(Vector2(edge * 64, 5), GameConfig.EMBER, 3)
@@ -606,38 +630,48 @@ func _update_hud() -> void:
 		time_label.text = ("3 · 2 · 1" if state == "countdown" else "%d:%02d" % [seconds / 60, seconds % 60])
 		time_label.add_theme_color_override("font_color", GameConfig.GOLD if remaining <= 15.0 and mode == "voodoo" else Color.WHITE)
 	var leader := _leader_index() if not players.is_empty() else -1
+	if leader != last_leader_index:
+		last_leader_index = leader
+		leader_name_since = elapsed
+	var card_order: Array[int] = _score_order() if not players.is_empty() else []
+	if local_player in card_order:
+		card_order.erase(local_player)
+		card_order.push_front(local_player)
+	_layout_score_cards(card_order)
 	for slot in range(score_name_labels.size()):
-		var active := slot < players.size() and not bool(players[slot].get("disconnected",false))
-		for control in [score_name_labels[slot], score_tag_labels[slot], score_portraits[slot], score_frames[slot], score_frame_skulls[slot]]:
+		var player_index := int(card_order[slot]) if slot < card_order.size() else slot
+		var active := player_index < players.size() and not bool(players[player_index].get("disconnected",false))
+		for control in [score_name_labels[player_index], score_tag_labels[player_index], score_portraits[player_index], score_frames[player_index], score_frame_skulls[player_index]]:
 			control.visible = active
-		score_number_labels[slot].visible = active and mode != "survival"
+		score_number_labels[player_index].visible = active and mode not in ["survival", "greed"]
 		for stitch in GameConfig.SURVIVAL_LIVES:
-			score_life_icons[slot][stitch].visible = active and mode == "survival"
-		score_crowns[slot].visible = active and slot == leader
+			score_life_icons[player_index][stitch].visible = active and mode == "survival"
+		score_crowns[player_index].visible = active and player_index == leader
 		if not active: continue
-		var player: Dictionary = players[slot]
-		score_name_labels[slot].text = String(player.name)
-		score_name_labels[slot].add_theme_color_override("font_color", player.color)
-		score_tag_labels[slot].text = "%s%d · %s%s" % [I18n.t("player"), slot + 1, (I18n.t("you") + " · ") if slot == local_player else "", player.shape]
-		score_tag_labels[slot].add_theme_color_override("font_color", player.color)
+		var player: Dictionary = players[player_index]
+		score_name_labels[player_index].text = String(player.name)
+		score_name_labels[player_index].add_theme_color_override("font_color", player.color)
+		score_tag_labels[player_index].text = "%s%d · %s%s" % [I18n.t("player"), player_index + 1, (I18n.t("you") + " · ") if player_index == local_player else "", player.shape]
+		score_tag_labels[player_index].add_theme_color_override("font_color", player.color)
 		var portrait_path := "res://assets/ui/retrato_%s_%s.png" % [player.character, player.sprite_color]
 		var portrait_texture: Texture2D = load(portrait_path)
-		if portrait_texture != null: score_portraits[slot].texture = portrait_texture
+		if portrait_texture != null: score_portraits[player_index].texture = portrait_texture
 		var frame_id := str(player.get("cosmetics",{}).get("frame","madera"))
 		var frame_texture: Texture2D = load("res://assets/ui/marco_%s.png" % ("hueso" if frame_id == "calavera" else frame_id))
-		if frame_texture != null: score_frames[slot].texture = frame_texture
-		score_frame_skulls[slot].visible = frame_id == "calavera"
+		if frame_texture != null: score_frames[player_index].texture = frame_texture
+		score_frame_skulls[player_index].visible = frame_id == "calavera"
 		var value := int(player.score)
-		if score_values[slot] != value:
-			var previous_value := maxi(0, score_values[slot])
-			score_values[slot] = value
-			score_change_times[slot] = Time.get_ticks_msec()
-			_animate_score(score_number_labels[slot], previous_value, value)
+		if score_values[player_index] != value:
+			var previous_value := maxi(0, score_values[player_index])
+			if player_index != local_player or pickup_streak_value <= 0:
+				score_values[player_index] = value
+				score_change_times[player_index] = Time.get_ticks_msec()
+				_animate_score(score_number_labels[player_index], previous_value, value)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
-				var atlas := score_life_icons[slot][stitch].texture as AtlasTexture
+				var atlas := score_life_icons[player_index][stitch].texture as AtlasTexture
 				atlas.region = Rect2(0.0 if stitch < int(player.lives) else 128.0, 0.0, 128.0, 128.0)
-			if score_number_labels[slot].has_meta("score_tween"): (score_number_labels[slot].get_meta("score_tween") as Tween).kill()
+			if score_number_labels[player_index].has_meta("score_tween"): (score_number_labels[player_index].get_meta("score_tween") as Tween).kill()
 	var spell_icon := hud_root.get_node_or_null("SpellIcon") as TextureRect
 	var spell_name := hud_root.get_node_or_null("SpellName") as Label
 	var spell_glow := hud_root.get_node_or_null("SpellGlow") as TextureRect
@@ -665,6 +699,44 @@ func _update_hud() -> void:
 		if notice_icon and notice_index >= 0: notice_icon.texture = spell_atlases[notice_index]
 		if notice_name: notice_name.text = I18n.t("spell_" + spell_notice_item)
 		if notice_text: notice_text.text = I18n.t("spell_desc_" + spell_notice_item)
+
+func _layout_score_cards(order: Array[int]) -> void:
+	var positions := [8.0, 294.0, 706.0, 992.0]
+	for player_index in range(mini(order.size(), score_cards.size())):
+		var visual_slot := order.find(player_index)
+		if visual_slot < 0: continue
+		var x: float = positions[visual_slot]
+		var local := player_index == local_player
+		score_cards[player_index].size.x = GameConfig.SCORE_CARD_LOCAL_WIDTH if local else 280.0
+		var targets: Array = [
+			[score_cards[player_index], Vector2(x, 8.0)],
+			[score_portraits[player_index], Vector2(x + 6.0, 13.0)],
+			[score_frames[player_index], Vector2(x + 3.0, 10.0)],
+			[score_frame_skulls[player_index], Vector2(x + 12.0, 23.0)],
+			[score_crowns[player_index], Vector2(x + 11.0, 3.0)],
+			[score_name_labels[player_index], Vector2(x + 58.0, 9.0)],
+			[score_tag_labels[player_index], Vector2(x + 58.0, 31.0)],
+			[score_number_labels[player_index], Vector2(x + 216.0, 6.0)]
+		]
+		for pair in targets:
+			var control := pair[0] as Control
+			var target: Vector2 = pair[1]
+			if control.get_meta("score_layout_target", Vector2(-10000.0, -10000.0)) == target: continue
+			control.set_meta("score_layout_target", target)
+			if Settings.reduce_motion or not control.is_inside_tree():
+				control.position = target
+			else:
+				if control.has_meta("score_layout_tween"):
+					var previous := control.get_meta("score_layout_tween") as Tween
+					if is_instance_valid(previous): previous.kill()
+				var slide := control.create_tween()
+				slide.tween_property(control, "position", target, GameConfig.SCORE_CARD_SLIDE_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+				control.set_meta("score_layout_tween", slide)
+		score_name_labels[player_index].size.x = 154.0
+		score_tag_labels[player_index].size.x = 158.0
+		score_number_labels[player_index].add_theme_font_size_override("font_size", 32 if local else GameConfig.SCORE_CARD_RIVAL_NUMBER_SIZE)
+		for stitch in GameConfig.SURVIVAL_LIVES:
+			score_life_icons[player_index][stitch].position = Vector2(x + 209.0 + stitch * 18.0, 15.0)
 
 func _build_menu() -> void:
 	Sfx.stop_music()
@@ -1155,6 +1227,7 @@ func _build_hud() -> void:
 		fog_rect.material = fog_material
 		root.add_child(fog_rect)
 	score_name_labels.clear()
+	score_cards.clear()
 	score_tag_labels.clear()
 	score_number_labels.clear()
 	score_life_icons.clear()
@@ -1175,6 +1248,7 @@ func _build_hud() -> void:
 		card.position = Vector2(card_x[slot], 8)
 		card.size = Vector2(280, 54)
 		root.add_child(card)
+		score_cards.append(card)
 		var portrait := TextureRect.new()
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait.position = Vector2(card_x[slot] + 6, 13)
@@ -1728,8 +1802,6 @@ func _draw() -> void:
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
-		if mode == "greed" and int(player.coins) > 0:
-			draw_string(floating_coin_font,pos + Vector2(-25,-80),str(player.coins),HORIZONTAL_ALIGNMENT_CENTER,50,24,GameConfig.GOLD)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
 				var texture: Texture2D = STITCHES_TEXTURE
@@ -1756,29 +1828,37 @@ func _draw() -> void:
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height), Color(1,1,1,0.35) if bool(player.get("ghost",false)) else Color.WHITE)
 			draw_set_transform(OFFSET)
 		var name_color: Color = player.color if i == local_player else Color.WHITE
-		var name_text := (I18n.t("you") + " · " if i == local_player else "") + String(player.name)
 		var name_font: Font = player_name_font if player_name_font != null else ThemeDB.fallback_font
-		var name_size := GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE if i == local_player else GameConfig.PLAYER_NAME_FONT_SIZE
-		var name_position: Vector2 = pos + Vector2(-GameConfig.PLAYER_NAME_WIDTH * 0.5, GameConfig.PLAYER_NAME_Y)
-		draw_string_outline(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, GameConfig.PLAYER_NAME_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
-		draw_string(name_font, name_position, name_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, name_size, name_color)
+		var show_rival_name := i != local_player and (elapsed <= GameConfig.PLAYER_NAME_INTRO_SECONDS or (i == _leader_index() and elapsed - leader_name_since <= GameConfig.PLAYER_NAME_CROWN_SECONDS))
+		if show_rival_name:
+			var name_position: Vector2 = pos + Vector2(-GameConfig.PLAYER_NAME_WIDTH * 0.5, GameConfig.PLAYER_NAME_Y)
+			draw_string_outline(name_font, name_position, String(player.name), HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, GameConfig.PLAYER_NAME_FONT_SIZE, GameConfig.PLAYER_NAME_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
+			draw_string(name_font, name_position, String(player.name), HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PLAYER_NAME_WIDTH, GameConfig.PLAYER_NAME_FONT_SIZE, name_color)
 		if i == local_player:
-			var arrow_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y - GameConfig.PLAYER_LOCAL_NAME_FONT_SIZE - GameConfig.PLAYER_ARROW_NAME_GAP)
+			var arrow_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_NAME_Y - GameConfig.PLAYER_ARROW_NAME_GAP)
 			draw_colored_polygon(PackedVector2Array([arrow_center + Vector2(-GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(GameConfig.PLAYER_ARROW_HALF_WIDTH, -GameConfig.PLAYER_ARROW_HEAD_HEIGHT), arrow_center + Vector2(0.0, GameConfig.PLAYER_ARROW_TIP_LENGTH)]), name_color)
 			var aura_center: Vector2 = pos + Vector2(0.0, GameConfig.PLAYER_AURA_CENTER_Y)
 			var aura_alpha := GameConfig.PLAYER_AURA_REDUCED_ALPHA if Settings.reduce_motion else (GameConfig.PLAYER_AURA_MIN_ALPHA + GameConfig.PLAYER_AURA_ALPHA_RANGE * (sin(elapsed * GameConfig.PLAYER_AURA_PULSE_SPEED) * 0.5 + 0.5))
 			draw_arc(aura_center, GameConfig.PLAYER_AURA_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, Color(name_color, aura_alpha), GameConfig.PLAYER_AURA_WIDTH, true)
-		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
+		draw_string(ThemeDB.fallback_font, pos + Vector2(-8, 34), player.shape, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, name_color)
 		if i == local_player and player.combo > 1:
 			var badge_center: Vector2 = pos + GameConfig.COMBO_BADGE_OFFSET
 			draw_circle(badge_center, GameConfig.COMBO_BADGE_RADIUS, Color("241838", 0.92))
-			draw_arc(badge_center, GameConfig.COMBO_BADGE_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, GameConfig.GOLD, GameConfig.COMBO_BADGE_OUTLINE_WIDTH, true)
+			draw_arc(badge_center, GameConfig.COMBO_BADGE_RADIUS, 0.0, TAU, GameConfig.PLAYER_AURA_SEGMENTS, GameConfig.EMBER, GameConfig.COMBO_BADGE_OUTLINE_WIDTH, true)
 			var badge_text_position := badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_OFFSET_Y)
 			var badge_text_width := GameConfig.COMBO_BADGE_RADIUS * GameConfig.COMBO_BADGE_DIAMETER_FACTOR
-			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, Color.WHITE)
-			draw_string(ThemeDB.fallback_font, badge_center + Vector2(-GameConfig.COMBO_BADGE_RADIUS, GameConfig.COMBO_BADGE_TEXT_BOTTOM_Y), str(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_COUNT_SIZE, GameConfig.GOLD)
+			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, GameConfig.BONE_TEXT)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
+	if pickup_streak_value > 0 and local_player >= 0 and local_player < players.size():
+		var streak_age := GameConfig.PICKUP_STREAK_SECONDS - pickup_streak_time
+		var streak_size := roundi(lerpf(GameConfig.PICKUP_STREAK_MIN_FONT, GameConfig.PICKUP_STREAK_MAX_FONT, clampf(float(pickup_streak_count - 1) / 8.0, 0.0, 1.0)))
+		var streak_pop := 1.0 if Settings.reduce_motion else 1.0 + 0.12 * (1.0 - clampf(streak_age / GameConfig.FLOAT_POP_SECONDS, 0.0, 1.0))
+		var streak_text := "+%d" % pickup_streak_value
+		var streak_pos := pickup_streak_position + Vector2(OFFSET.x - GameConfig.PICKUP_STREAK_TEXT_WIDTH * 0.5, OFFSET.y - GameConfig.PICKUP_STREAK_HEIGHT)
+		var streak_color := GameConfig.BONE_TEXT if pickup_streak_value == 1 else GameConfig.EMBER
+		draw_string_outline(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, streak_pos, streak_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PICKUP_STREAK_TEXT_WIDTH, roundi(streak_size * streak_pop), GameConfig.FLOAT_COIN_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
+		draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, streak_pos, streak_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PICKUP_STREAK_TEXT_WIDTH, roundi(streak_size * streak_pop), streak_color)
 	if safe_zone_warning_step > safe_zone_step:
 		var warning_rect := ZoneRules.safe_rect(safe_zone_step + 1)
 		var warning_alpha := 0.78 if Settings.reduce_motion else (0.55 + 0.45 * sin(elapsed * GameConfig.ZONE_WARNING_FLASH_SPEED))
@@ -2028,6 +2108,32 @@ func _score_order() -> Array[int]:
 
 func _on_floating_text(text: String, world_pos: Vector2, tint: Color) -> void:
 	Fx.render_pop(text, world_pos, Color("7fe7ff") if text == I18n.t("trap_zap") else tint)
+
+func _finish_pickup_streak() -> void:
+	if pickup_streak_value <= 0: return
+	var total := pickup_streak_value
+	var from := pickup_streak_position + OFFSET - Vector2(0.0, GameConfig.PICKUP_STREAK_HEIGHT)
+	if is_instance_valid(hud_root) and local_player >= 0 and local_player < score_number_labels.size() and is_instance_valid(score_number_labels[local_player]):
+		var label := Label.new()
+		label.text = "+%d" % total
+		label.add_theme_font_override("font", ThemeBuilder.font("Oswald-Bold.woff2"))
+		label.add_theme_font_size_override("font_size", GameConfig.PICKUP_STREAK_MIN_FONT)
+		label.add_theme_color_override("font_color", GameConfig.EMBER)
+		label.add_theme_constant_override("outline_size", GameConfig.FLOAT_COIN_OUTLINE_SIZE)
+		label.add_theme_color_override("font_outline_color", GameConfig.BACKGROUND)
+		label.size = Vector2(GameConfig.PICKUP_STREAK_TEXT_WIDTH, GameConfig.PICKUP_STREAK_MIN_FONT * 1.5)
+		label.position = from - label.size * 0.5
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hud_root.add_child(label)
+		var destination: Vector2 = hud_root.to_local(score_number_labels[local_player].global_position + score_number_labels[local_player].size * 0.5 - label.size * 0.5)
+		var tween := label.create_tween()
+		tween.tween_property(label, "position", destination, GameConfig.JUICE_FLIGHT_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tween.tween_callback(label.queue_free)
+	else:
+		Fx.pop("+%d" % total, from, GameConfig.EMBER)
+	pickup_streak_value = 0
+	pickup_streak_count = 0
+	pickup_streak_time = 0.0
 
 func _animate_score(label: Label, old_value: int, value: int) -> void:
 	if label.has_meta("score_tween"):

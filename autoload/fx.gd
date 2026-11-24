@@ -7,9 +7,18 @@ var text_layer: CanvasLayer
 var canvas: Node2D
 var hitstop := 0.0
 var squash: Dictionary = {}
+var active_texts: Array[Label] = []
+var banner_queue: Array[Dictionary] = []
+var banner_active := false
+var banner_cooldown := 0.0
 
 func _process(delta: float) -> void:
 	hitstop = maxf(0, hitstop - delta)
+	banner_cooldown = maxf(0.0, banner_cooldown - delta)
+	active_texts = active_texts.filter(func(label: Label) -> bool: return is_instance_valid(label))
+	if not banner_active and banner_cooldown <= 0.0 and not banner_queue.is_empty():
+		var queued: Dictionary = banner_queue.pop_front()
+		_render_pop(str(queued.text), queued.position, queued.tint, true)
 	for index in squash.keys():
 		squash[index] = maxf(0, float(squash[index]) - delta)
 
@@ -95,13 +104,25 @@ func feedback(event: Dictionary, local_player: int) -> void:
 		elif int(event.attacker) == local_player: vibrate(0.5)
 
 func render_pop(text: String, position: Vector2, tint: Color) -> void:
+	var banner := text in [I18n.t("frenzy"), I18n.t("voodoo_combo"), I18n.t("zone_warning")]
+	if banner and banner_active:
+		if banner_queue.size() < GameConfig.FLOAT_BANNER_QUEUE_MAX:
+			banner_queue.append({"text":text,"position":position,"tint":tint})
+		return
+	_render_pop(text, position, tint, banner)
+
+func _render_pop(text: String, position: Vector2, tint: Color, banner: bool) -> void:
 	if not is_instance_valid(text_layer):
 		text_layer = CanvasLayer.new()
 		text_layer.layer = 20
 		add_child(text_layer)
 	var numeric := text.begins_with("+") or text.begins_with("-")
 	var loss := text.begins_with("-")
-	var banner := text in [I18n.t("frenzy"), I18n.t("voodoo_combo")]
+	if banner: banner_active = true
+	active_texts = active_texts.filter(func(active: Label) -> bool: return is_instance_valid(active))
+	while active_texts.size() >= GameConfig.FLOAT_TEXT_MAX_VISIBLE:
+		var oldest: Label = active_texts.pop_front()
+		if is_instance_valid(oldest): oldest.queue_free()
 	var label := Label.new()
 	label.text = text
 	var font_size := GameConfig.FLOAT_NOTICE_LARGE_FONT_SIZE if banner else (GameConfig.FLOAT_COIN_FONT_SIZE if numeric else GameConfig.FLOAT_NOTICE_FONT_SIZE)
@@ -115,10 +136,15 @@ func render_pop(text: String, position: Vector2, tint: Color) -> void:
 	label.add_theme_color_override("font_color", color)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.size = Vector2(GameConfig.FLOAT_NOTICE_TEXT_WIDTH, font_size * 2)
-	label.position = position - label.size * 0.5
+	var spaced_position := position
+	for active in active_texts:
+		if active.position.distance_to(spaced_position - label.size * 0.5) < GameConfig.FLOAT_TEXT_MIN_SPACING:
+			spaced_position.y -= GameConfig.FLOAT_TEXT_MIN_SPACING
+	label.position = spaced_position - label.size * 0.5
 	label.pivot_offset = label.size * 0.5
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text_layer.add_child(label)
+	active_texts.append(label)
 	var duration := GameConfig.FLOAT_COIN_SECONDS if numeric else GameConfig.FLOAT_NOTICE_SECONDS
 	var tween := label.create_tween().set_parallel(true)
 	if not Settings.reduce_motion:
@@ -146,12 +172,23 @@ func render_pop(text: String, position: Vector2, tint: Color) -> void:
 				pulse.tween_property(label, "scale", Vector2.ONE, 0.15)
 		tween.tween_property(label, "scale", Vector2.ONE * 0.6, 0.25).set_delay(duration - 0.25)
 	tween.tween_property(label, "modulate:a", 0.0, 0.25).set_delay(duration - 0.25)
-	tween.chain().tween_callback(label.queue_free)
+	tween.chain().tween_callback(func(): _release_text(label, banner))
+
+func _release_text(label: Label, banner: bool) -> void:
+	active_texts.erase(label)
+	if is_instance_valid(label): label.queue_free()
+	if banner:
+		banner_active = false
+		banner_cooldown = GameConfig.FLOAT_BANNER_QUEUE_DELAY
 
 func clear_text() -> void:
 	if is_instance_valid(text_layer):
 		text_layer.free()
 		text_layer = null
+	active_texts.clear()
+	banner_queue.clear()
+	banner_active = false
+	banner_cooldown = 0.0
 	hitstop = 0.0
 	squash.clear()
 	if is_instance_valid(canvas):

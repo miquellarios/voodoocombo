@@ -20,6 +20,12 @@
 - La regresión principal pasa y una prueba temporal recorrió las cuatro pestañas sin desplegables. Esa prueba de reconstrucción repetida terminó con avisos de RIDs `CanvasItem`; dos cambios de pestaña aislados no los reprodujeron. Queda como prueba humana cambiar varias veces de pestaña en una sola sesión.
 - Pruebas humanas: recorrer PERSONAJE, MARCO, ESTELA y EMOTES con ratón, foco/teclado y mando; previsualizar bloqueados, equipar uno disponible, configurar las ocho ranuras y revisar la taquilla a 75 % y 150 %.
 
+### Fase 13d — Menos ruido visual en partida
+- Quitados los textos repetidos por cada doblón y los nombres al abrir cofres; los avisos de combo y golpes ahora se atribuyen al jugador afectado. El jugador local ve una racha acumulada (+N) que aumenta de tamaño y vuela a su marcador al terminar.
+- Limitados los textos flotantes a tres a la vez, con separación vertical mínima; los banners de Frenesí, Voodoo Combo y niebla se encolan. Sobre el muñeco local quedan la flecha, la forma y el aro; los nombres rivales solo aparecen al inicio y al ganar la corona. El marcador fija tu ficha a la izquierda, reduce el tamaño de números rivales, anima el reordenamiento y oculta las cifras individuales en Codicia.
+- El escaneo de scripts de Godot 4.7 y `tests/run_tests.gd` pasan. La captura automática de este bloque no se pudo obtener con el renderer headless (no ofrece textura de pantalla); queda pendiente la revisión gráfica y la prueba de 20 s con cuatro bots.
+- Pruebas humanas: jugar 20 s con cuatro bots y comprobar que nunca aparecen más de tres textos, que no se pisan, que la racha vuela al marcador, que los avisos grandes esperan su turno y que las fichas se reordenan bien en Codicia y VoodooCombo.
+
 ## Registro humano
 
 Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el profesorado.
