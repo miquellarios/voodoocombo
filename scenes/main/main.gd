@@ -85,6 +85,12 @@ var character_preview: TextureRect
 var character_preview_id := "mago"
 var character_idle := 0.0
 var locker_tab := "character"
+var locker_name_label: Label
+var locker_role_label: Label
+var locker_frame_preview: TextureRect
+var locker_trail_preview: ColorRect
+var locker_social_slot := 0
+var locker_preview_item := ""
 var spell_notice_time := 0.0
 var spell_notice_item := ""
 var last_input_controller := false
@@ -232,6 +238,12 @@ func _process(delta: float) -> void:
 		return
 	if state == "menu":
 		if not Settings.reduce_motion: character_idle += delta
+		if is_instance_valid(character_preview): _update_character_preview()
+		return
+	if state == "locker":
+		if not Settings.reduce_motion:
+			character_idle += delta
+			if is_instance_valid(locker_trail_preview): locker_trail_preview.modulate.a = GameConfig.LOCKER_TRAIL_PULSE_ALPHA + sin(character_idle * GameConfig.LOCKER_TRAIL_PULSE_RATE) * GameConfig.LOCKER_TRAIL_PULSE_AMOUNT
 		if is_instance_valid(character_preview): _update_character_preview()
 		return
 	if state == "loading":
@@ -710,40 +722,74 @@ func _build_locker(tab: String) -> void:
 	state = "locker"
 	locker_tab = tab
 	var root := _new_overlay()
-	_label(root, I18n.t("characters"), Vector2(0, 44), 42, GameConfig.GOLD, true)
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0.043, 0.027, 0.063, 0.96)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(backdrop)
+	root.move_child(backdrop, 0)
+	_label(root, I18n.t("characters"), GameConfig.LOCKER_TITLE_POSITION, GameConfig.LOCKER_TITLE_FONT_SIZE, GameConfig.BONE_TEXT, true)
 	var tab_ids := ["character", "frame", "trail", "emotes"]
 	var tab_keys := ["locker_character", "locker_frame", "locker_trail", "locker_emotes"]
 	for index in range(tab_ids.size()):
-		var tab_button := _button(root, I18n.t(tab_keys[index]), Vector2(0, 102), Callable(self, "_build_locker").bind(tab_ids[index]))
-		tab_button.position = Vector2(180.0 + index * 235.0, 102.0)
-		tab_button.size = Vector2(210.0, 46.0)
-	if tab != "character":
-		_build_cosmetic_tab(root, tab)
-		_button(root, I18n.t("menu"), Vector2(0, 610), _locker_back)
-		return
+		var tab_button := _button(root, I18n.t(tab_keys[index]), Vector2(0, 0), Callable(self, "_build_locker").bind(tab_ids[index]))
+		tab_button.position = Vector2(GameConfig.LOCKER_TAB_START_X + index * GameConfig.LOCKER_TAB_SPACING, 76.0)
+		tab_button.size = GameConfig.LOCKER_TAB_SIZE
+		tab_button.add_theme_font_size_override("font_size", GameConfig.LOCKER_TAB_FONT_SIZE)
+		tab_button.add_theme_font_override("font", ThemeBuilder.title_font(GameConfig.LOCKER_TAB_FONT_SIZE, true))
+		if tab_ids[index] == tab: tab_button.add_theme_color_override("font_color", GameConfig.EMBER)
 	if not ["mago", "trol", "gnomo", "nigro"].has(Profile.character): Profile.character = "mago"
-	character_preview_id = Profile.character
+	if tab == "character": character_preview_id = Profile.character
+	elif character_preview_id.is_empty(): character_preview_id = Profile.character
+	var preview_panel := Panel.new()
+	preview_panel.position = GameConfig.LOCKER_PREVIEW_RECT.position
+	preview_panel.size = GameConfig.LOCKER_PREVIEW_RECT.size
+	var preview_style := StyleBoxFlat.new()
+	preview_style.bg_color = Color("160f20")
+	preview_style.border_color = Color("5c496d")
+	preview_style.set_border_width_all(2)
+	preview_style.set_corner_radius_all(10)
+	preview_panel.add_theme_stylebox_override("panel", preview_style)
+	root.add_child(preview_panel)
+	locker_trail_preview = ColorRect.new()
+	locker_trail_preview.position = GameConfig.LOCKER_TRAIL_RECT.position
+	locker_trail_preview.size = GameConfig.LOCKER_TRAIL_RECT.size
+	locker_trail_preview.color = _locker_trail_color(str(Profile.cosmetics.get("trail", "color")))
+	preview_panel.add_child(locker_trail_preview)
+	locker_frame_preview = TextureRect.new()
+	locker_frame_preview.position = GameConfig.LOCKER_FRAME_RECT.position
+	locker_frame_preview.size = GameConfig.LOCKER_FRAME_RECT.size
+	locker_frame_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	locker_frame_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	preview_panel.add_child(locker_frame_preview)
 	character_preview = TextureRect.new()
 	character_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	character_preview.name = "CharacterPreview"
-	character_preview.position = Vector2(490, 145)
-	character_preview.size = Vector2(300, 300)
+	character_preview.position = GameConfig.LOCKER_CHARACTER_RECT.position
+	character_preview.size = GameConfig.LOCKER_CHARACTER_RECT.size
 	character_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	character_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	root.add_child(character_preview)
+	preview_panel.add_child(character_preview)
 	_update_character_preview()
-	var display: Dictionary = character_metadata.get("characters", {}).get(character_preview_id, {})
-	_label(root, String(display.get("name", character_preview_id.to_upper())), Vector2(0, 420), 34, Color("fff6c2"), true)
-	_label(root, String(display.get("role", "")), Vector2(0, 465), 20, Color("b8a9d1"), false)
-	_label(root, Profile.nick, Vector2(0.0, GameConfig.CHARACTER_NICKNAME_Y), GameConfig.CHARACTER_NICKNAME_FONT_SIZE, Color("fff6c2"), false)
-	_button(root, I18n.t("name_edit"), Vector2(0.0, GameConfig.NICK_EDIT_BUTTON_Y), func(): _build_nickname_dialog(true))
-	var previous_button := _button(root, "◀", Vector2(-210, 265), func(): _cycle_character(-1))
-	previous_button.position = Vector2(350, 265)
-	previous_button.size = Vector2(64, 54)
-	var next_button := _button(root, "▶", Vector2(210, 265), func(): _cycle_character(1))
-	next_button.position = Vector2(866, 265)
-	next_button.size = Vector2(64, 54)
-	_button(root, I18n.t("menu"), Vector2(0, 565), _locker_back)
+	locker_name_label = _hud_label(preview_panel, GameConfig.LOCKER_NAME_RECT.position, GameConfig.LOCKER_NAME_RECT.size, GameConfig.LOCKER_NAME_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	locker_name_label.text = I18n.t("character_" + character_preview_id)
+	locker_role_label = _hud_label(preview_panel, GameConfig.LOCKER_ROLE_RECT.position, GameConfig.LOCKER_ROLE_RECT.size, GameConfig.LOCKER_ROLE_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	locker_role_label.text = I18n.t("character_role_" + character_preview_id)
+	var equipped_frame := str(Profile.cosmetics.get("frame", "madera"))
+	locker_frame_preview.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if equipped_frame == "calavera" else equipped_frame))
+	var nick := _hud_label(preview_panel, GameConfig.LOCKER_NICK_RECT.position, GameConfig.LOCKER_NICK_RECT.size, GameConfig.CHARACTER_NICKNAME_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
+	nick.text = Profile.nick if not Profile.nick.strip_edges().is_empty() else I18n.t("profile_name_empty")
+	var edit := _button(preview_panel, "✎", Vector2(339, 438), func(): _build_nickname_dialog(true))
+	edit.position = GameConfig.LOCKER_EDIT_RECT.position
+	edit.size = GameConfig.LOCKER_EDIT_RECT.size
+	var previous_button := _button(preview_panel, "‹", GameConfig.LOCKER_PREVIEW_PREVIOUS_POSITION, func(): _cycle_character(-1))
+	previous_button.position = GameConfig.LOCKER_PREVIEW_PREVIOUS_POSITION
+	previous_button.size = GameConfig.LOCKER_PREVIEW_ARROW_SIZE
+	var next_button := _button(preview_panel, "›", GameConfig.LOCKER_PREVIEW_NEXT_POSITION, func(): _cycle_character(1))
+	next_button.position = GameConfig.LOCKER_PREVIEW_NEXT_POSITION
+	next_button.size = GameConfig.LOCKER_PREVIEW_ARROW_SIZE
+	_build_cosmetic_tab(root, tab)
+	_button(root, I18n.t("menu"), GameConfig.LOCKER_MENU_RECT.position, _locker_back).size = GameConfig.LOCKER_MENU_RECT.size
 	character_idle = 0.0
 
 func _build_cosmetic_tab(root: Control, tab: String) -> void:
@@ -759,53 +805,84 @@ func _build_cosmetic_tab(root: Control, tab: String) -> void:
 		ids = ["color", "oro", "escarcha", "almas"]
 		levels = GameConfig.TRAIL_UNLOCK_LEVELS
 	else:
-		ids = ["risa", "enfado", "llanto", "corazon", "gg", "calavera", "pulgar", "fuego"]
-		levels = GameConfig.EMOTE_UNLOCK_LEVELS
+		ids = ["mago", "trol", "gnomo", "nigro"]
+		levels = {"mago": 1, "trol": 1, "gnomo": 1, "nigro": 1}
+	var scroll := ScrollContainer.new()
+	scroll.position = GameConfig.LOCKER_SCROLL_RECT.position
+	scroll.size = GameConfig.LOCKER_SCROLL_RECT.size
+	root.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = GameConfig.LOCKER_GRID_COLUMNS
+	grid.add_theme_constant_override("h_separation", GameConfig.LOCKER_GRID_GAP)
+	grid.add_theme_constant_override("v_separation", GameConfig.LOCKER_GRID_GAP)
+	scroll.add_child(grid)
 	var equipped: Array = Profile.cosmetics.get("emotes", [])
 	for index in range(ids.size()):
 		var item_id := ids[index]
-		var col := index % 4
-		var row := index / 4
-		var card := Panel.new()
-		card.position = Vector2(122.0 + col * 264.0, 180.0 + row * 192.0)
-		card.size = Vector2(230.0, 166.0)
+		var card := PanelContainer.new()
+		card.custom_minimum_size = GameConfig.LOCKER_CARD_SIZE
+		card.focus_mode = Control.FOCUS_ALL
+		card.mouse_entered.connect(_preview_locker_item.bind(tab, item_id))
+		card.focus_entered.connect(_preview_locker_item.bind(tab, item_id))
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color("241838")
-		style.border_color = GameConfig.GOLD if (Profile.cosmetics.get("frame", "madera") == item_id or Profile.cosmetics.get("trail", "color") == item_id or equipped.has(item_id)) else Color("5c496d")
+		var selected: bool = Profile.cosmetics.get(tab, "") == item_id or equipped.has(item_id) or (tab == "character" and Profile.character == item_id)
+		style.border_color = GameConfig.EMBER if selected else Color("5c496d")
 		style.set_border_width_all(2)
-		style.set_corner_radius_all(8)
+		style.set_corner_radius_all(7)
 		card.add_theme_stylebox_override("panel", style)
-		root.add_child(card)
+		grid.add_child(card)
+		var content := VBoxContainer.new()
+		content.alignment = BoxContainer.ALIGNMENT_CENTER
+		content.add_theme_constant_override("separation", 3)
+		card.add_child(content)
 		var icon := TextureRect.new()
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.position = Vector2(82.0, 10.0)
-		icon.size = Vector2(66.0, 66.0)
+		icon.custom_minimum_size = GameConfig.LOCKER_CARD_ICON_SIZE
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		if tab == "frame":
 			icon.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if item_id == "calavera" else item_id))
-			card.add_child(icon)
-		elif tab == "emotes":
-			icon = _result_emote_icon(item_id)
-			icon.position = Vector2(82.0, 10.0)
-			icon.size = Vector2(66.0, 66.0)
-			card.add_child(icon)
+		elif tab == "character":
+			icon.texture = load("res://assets/ui/retrato_%s_coral.png" % item_id)
 		else:
 			var swatch := ColorRect.new()
-			swatch.position = Vector2(100.0, 16.0)
-			swatch.size = Vector2(30.0, 52.0)
-			swatch.color = {"color": Color("d9a8ff"), "oro": GameConfig.GOLD, "escarcha": Color("7fe7ff"), "almas": Color("b06bff")}.get(item_id, Color.WHITE)
-			card.add_child(swatch)
-		var title := _hud_label(card, Vector2(4.0, 80.0), Vector2(222.0, 30.0), 17, HORIZONTAL_ALIGNMENT_CENTER)
-		title.text = I18n.t("cosmetic_" + item_id)
+			swatch.position = GameConfig.LOCKER_TRAIL_ICON_BAR_RECT.position
+			swatch.size = GameConfig.LOCKER_TRAIL_ICON_BAR_RECT.size
+			swatch.color = _locker_trail_color(item_id)
+			for glint_rect: Rect2 in GameConfig.LOCKER_TRAIL_ICON_GLINT_RECTS:
+				var glint := ColorRect.new()
+				glint.position = glint_rect.position
+				glint.size = glint_rect.size
+				glint.color = Color(1.0, 1.0, 1.0, 0.65)
+				swatch.add_child(glint)
+			icon = TextureRect.new()
+			icon.custom_minimum_size = GameConfig.LOCKER_CARD_ICON_SIZE
+			icon.add_child(swatch)
+		content.add_child(icon)
+		var title := _hud_label(content, Vector2.ZERO, Vector2(158, 28), 17, HORIZONTAL_ALIGNMENT_CENTER)
+		if tab == "character": title.text = I18n.t("character_" + item_id)
+		elif tab == "trail": title.text = I18n.t("trail_" + item_id)
+		else: title.text = I18n.t("cosmetic_" + item_id)
 		var unlocked := Profile.level() >= int(levels.get(item_id, 99))
-		var action_text := I18n.t("locker_equipped") if (Profile.cosmetics.get(tab, "") == item_id or equipped.has(item_id)) else I18n.t("locker_select")
-		if not unlocked: action_text = "🔒 " + (I18n.t("unlock_level") % int(levels.get(item_id, 1)))
-		var pick := _button(card, action_text, Vector2(0.0, 119.0), Callable(self, "_select_locker_item").bind(tab, item_id))
-		pick.position = Vector2(8.0, 118.0)
-		pick.size = Vector2(214.0, 40.0)
+		var action_text := "✓ " + I18n.t("locker_equipped") if selected else ("🔒 " + (I18n.t("unlock_level") % int(levels.get(item_id, 1))) if not unlocked else I18n.t("locker_select"))
+		var pick := Button.new()
+		pick.text = action_text
+		pick.custom_minimum_size = GameConfig.LOCKER_CARD_STATUS_SIZE
+		pick.clip_text = true
+		pick.add_theme_font_size_override("font_size", 14)
+		pick.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
+		pick.disabled = not unlocked and not selected
+		pick.pressed.connect(_select_locker_item.bind(tab, item_id))
+		pick.mouse_entered.connect(_preview_locker_item.bind(tab, item_id))
+		pick.focus_entered.connect(_preview_locker_item.bind(tab, item_id))
+		content.add_child(pick)
 
 func _select_locker_item(tab: String, item_id: String) -> void:
+	if tab == "character":
+		Profile.character = item_id
+		Profile.save()
+		_build_locker("character")
+		return
 	var levels: Dictionary = GameConfig.EMOTE_UNLOCK_LEVELS if tab == "emotes" else (GameConfig.FRAME_UNLOCK_LEVELS if tab == "frame" else GameConfig.TRAIL_UNLOCK_LEVELS)
 	if Profile.level() < int(levels.get(item_id, 99)): return
 	if tab == "emotes":
@@ -825,25 +902,101 @@ func _select_locker_item(tab: String, item_id: String) -> void:
 	_build_locker(tab)
 
 func _build_social_locker(root: Control) -> void:
-	var equipped: Array = Profile.cosmetics.get("social", GameConfig.SOCIAL_DEFAULT)
-	var ids: Array = GameConfig.SOCIAL_LEVELS.keys()
+	var equipped: Array = Profile.cosmetics.get("social", GameConfig.SOCIAL_DEFAULT).duplicate()
+	while equipped.size() < 8: equipped.append("risa")
+	var wheel_panel := Control.new()
+	wheel_panel.position = GameConfig.LOCKER_SOCIAL_WHEEL_RECT.position
+	wheel_panel.size = GameConfig.LOCKER_SOCIAL_WHEEL_RECT.size
+	root.add_child(wheel_panel)
 	for slot in 8:
-		var column := slot % 2
-		var row := slot / 2
-		var selector := OptionButton.new()
-		selector.position = Vector2(150 + column * 510, 190 + row * 90)
-		selector.size = Vector2(460, 60)
-		for index in ids.size():
-			var item: String = str(ids[index])
-			var key := item if item.begins_with("dance") or item.begins_with("shout") else "cosmetic_" + item
-			selector.add_item("%d · %s" % [slot + 1, I18n.t(key)])
-			selector.set_item_disabled(index, Profile.level() < int(GameConfig.SOCIAL_LEVELS[item]))
-			if item == str(equipped[slot]): selector.select(index)
-		selector.item_selected.connect(func(index: int):
-			Profile.cosmetics.social[slot] = ids[index]
-			Profile.save()
-		)
-		root.add_child(selector)
+		var button := Button.new()
+		var direction := Vector2.from_angle(float(slot) * TAU / 8.0 - PI * 0.5)
+		button.position = GameConfig.LOCKER_SOCIAL_WHEEL_CENTER + direction * GameConfig.LOCKER_SOCIAL_WHEEL_RADIUS - GameConfig.LOCKER_SOCIAL_SLOT_SIZE * 0.5
+		button.size = GameConfig.LOCKER_SOCIAL_SLOT_SIZE
+		button.add_theme_color_override("font_color", GameConfig.EMBER if slot == locker_social_slot else GameConfig.BONE_TEXT)
+		button.pressed.connect(func(): locker_social_slot = slot; _build_locker("emotes"))
+		wheel_panel.add_child(button)
+		var social_key: String = str(equipped[slot]) if slot < equipped.size() else "risa"
+		if social_key.begins_with("shout"):
+			var shout_icon := _hud_label(wheel_panel, button.position + Vector2(3, 10), Vector2(46, 28), 14, HORIZONTAL_ALIGNMENT_CENTER)
+			shout_icon.text = "✦"
+		else:
+			var social_icon := _result_emote_icon(social_key if not social_key.begins_with("dance") else "jaja")
+			social_icon.position = button.position + Vector2(12, 10)
+			social_icon.size = GameConfig.LOCKER_SOCIAL_ICON_SIZE
+			wheel_panel.add_child(social_icon)
+		var slot_number := _hud_label(wheel_panel, button.position + Vector2(34, 2), Vector2(16, 16), 11, HORIZONTAL_ALIGNMENT_CENTER)
+		slot_number.text = str(slot + 1)
+	var selected_social := _hud_label(wheel_panel, Vector2(300, 130), Vector2(135, 22), 14, HORIZONTAL_ALIGNMENT_CENTER)
+	selected_social.text = _social_name(str(equipped[locker_social_slot]))
+	var ids: Array = GameConfig.SOCIAL_LEVELS.keys()
+	var scroll := ScrollContainer.new()
+	scroll.position = GameConfig.LOCKER_SOCIAL_GRID_RECT.position
+	scroll.size = GameConfig.LOCKER_SOCIAL_GRID_RECT.size
+	root.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = GameConfig.LOCKER_GRID_COLUMNS
+	grid.add_theme_constant_override("h_separation", GameConfig.LOCKER_GRID_GAP)
+	grid.add_theme_constant_override("v_separation", GameConfig.LOCKER_GRID_GAP)
+	scroll.add_child(grid)
+	for entry: Variant in ids:
+		var item := str(entry)
+		var card := PanelContainer.new()
+		card.custom_minimum_size = GameConfig.LOCKER_SOCIAL_CARD_SIZE
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("241838")
+		style.border_color = GameConfig.EMBER if str(equipped[locker_social_slot]) == item else Color("5c496d")
+		style.set_border_width_all(2)
+		card.add_theme_stylebox_override("panel", style)
+		grid.add_child(card)
+		var content := VBoxContainer.new()
+		content.alignment = BoxContainer.ALIGNMENT_CENTER
+		card.add_child(content)
+		if item.begins_with("shout"):
+			var shout := _hud_label(content, Vector2.ZERO, Vector2(156, 90), 14, HORIZONTAL_ALIGNMENT_CENTER)
+			shout.text = I18n.t(item)
+			shout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			shout.custom_minimum_size = Vector2(154, 76)
+		else:
+			var icon := _result_emote_icon(item if not item.begins_with("dance") else "jaja")
+			icon.custom_minimum_size = Vector2(72, 72)
+			content.add_child(icon)
+		var pick := Button.new()
+		pick.text = _social_name(item)
+		pick.clip_text = true
+		pick.add_theme_font_size_override("font_size", 14)
+		pick.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
+		pick.disabled = Profile.level() < int(GameConfig.SOCIAL_LEVELS[item])
+		pick.custom_minimum_size = Vector2(154, 34)
+		pick.pressed.connect(_select_social_item.bind(locker_social_slot, item))
+		content.add_child(pick)
+
+func _social_name(item: String) -> String:
+	var key := item if item.begins_with("dance") or item.begins_with("shout") else "cosmetic_" + item
+	return I18n.t(key)
+
+func _select_social_item(slot: int, item: String) -> void:
+	var equipped: Array = Profile.cosmetics.get("social", GameConfig.SOCIAL_DEFAULT).duplicate()
+	while equipped.size() < 8: equipped.append("risa")
+	equipped[slot] = item
+	Profile.cosmetics.social = equipped
+	Profile.save()
+	_build_locker("emotes")
+
+func _preview_locker_item(tab: String, item_id: String) -> void:
+	locker_preview_item = item_id
+	if tab == "character":
+		character_preview_id = item_id
+		_update_character_preview()
+		if is_instance_valid(locker_name_label): locker_name_label.text = I18n.t("character_" + item_id)
+		if is_instance_valid(locker_role_label): locker_role_label.text = I18n.t("character_role_" + item_id)
+	elif tab == "frame" and is_instance_valid(locker_frame_preview):
+		locker_frame_preview.texture = load("res://assets/ui/marco_%s.png" % ("hueso" if item_id == "calavera" else item_id))
+	elif tab == "trail" and is_instance_valid(locker_trail_preview):
+		locker_trail_preview.color = _locker_trail_color(item_id)
+
+func _locker_trail_color(item_id: String) -> Color:
+	return {"color": Color("d9a8ff"), "oro": Color("ffd23f"), "escarcha": Color("7fe7ff"), "almas": Color("b06bff")}.get(item_id, Color("d9a8ff"))
 
 func _build_nickname_dialog(return_to_characters: bool = false) -> void:
 	_clear_hud()
@@ -1817,6 +1970,13 @@ func _clear_hud() -> void:
 	if menu_logo_tween != null and menu_logo_tween.is_running(): menu_logo_tween.kill()
 	menu_logo_tween = null
 	if is_instance_valid(hud): hud.queue_free()
+	hud = null
+	hud_root = null
+	character_preview = null
+	locker_frame_preview = null
+	locker_trail_preview = null
+	locker_name_label = null
+	locker_role_label = null
 
 func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color, _bold: bool) -> Label:
 	var label := Label.new()

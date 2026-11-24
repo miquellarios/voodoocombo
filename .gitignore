@@ -16,3 +16,4 @@ build/Godot_v4.7.2-stable_win64.exe
 
 /.godot-local/
 docs/capturas/**/*.png.import
+/LocalLow/

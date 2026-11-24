@@ -14,6 +14,12 @@
 - La regresión completa de lógica pasa. Prueba local autorizada de loopback inicia el servidor, conecta un cliente y verifica que el proceso muere al salir. El ejecutable exportado arranca en modo headless. No se ha podido comprobar entre dos PCs ni verificar el firewall/NAT.
 - Pruebas humanas: probar alojar y unirse por IP/código desde dos PCs en la misma wifi; repetir desde redes distintas con VPN, cerrar el anfitrión durante una partida y comprobar el aviso de desconexión.
 
+### Fase 13c — Taquilla y cosméticos
+- Reorganizada la taquilla en dos columnas: personaje animado, marco y estela equipados a la izquierda; tarjetas enfocables para personaje, marco y estela a la derecha. El foco y el ratón previsualizan el objeto; las tarjetas muestran selección y nivel de desbloqueo. La pestaña social ahora usa ocho ranuras en rueda y una cuadrícula, sin `OptionButton`. Los textos nuevos de personajes y estelas pasan por I18n en es/ca/en.
+- Añadidas constantes de disposición/tamaño a `GameConfig`. Capturas de las cuatro pestañas en 1280×720 y 1920×1080, con 75 %, 100 % y 130 %, en `docs/capturas/fase-13/`. Revisadas visualmente varias esquinas de resolución/escala: tarjetas y nombres quedan separados; la cuadrícula de emotes continúa con scroll.
+- La regresión principal pasa y una prueba temporal recorrió las cuatro pestañas sin desplegables. Esa prueba de reconstrucción repetida terminó con avisos de RIDs `CanvasItem`; dos cambios de pestaña aislados no los reprodujeron. Queda como prueba humana cambiar varias veces de pestaña en una sola sesión.
+- Pruebas humanas: recorrer PERSONAJE, MARCO, ESTELA y EMOTES con ratón, foco/teclado y mando; previsualizar bloqueados, equipar uno disponible, configurar las ocho ranuras y revisar la taquilla a 75 % y 150 %.
+
 ## Registro humano
 
 Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el profesorado.
