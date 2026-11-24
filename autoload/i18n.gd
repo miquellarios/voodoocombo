@@ -233,6 +233,9 @@ func _init() -> void:
 	strings.es.merge({"trail_color": "Estela de color", "trail_oro": "Estela dorada", "trail_escarcha": "Estela de escarcha", "trail_almas": "Estela de almas"}, true)
 	strings.ca.merge({"trail_color": "Estela de color", "trail_oro": "Estela daurada", "trail_escarcha": "Estela de gebre", "trail_almas": "Estela d'ànimes"}, true)
 	strings.en.merge({"trail_color": "Color trail", "trail_oro": "Golden trail", "trail_escarcha": "Frost trail", "trail_almas": "Soul trail"}, true)
+	strings.es.merge({"press_spell": "Pulsa"}, true)
+	strings.ca.merge({"press_spell": "Prem"}, true)
+	strings.en.merge({"press_spell": "Press"}, true)
 
 func t(key: String) -> String:
 	return str(strings.get(language, strings.es).get(key, key))

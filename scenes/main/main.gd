@@ -680,14 +680,25 @@ func _update_hud() -> void:
 		var spell_index := ITEMS.find(String(players[local_player].item))
 		spell_icon.visible = spell_index >= 0
 		spell_icon.texture = spell_atlases[spell_index] if spell_index >= 0 else null
+		spell_icon.pivot_offset = spell_icon.size * 0.5
+		spell_icon.scale = Vector2.ONE * (1.0 if Settings.reduce_motion or spell_index < 0 else 1.0 + sin(Time.get_ticks_msec() / 230.0) * GameConfig.SPELL_SLOT_ICON_PULSE_AMOUNT)
 		if spell_glow:
 			spell_glow.visible = spell_index >= 0
 			spell_glow.modulate.a = 0.65 + 0.25 * sin(Time.get_ticks_msec() / 180.0) if not Settings.reduce_motion else 0.8
-		if spell_key: spell_key.texture = SPELL_KEY_B_TEXTURE if last_input_controller else SPELL_KEY_E_TEXTURE
+		if spell_key:
+			spell_key.texture = SPELL_KEY_B_TEXTURE if last_input_controller else SPELL_KEY_E_TEXTURE
+			spell_key.visible = spell_index >= 0
+	var duration_ring := hud_root.get_node_or_null("SpellDurationRing") as Control
+	if duration_ring and not players.is_empty():
+		var current_item := String(players[local_player].item)
+		var duration := SpellRules.duration(current_item)
+		var time_left := float(players[local_player].item_time)
+		duration_ring.visible = duration > 0.0 and time_left > 0.0
+		duration_ring.set("progress", clampf(time_left / duration, 0.0, 1.0) if duration > 0.0 else 0.0)
 	if spell_name and not players.is_empty():
 		var item := String(players[local_player].item)
-		var is_active := float(players[local_player].item_time) > 0.0
-		spell_name.text = (I18n.t(ItemTable.display_key(item,mode)) + "  %.1f" % float(players[local_player].item_time)) if is_active else (I18n.t(ItemTable.display_key(item,mode)) if not item.is_empty() else I18n.t("spell"))
+		spell_name.text = I18n.t(ItemTable.display_key(item,mode)) if not item.is_empty() else ""
+		spell_name.visible = not item.is_empty()
 		spell_name.modulate.a = 1.0 if SpellRules.can_activate(players[local_player]) else 0.72
 	var notice := hud_root.get_node_or_null("SpellNotice") as Control
 	if notice:
@@ -695,10 +706,14 @@ func _update_hud() -> void:
 		var notice_icon := hud_root.get_node_or_null("SpellNoticeIcon") as TextureRect
 		var notice_name := hud_root.get_node_or_null("SpellNoticeName") as Label
 		var notice_text := hud_root.get_node_or_null("SpellNoticeText") as Label
+		var notice_key := hud_root.get_node_or_null("SpellNoticeKey") as TextureRect
+		var notice_press := hud_root.get_node_or_null("SpellNoticePress") as Label
 		var notice_index := ITEMS.find(spell_notice_item)
 		if notice_icon and notice_index >= 0: notice_icon.texture = spell_atlases[notice_index]
 		if notice_name: notice_name.text = I18n.t("spell_" + spell_notice_item)
 		if notice_text: notice_text.text = I18n.t("spell_desc_" + spell_notice_item)
+		if notice_key: notice_key.texture = SPELL_KEY_B_TEXTURE if last_input_controller else SPELL_KEY_E_TEXTURE
+		if notice_press: notice_press.text = I18n.t("press_spell")
 
 func _layout_score_cards(order: Array[int]) -> void:
 	var positions := [8.0, 294.0, 706.0, 992.0]
@@ -1333,10 +1348,17 @@ func _build_hud() -> void:
 	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glow.visible = false
 	root.add_child(glow)
+	var duration_ring: Control = preload("res://ui/spell_duration_ring.gd").new()
+	duration_ring.name = "SpellDurationRing"
+	duration_ring.position = Vector2(12, 626)
+	duration_ring.size = Vector2(80, 80)
+	duration_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	duration_ring.visible = false
+	root.add_child(duration_ring)
 	var spell_icon := TextureRect.new()
 	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_icon.name = "SpellIcon"
-	spell_icon.position = Vector2(31, 645)
+	spell_icon.position = Vector2(31, 638)
 	spell_icon.size = Vector2(42, 42)
 	spell_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1346,8 +1368,8 @@ func _build_hud() -> void:
 	spell_key.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_key.name = "SpellKey"
 	spell_key.texture = SPELL_KEY_E_TEXTURE
-	spell_key.position = Vector2(65, 675)
-	spell_key.size = Vector2(26, 26)
+	spell_key.position = Vector2(39, 690)
+	spell_key.size = Vector2(22, 22)
 	spell_key.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spell_key.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	spell_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1356,11 +1378,11 @@ func _build_hud() -> void:
 	spell_name.name = "SpellName"
 	var notice := Panel.new()
 	notice.name = "SpellNotice"
-	notice.position = Vector2(18, 526)
-	notice.size = Vector2(330, 86)
+	notice.position = GameConfig.SPELL_NOTICE_POSITION
+	notice.size = GameConfig.SPELL_NOTICE_SIZE
 	var notice_style := StyleBoxFlat.new()
 	notice_style.bg_color = Color("241838")
-	notice_style.border_color = GameConfig.GOLD
+	notice_style.border_color = GameConfig.EMBER
 	notice_style.set_border_width_all(2)
 	notice_style.set_corner_radius_all(8)
 	notice.add_theme_stylebox_override("panel", notice_style)
@@ -1371,14 +1393,30 @@ func _build_hud() -> void:
 	notice_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	notice_icon.name = "SpellNoticeIcon"
 	notice_icon.position = Vector2(10, 12)
-	notice_icon.size = Vector2(58, 58)
+	notice_icon.size = Vector2(GameConfig.SPELL_NOTICE_ICON_SIZE, GameConfig.SPELL_NOTICE_ICON_SIZE)
 	notice_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	notice_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	notice.add_child(notice_icon)
-	var notice_name := _hud_label(notice, Vector2(76, 8), Vector2(238, 31), 20, HORIZONTAL_ALIGNMENT_LEFT)
+	var notice_name := _hud_label(notice, Vector2(86, 5), Vector2(262, 31), GameConfig.SPELL_NOTICE_TITLE_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
 	notice_name.name = "SpellNoticeName"
-	var notice_text := _hud_label(notice, Vector2(76, 42), Vector2(238, 34), 15, HORIZONTAL_ALIGNMENT_LEFT)
+	notice_name.add_theme_font_override("font", ThemeBuilder.title_font(GameConfig.SPELL_NOTICE_TITLE_SIZE))
+	notice_name.add_theme_color_override("font_color", GameConfig.EMBER)
+	var notice_text := _hud_label(notice, Vector2(86, 37), Vector2(262, 32), GameConfig.SPELL_NOTICE_BODY_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
 	notice_text.name = "SpellNoticeText"
+	notice_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notice_text.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
+	notice_text.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
+	var notice_key := TextureRect.new()
+	notice_key.name = "SpellNoticeKey"
+	notice_key.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	notice_key.position = Vector2(86, 75)
+	notice_key.size = Vector2(24, 24)
+	notice_key.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	notice_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	notice.add_child(notice_key)
+	var notice_press := _hud_label(notice, Vector2(114, 72), Vector2(150, 28), GameConfig.SPELL_NOTICE_BODY_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+	notice_press.name = "SpellNoticePress"
+	notice_press.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
 	var pause := Button.new()
 	pause.text = "Ⅱ"
 	pause.position = Vector2(1200, 648)

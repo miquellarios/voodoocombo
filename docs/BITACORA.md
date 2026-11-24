@@ -26,6 +26,11 @@
 - El escaneo de scripts de Godot 4.7 y `tests/run_tests.gd` pasan. La captura automática de este bloque no se pudo obtener con el renderer headless (no ofrece textura de pantalla); queda pendiente la revisión gráfica y la prueba de 20 s con cuatro bots.
 - Pruebas humanas: jugar 20 s con cuatro bots y comprobar que nunca aparecen más de tres textos, que no se pisan, que la racha vuela al marcador, que los avisos grandes esperan su turno y que las fichas se reordenan bien en Codicia y VoodooCombo.
 
+### Fase 13e — Ranura y tarjeta del hechizo
+- La ranura vacía ya no muestra «HECHIZO» ni una tecla accionable. Al guardar un hechizo muestra el nombre, la tecla correcta y un pulso suave; los efectos de duración tienen un aro que se vacía sin contador decimal. La tarjeta de adquisición lleva icono de 64 px, título Cinzel en brasa, descripción Oswald en hueso y tecla E/B con texto localizado.
+- Añadidas las cadenas «Pulsa / Prem / Press» y constantes de dimensión, pulso y aro. Godot 4.7 escanea los scripts y `tests/run_tests.gd` pasa; queda pendiente revisar la legibilidad de la tarjeta al 75 % y 130 % en ventana real.
+- Humanos: recoger cada hechizo, comprobar la tarjeta, teclado y mando; activar los cuatro hechizos de duración y confirmar el vaciado del aro, la ranura vacía y el ajuste «Reducir movimiento».
+
 ## Registro humano
 
 Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el profesorado.
