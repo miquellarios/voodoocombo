@@ -6,6 +6,8 @@ const COIN_TEXTURE := preload("res://assets/items/doblon.png")
 const COIN_SHADOW_TEXTURE := preload("res://assets/items/doblon_sombra.png")
 const CHEST_TEXTURE := preload("res://assets/items/cofre.png")
 const SPELL_TEXTURE := preload("res://assets/items/hechizos.png")
+const SPELL_EFFECT_TEXTURE := preload("res://assets/ui/efectos_hechizos.png")
+const SPELL_EFFECT_ORDER := ["oveja_a", "oveja_b", "hielo", "capa", "iman", "botas", "anillo", "alfiler", "lanzar", "escarcha"]
 const SPELL_SLOT_TEXTURE := preload("res://assets/ui/hechizo_ranura.png")
 const SPELL_GLOW_TEXTURE := preload("res://assets/ui/hechizo_brillo.png")
 const SPELL_KEY_E_TEXTURE := preload("res://assets/ui/tecla_e.png")
@@ -41,12 +43,16 @@ var player_hitbox_rects: Array[Rect2] = []
 var hazard_runtime: Array[Dictionary] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
+var pin_projectiles: Array[Dictionary] = []
 var chests: Array[Vector2] = []
 var opened_chests: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
 var hud: CanvasLayer
 var hud_root: Control
 var floating: Array[Dictionary] = []
+var spell_effects: Array[Dictionary] = []
+var spell_screen_flash_time := 0.0
+var spell_screen_flash_color := GameConfig.EMBER
 var dash_trails: Array[Dictionary] = []
 var dash_trail_emit := 0.0
 var roll_time := 0.0
@@ -279,6 +285,7 @@ func _process(delta: float) -> void:
 		_use_spell(0)
 	if state == "playing":
 		_update_dash_trails(delta)
+		_update_spell_effects(delta)
 		spell_notice_time = maxf(0.0, spell_notice_time - delta)
 	if state == "countdown":
 		countdown -= delta
@@ -357,6 +364,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _begin_match(arena_id: String = "", overrides: Dictionary = {}) -> void:
 	Fx.clear_text()
+	spell_effects.clear()
+	pin_projectiles.clear()
 	pickup_streak_value = 0
 	pickup_streak_count = 0
 	pickup_streak_time = 0.0
@@ -425,6 +434,8 @@ func _handle_events(events: Array) -> void:
 				pickup_streak_time = GameConfig.PICKUP_STREAK_SECONDS
 				pickup_streak_position = players[local_player].pos
 				if int(event.combo) == 5: Fx.shake.emit(1.5)
+			if int(event.player) < players.size() and SpellRules.is_active(players[int(event.player)], "ring"):
+				Fx.sparks(event.pos + OFFSET, GameConfig.GOLD, 3)
 		if event.type == "player_hit" and int(event.attacker) >= 0 and int(event.dropped) > 0 and score_number_labels.size() > int(event.victim):
 			Fx.fly_coin(score_number_labels[int(event.victim)].global_position, score_number_labels[int(event.attacker)].global_position)
 			if int(event.attacker) == local_player or int(event.victim) == local_player:
@@ -491,6 +502,18 @@ func _handle_events(events: Array) -> void:
 				if int(event.player) == local_player:
 					spell_notice_item = str(event.item)
 					spell_notice_time = GameConfig.SPELL_NOTICE_SECONDS
+			"item_used":
+				_spawn_spell_effect(event)
+			"cloak_broken":
+				Fx.sparks(event.pos + OFFSET, GameConfig.FROST_COLOR, 10)
+				Sfx.play_tone(GameConfig.SPELL_SOUND_CLOAK * 1.4, 0.1)
+			"frost_ended":
+				Fx.sparks(event.pos + OFFSET, GameConfig.FROST_COLOR, GameConfig.SPELL_CRYSTAL_COUNT)
+			"sheep_transformed", "sheep_ended":
+				Fx.sparks(event.pos + OFFSET, GameConfig.BONE_TEXT, GameConfig.SPELL_SMOKE_PARTICLES)
+				Sfx.play_tone(GameConfig.SPELL_SOUND_SHEEP * (1.2 if event.type == "sheep_ended" else 1.0), 0.12)
+			"spell_projectile_impact", "spell_projectile_end":
+				spell_effects.append({"kind":"impact","item":"pin","pos":event.pos,"age":0.0,"duration":GameConfig.SPELL_CAST_EFFECT_SECONDS})
 			"match_over":
 				if event.has("snapshot"): _read_state(event.snapshot)
 				_finish_match(event.get("ranking", []), event.get("awards", {}))
@@ -1823,6 +1846,12 @@ func _draw() -> void:
 		var coin_meta: Dictionary = item_metadata.get("doblon", {})
 		var coin_size := Vector2(int(coin_meta.get("frame_w", 64)), int(coin_meta.get("frame_h", 64)))
 		_draw_strip_frame(COIN_TEXTURE, coin_size, floori(elapsed * float(coin_meta.get("fps", 10.0)) + phase), pos - Vector2(0.0, coin_bounce), float(coin_meta.get("scale", 0.5)), int(coin_meta.get("frames", 8)), Color(1.0, 1.0, 1.0, float(coin.get("fade_alpha", 1.0))))
+		for magnet_player in players:
+			if not SpellRules.is_active(magnet_player, "magnet") or magnet_player.pos.distance_to(pos) > GameConfig.SPELL_MAGNET_RADIUS: continue
+			for trail_point in 3:
+				var t := (trail_point + 1.0) / 4.0
+				var spiral := Vector2.from_angle(elapsed * 9.0 + phase + trail_point * TAU / 3.0) * (10.0 * (1.0 - t))
+				draw_circle(pos.lerp(magnet_player.pos, t) + spiral, 2.0 - t, GameConfig.GOLD)
 	for chest_index in range(chests.size()):
 		var chest: Vector2 = chests[chest_index]
 		var chest_meta: Dictionary = item_metadata.get("cofre", {})
@@ -1840,6 +1869,14 @@ func _draw() -> void:
 		var player: Dictionary = players[i]
 		if player.invuln > 0.0 and floori(float(Time.get_ticks_msec()) / 90.0) % 2 == 0: continue
 		var pos: Vector2 = player.pos
+		if SpellRules.is_active(player, "magnet"):
+			var angle := elapsed * GameConfig.SPELL_MAGNET_ORBIT_SPEED + float(i) * 1.7
+			_draw_spell_sprite("iman", pos + Vector2.from_angle(angle) * GameConfig.SPELL_ORBIT_RADIUS, 0.85, GameConfig.SPELL_EFFECT_SCALE, angle)
+		if SpellRules.is_active(player, "boots") and player.vel.length() > 10.0:
+			var boot_angle: float = player.vel.angle() + PI
+			_draw_spell_sprite("botas", pos + Vector2.from_angle(boot_angle) * 25.0, 0.75, GameConfig.SPELL_EFFECT_SCALE, boot_angle)
+		if SpellRules.is_active(player, "ring"):
+			_draw_spell_sprite("anillo", pos + Vector2(0, 3), 0.9, GameConfig.SPELL_EFFECT_SCALE, elapsed * 1.6)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
 				var texture: Texture2D = STITCHES_TEXTURE
@@ -1858,13 +1895,27 @@ func _draw() -> void:
 		var frame_height := int(character_metadata.get("frame_h", 256))
 		var frame := posmod(floori(elapsed * float(animation.get("fps", 6))), int(animation.get("frames", 1)))
 		var sheet: Texture2D = character_sheets.get("%s_%s" % [player.character, player.sprite_color])
-		if sheet != null:
+		if String(player.item) == "sheep":
+			var sheep_frame := "oveja_a" if player.vel.length() <= 10.0 or floori(elapsed * GameConfig.SPELL_EFFECT_FRAMES_PER_SECOND) % 2 == 0 else "oveja_b"
+			_draw_spell_sprite(sheep_frame, pos, 1.0, GameConfig.SPELL_EFFECT_SCALE, 0.0)
+		elif sheet != null:
 			var sprite_scale := 0.37
 			if mode == "greed": sprite_scale *= TeamRules.scale_for(int(player.coins))
 			var face_left: bool = player.dash_dir.x < -0.1 if player.dash_left > 0.0 else player.vel.x < -0.1
+			if SpellRules.is_active(player, "boots") and player.vel.length() > 10.0:
+				for ghost_index in GameConfig.SPELL_TRAIL_COUNT:
+					var ghost_alpha := 0.22 - ghost_index * 0.05
+					var ghost_pos: Vector2 = OFFSET + pos - player.vel.normalized() * (ghost_index + 1) * 13.0
+					draw_set_transform(ghost_pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale))
+					draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height), Color(1.0,1.0,1.0,ghost_alpha))
 			draw_set_transform(OFFSET + pos, 0.0, Vector2(-sprite_scale if face_left else sprite_scale, sprite_scale) * Fx.squash_scale(i))
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height), Color(1,1,1,0.35) if bool(player.get("ghost",false)) else Color.WHITE)
 			draw_set_transform(OFFSET)
+		if SpellRules.is_active(player, "cloak"):
+			var cloak_alpha := 0.72 if Settings.reduce_motion else 0.58 + 0.18 * sin(elapsed * 5.0)
+			_draw_spell_sprite("capa", pos, cloak_alpha, GameConfig.SPELL_EFFECT_SCALE, 0.0)
+		if float(player.get("frozen_left", 0.0)) > 0.0:
+			_draw_spell_sprite("hielo", pos, 0.9, GameConfig.SPELL_EFFECT_SCALE, 0.0)
 		var name_color: Color = player.color if i == local_player else Color.WHITE
 		var name_font: Font = player_name_font if player_name_font != null else ThemeDB.fallback_font
 		var show_rival_name := i != local_player and (elapsed <= GameConfig.PLAYER_NAME_INTRO_SECONDS or (i == _leader_index() and elapsed - leader_name_since <= GameConfig.PLAYER_NAME_CROWN_SECONDS))
@@ -1888,12 +1939,47 @@ func _draw() -> void:
 			draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, badge_text_position, "x%d" % Scoring.multiplier(player.combo), HORIZONTAL_ALIGNMENT_CENTER, badge_text_width, GameConfig.COMBO_BADGE_TEXT_SIZE, GameConfig.BONE_TEXT)
 		if i == _leader_index() and mode == "voodoo":
 			draw_string(ThemeDB.fallback_font, pos + Vector2(-8, -30), "👑", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GameConfig.GOLD)
+	for projectile in pin_projectiles:
+		_draw_spell_sprite("alfiler", projectile.pos, 1.0, GameConfig.SPELL_EFFECT_SCALE, projectile.direction.angle())
+	for effect in spell_effects:
+		var age := float(effect.age)
+		var duration := float(effect.duration)
+		var alpha := clampf(1.0 - age / duration, 0.0, 1.0)
+		var origin: Vector2 = effect.pos
+		var rune_progress := clampf(age / GameConfig.SPELL_RUNE_SECONDS, 0.0, 1.0)
+		var rune_scale := lerpf(0.4, 1.1, rune_progress) if rune_progress < 0.5 else lerpf(1.1, 1.0, (rune_progress - 0.5) * 2.0)
+		if effect.kind == "cast":
+			if age <= GameConfig.SPELL_RUNE_SECONDS: _draw_spell_sprite("lanzar", origin, alpha, GameConfig.SPELL_EFFECT_SCALE * rune_scale, 0.0)
+			if age <= GameConfig.SPELL_CAST_EFFECT_SECONDS:
+				var spell_frame := ITEMS.find(String(effect.item))
+				_draw_strip_frame(SPELL_TEXTURE, Vector2(128,128), spell_frame, origin + Vector2(0, GameConfig.SPELL_EFFECT_BASE_Y - GameConfig.SPELL_ICON_RISE_PIXELS * clampf(age / GameConfig.SPELL_CAST_EFFECT_SECONDS,0.0,1.0)), GameConfig.SPELL_EFFECT_SCALE, ITEMS.size(), Color(1,1,1,alpha))
+		if effect.kind == "impact":
+			_draw_spell_sprite("alfiler", origin, alpha, GameConfig.SPELL_EFFECT_SCALE * (0.5 + age), 0.0)
+		elif effect.item == "frost":
+			var wave_progress := clampf(age / GameConfig.SPELL_FROST_WAVE_SECONDS, 0.0, 1.0)
+			_draw_spell_sprite("escarcha", origin, alpha, GameConfig.SPELL_FROST_MAX_SCALE * wave_progress, 0.0)
+		elif effect.item == "sheep":
+			var target_index := int(effect.target)
+			if target_index >= 0 and target_index < players.size():
+				var target_pos: Vector2 = players[target_index].pos
+				var beam_progress := clampf(age / GameConfig.SPELL_SHEEP_TRAVEL_SECONDS, 0.0, 1.0)
+				var control_point := (origin + target_pos) * 0.5 + Vector2(0, -GameConfig.SPELL_SHEEP_ARC_HEIGHT)
+				var previous_point := origin
+				for segment in range(1, GameConfig.SPELL_SHEEP_ARC_SEGMENTS + 1):
+					var t := minf(float(segment) / GameConfig.SPELL_SHEEP_ARC_SEGMENTS, beam_progress)
+					var inverse := 1.0 - t
+					var arc_point := origin * inverse * inverse + control_point * 2.0 * inverse * t + target_pos * t * t
+					draw_line(previous_point, arc_point, Color(GameConfig.ZONE_WARNING_COLOR, alpha), 5.0, true)
+					previous_point = arc_point
+					if t >= beam_progress: break
+				var beam_position := origin.lerp(target_pos, beam_progress)
+				_draw_spell_sprite("oveja_a", beam_position, alpha, GameConfig.SPELL_EFFECT_SCALE, beam_position.angle_to_point(target_pos))
 	if pickup_streak_value > 0 and local_player >= 0 and local_player < players.size():
 		var streak_age := GameConfig.PICKUP_STREAK_SECONDS - pickup_streak_time
 		var streak_size := roundi(lerpf(GameConfig.PICKUP_STREAK_MIN_FONT, GameConfig.PICKUP_STREAK_MAX_FONT, clampf(float(pickup_streak_count - 1) / 8.0, 0.0, 1.0)))
 		var streak_pop := 1.0 if Settings.reduce_motion else 1.0 + 0.12 * (1.0 - clampf(streak_age / GameConfig.FLOAT_POP_SECONDS, 0.0, 1.0))
 		var streak_text := "+%d" % pickup_streak_value
-		var streak_pos := pickup_streak_position + Vector2(OFFSET.x - GameConfig.PICKUP_STREAK_TEXT_WIDTH * 0.5, OFFSET.y - GameConfig.PICKUP_STREAK_HEIGHT)
+		var streak_pos := pickup_streak_position + Vector2(-GameConfig.PICKUP_STREAK_TEXT_WIDTH * 0.5, -GameConfig.PICKUP_STREAK_HEIGHT)
 		var streak_color := GameConfig.BONE_TEXT if pickup_streak_value == 1 else GameConfig.EMBER
 		draw_string_outline(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, streak_pos, streak_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PICKUP_STREAK_TEXT_WIDTH, roundi(streak_size * streak_pop), GameConfig.FLOAT_COIN_OUTLINE_SIZE, GameConfig.PLAYER_NAME_OUTLINE_COLOR)
 		draw_string(floating_coin_font if floating_coin_font != null else ThemeDB.fallback_font, streak_pos, streak_text, HORIZONTAL_ALIGNMENT_CENTER, GameConfig.PICKUP_STREAK_TEXT_WIDTH, roundi(streak_size * streak_pop), streak_color)
@@ -2016,6 +2102,15 @@ func _draw_hazard_sprite(sprite_id: String, center: Vector2, frame_index: int = 
 		draw_set_transform(OFFSET)
 	else:
 		draw_texture_rect_region(texture, Rect2(center - frame_size * 0.5, frame_size), source)
+
+func _draw_spell_sprite(frame_name: String, position: Vector2, alpha: float = 1.0, scale_factor: float = GameConfig.SPELL_EFFECT_SCALE, angle: float = 0.0) -> void:
+	var frame_index := SPELL_EFFECT_ORDER.find(frame_name)
+	if frame_index < 0: return
+	var frame_size := float(GameConfig.SPELL_EFFECT_FRAME_SIZE)
+	var draw_scale := Vector2.ONE * scale_factor
+	draw_set_transform(OFFSET + position + Vector2(0.0, GameConfig.SPELL_EFFECT_BASE_Y), angle, draw_scale)
+	draw_texture_rect_region(SPELL_EFFECT_TEXTURE, Rect2(Vector2(-frame_size * 0.5, -frame_size * 0.5), Vector2(frame_size, frame_size)), Rect2(frame_index * frame_size, 0.0, frame_size, frame_size), Color(1.0, 1.0, 1.0, alpha))
+	draw_set_transform(OFFSET)
 
 func _json_point(value: Variant) -> Vector2:
 	if value is Array and value.size() >= 2:
@@ -2146,6 +2241,66 @@ func _score_order() -> Array[int]:
 
 func _on_floating_text(text: String, world_pos: Vector2, tint: Color) -> void:
 	Fx.render_pop(text, world_pos, Color("7fe7ff") if text == I18n.t("trap_zap") else tint)
+
+func _update_spell_effects(delta: float) -> void:
+	spell_screen_flash_time = maxf(0.0, spell_screen_flash_time - delta)
+	for index in range(spell_effects.size() - 1, -1, -1):
+		spell_effects[index].age = float(spell_effects[index].age) + delta
+		if float(spell_effects[index].age) >= float(spell_effects[index].duration): spell_effects.remove_at(index)
+
+func _spawn_spell_effect(event: Dictionary) -> void:
+	var item := str(event.get("item", ""))
+	if item not in ITEMS: return
+	var player_index := int(event.get("player", -1))
+	if player_index < 0 or player_index >= players.size(): return
+	var position: Vector2 = players[player_index].pos
+	var effect_duration := GameConfig.SPELL_SHEEP_TRAVEL_SECONDS if item == "sheep" else GameConfig.SPELL_EFFECT_BURST_SECONDS
+	spell_effects.append({"kind":"cast","item":item,"player":player_index,"pos":position,"target":int(event.get("target", -1)),"targets":event.get("targets", []),"age":0.0,"duration":effect_duration})
+	var tone := GameConfig.SPELL_SOUND_MAGNET
+	match item:
+		"boots": tone = GameConfig.SPELL_SOUND_BOOTS
+		"cloak": tone = GameConfig.SPELL_SOUND_CLOAK
+		"pin": tone = GameConfig.SPELL_SOUND_PIN
+		"frost": tone = GameConfig.SPELL_SOUND_FROST
+		"sheep": tone = GameConfig.SPELL_SOUND_SHEEP
+		"ring": tone = GameConfig.SPELL_SOUND_RING
+	Sfx.play_tone(tone, 0.14)
+	if item == "sheep":
+		var sheep_target := int(event.get("target", -1))
+		if sheep_target >= 0 and sheep_target < players.size(): Fx.sparks(players[sheep_target].pos + OFFSET, GameConfig.BONE_TEXT, GameConfig.SPELL_SMOKE_PARTICLES)
+	if player_index == local_player: _spell_screen_flash(_spell_color(item))
+
+func _spell_color(item: String) -> Color:
+	match item:
+		"frost": return GameConfig.FROST_COLOR
+		"sheep": return GameConfig.ZONE_WARNING_COLOR
+		"pin": return GameConfig.CYAN_TEXT
+		"cloak": return GameConfig.FROST_COLOR
+		"magnet", "ring": return GameConfig.GOLD
+		_: return GameConfig.EMBER
+
+func _spell_screen_flash(color: Color) -> void:
+	if Settings.reduce_flashes or Settings.reduce_motion or not is_instance_valid(hud_root): return
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.z_index = 100
+	hud_root.add_child(overlay)
+	for edge in 4:
+		var border := ColorRect.new()
+		border.color = Color(color, GameConfig.SPELL_SCREEN_FLASH_ALPHA)
+		border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		match edge:
+			0: border.position = Vector2.ZERO; border.size = Vector2(1280, GameConfig.SPELL_SCREEN_FLASH_WIDTH)
+			1: border.position = Vector2(0, 720 - GameConfig.SPELL_SCREEN_FLASH_WIDTH); border.size = Vector2(1280, GameConfig.SPELL_SCREEN_FLASH_WIDTH)
+			2: border.position = Vector2.ZERO; border.size = Vector2(GameConfig.SPELL_SCREEN_FLASH_WIDTH, 720)
+			3: border.position = Vector2(1280 - GameConfig.SPELL_SCREEN_FLASH_WIDTH, 0); border.size = Vector2(GameConfig.SPELL_SCREEN_FLASH_WIDTH, 720)
+		overlay.add_child(border)
+	overlay.modulate.a = 0.0
+	var tween := overlay.create_tween()
+	tween.tween_property(overlay, "modulate:a", 1.0, GameConfig.SPELL_SCREEN_FLASH_SECONDS * 0.35)
+	tween.tween_property(overlay, "modulate:a", 0.0, GameConfig.SPELL_SCREEN_FLASH_SECONDS * 0.65)
+	tween.tween_callback(overlay.queue_free)
 
 func _finish_pickup_streak() -> void:
 	if pickup_streak_value <= 0: return

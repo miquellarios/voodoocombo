@@ -31,6 +31,12 @@
 - Añadidas las cadenas «Pulsa / Prem / Press» y constantes de dimensión, pulso y aro. Godot 4.7 escanea los scripts y `tests/run_tests.gd` pasa; queda pendiente revisar la legibilidad de la tarjeta al 75 % y 130 % en ventana real.
 - Humanos: recoger cada hechizo, comprobar la tarjeta, teclado y mando; activar los cuatro hechizos de duración y confirmar el vaciado del aro, la ranura vacía y el ajuste «Reducir movimiento».
 
+### Fase 13f — Efectos visibles de los hechizos
+- Añadida la secuencia de lanzamiento (runas, icono ascendente, sonido por hechizo y flash local accesible), auras de Imán/Botas/Capa/Anillo, fantasma de Botas, onda y estado congelado de Escarcha, arco y transformación de Oveja con humo, y cristales al romperse la Capa o terminar Escarcha.
+- El Alfiler ahora es un proyectil autoritativo de 700 px/s y 900 px de alcance, con colisión contra hitboxes de obstáculos, bordes y rivales. `pin_projectiles` y las maldiciones ovinas en viaje forman parte del snapshot; Oveja tarda 0,6 s y luego convierte al líder durante 3 s. Se corrigió además el uso de Oveja, que se confundía con un hechizo de duración del lanzador.
+- Tests nuevos comprueban creación, velocidad, snapshot y desaparición del Alfiler ante un obstáculo, así como el viaje y duración de Oveja. Escaneo de Godot 4.7, suite completa y prueba de integración local con HUD/aro pasan.
+- Humanos: probar los siete hechizos en local y red, fijarse en proyectil y obstáculos, objetivo de Oveja, congelación, bloqueo de Capa, y los ajustes de reducir movimiento/destellos. La captura visual del bloque queda pendiente porque el renderer headless no permite extraer imágenes.
+
 ## Registro humano
 
 Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el profesorado.

@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_test_hazard_rules()
 	_test_items()
 	_test_spell_rules()
+	_test_spell_projectiles()
 	_test_nickname_rules()
 	_test_safe_zone()
 	_test_ranking()
@@ -199,6 +200,36 @@ func _test_spell_rules() -> void:
 	_check(SpellRules.duration("pin") == 0.0 and SpellRules.duration("frost") == 0.0, "instant spells have no duration")
 	var inactive_cloak := HazardRules.resolve_hit({"coins": 10, "score": 10, "item": "cloak", "item_time": 0.0, "invuln": 0.0, "combo": 1, "stun": 0.0, "hits": 0}, 0.25, 3, 12, 0.4)
 	_check(inactive_cloak.applied, "held cloak does not block before activation")
+
+func _test_spell_projectiles() -> void:
+	var sim := MatchSim.new()
+	sim.setup({"seed":44,"mode":"voodoo","arena_id":"cienaga","players":[{"name":"A","is_bot":false},{"name":"B","is_bot":true}]})
+	sim.coins.clear()
+	sim.players[0].pos = Vector2(100,300)
+	sim.players[0].look_dir = Vector2.RIGHT
+	sim.players[0].item = "pin"
+	sim.players[1].pos = Vector2(500,300)
+	sim.player_hitbox_rects.clear()
+	sim._use_spell(0)
+	_check(sim.pin_projectiles.size() == 1, "pin spell creates a real projectile")
+	var initial: Vector2 = sim.pin_projectiles[0].pos
+	sim._update_pin_projectiles(0.1)
+	_check(is_equal_approx(sim.pin_projectiles[0].pos.distance_to(initial), GameConfig.SPELL_PIN_SPEED * 0.1), "pin projectile travels at 700 px/s")
+	_check((sim.snapshot().pin_projectiles as Array).size() == 1, "active pin projectile is included in the snapshot")
+	sim.player_hitbox_rects.append(Rect2(250,250,20,100))
+	sim._update_pin_projectiles(0.1)
+	_check(sim.pin_projectiles.is_empty(), "pin projectile disappears when it hits an obstacle")
+
+	var sheep_sim := MatchSim.new()
+	sheep_sim.setup({"seed":45,"mode":"voodoo","arena_id":"cienaga","players":[{"name":"A","is_bot":false},{"name":"B","is_bot":true}]})
+	sheep_sim.players[0].item = "sheep"
+	sheep_sim.players[1].coins = 20
+	sheep_sim.players[1].score = 20
+	sheep_sim._use_spell(0)
+	_check(sheep_sim.pending_sheep.size() == 1 and sheep_sim.players[1].item.is_empty(), "sheep curse travels before transforming its target")
+	sheep_sim._update_pending_sheep(GameConfig.SPELL_SHEEP_TRAVEL_SECONDS)
+	var sheep_snapshot: Dictionary = sheep_sim.snapshot()
+	_check(sheep_snapshot.players[1].item == "sheep" and is_equal_approx(float(sheep_snapshot.players[1].item_time), GameConfig.SPELL_SHEEP_SECONDS), "sheep curse is present in the snapshot for three seconds")
 
 func _test_nickname_rules() -> void:
 	_check(NicknameRules.is_valid(" Ada ") and NicknameRules.normalize(" Ada ") == "Ada", "nickname trims outside spaces")

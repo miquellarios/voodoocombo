@@ -15,6 +15,9 @@ var player_hitbox_rects: Array[Rect2] = []
 var hazard_runtime: Array[Dictionary] = []
 var players: Array[Dictionary] = []
 var coins: Array[Dictionary] = []
+var pin_projectiles: Array[Dictionary] = []
+var pending_sheep: Array[Dictionary] = []
+var next_pin_id := 1
 var chests: Array[Vector2] = []
 var opened_chests: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -50,6 +53,9 @@ func setup(config: Dictionary) -> void:
 	player_hitbox_rects = _get_obstacle_hitboxes(arena.get("obstacles", []))
 	players.clear()
 	coins.clear()
+	pin_projectiles.clear()
+	pending_sheep.clear()
+	next_pin_id = 1
 	chests.clear()
 	opened_chests.clear()
 	chest_fade_alpha.clear()
@@ -76,7 +82,7 @@ func setup(config: Dictionary) -> void:
 		var entry: Dictionary = roster[i]
 		names[i] = str(entry.get("name", names[i]))
 		characters[i] = str(entry.get("character", characters[i]))
-		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "stun": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1, "zone_drain_left": GameConfig.ZONE_DRAIN_INTERVAL})
+		players.append({"name": names[i], "character": characters[i], "sprite_color": sprite_colors[i], "pos": arena.spawns[i], "vel": Vector2.ZERO, "color": GameConfig.COLORS[i], "shape": GameConfig.SHAPES[i], "coins": 0, "score": 0, "collected": 0, "combo": 0, "max_combo": 0, "last_pickup": -10.0, "dash_left": 0.0, "dash_cd": 0.0, "dash_dir": Vector2.RIGHT, "look_dir": Vector2.RIGHT, "stun": 0.0, "frozen_left": 0.0, "invuln": 0.0, "item": "", "item_time": 0.0, "stolen": 0, "dashes": 0, "sheep": 0, "hits": 0, "is_bot": i > 0, "dash_lock": 0.0, "recoil_left": 0.0, "recoil_dir": Vector2.ZERO, "rooted_left": 0.0, "hazard_cooldowns": {}, "bot_repath_left": 0.0, "bot_path": [], "bot_path_index": 0, "bot_goal": Vector2.ZERO, "bot_stuck_left": 0.0, "bot_stuck_position": arena.spawns[i], "bot_escape_left": 0.0, "bot_escape_direction": Vector2.ZERO, "bot_action_left": 0.5, "bot_dash_target": -1, "bot_recent_hit": 0.0, "bot_ignored_peer": -1, "zone_drain_left": GameConfig.ZONE_DRAIN_INTERVAL})
 		players[i].is_bot = bool(entry.get("is_bot", i > 0))
 		players[i]["peer_id"] = int(entry.get("peer_id", i + 1))
 		players[i]["cosmetics"] = entry.get("cosmetics", {}).duplicate(true)
@@ -142,8 +148,14 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 		chest_fade_alpha.append(1.0)
 	for index in range(players.size()):
 		if bool(players[index].get("disconnected", false)) or bool(players[index].get("ghost", false)): continue
+		var frozen_before := float(players[index].get("frozen_left", 0.0))
+		players[index].frozen_left = maxf(0.0, frozen_before - delta)
+		if frozen_before > 0.0 and players[index].frozen_left <= 0.0:
+			events.append({"type":"frost_ended","player":index,"pos":players[index].pos})
 		if bool(players[index].is_bot): _update_bot(index, delta)
 		else: _update_player(index, delta)
+	_update_pin_projectiles(delta)
+	_update_pending_sheep(delta)
 	_update_arena_hazards(delta)
 	_update_dash_hits()
 	_separate_players()
@@ -172,7 +184,7 @@ func step(delta: float, inputs: Array[Dictionary]) -> void:
 
 func snapshot() -> Dictionary:
 	var result: Dictionary = {}
-	for key in ["mode","elapsed","remaining","seed_value","arena","safe_zone_step","safe_zone_warning_step","chest_fade_alpha","obstacle_rects","player_hitbox_rects","hazard_runtime","players","coins","chests","opened_chests","roll_time","roll_player","roll_result","frenzy_notified","bots_dash_global_left"]:
+	for key in ["mode","elapsed","remaining","seed_value","arena","safe_zone_step","safe_zone_warning_step","chest_fade_alpha","obstacle_rects","player_hitbox_rects","hazard_runtime","players","coins","pin_projectiles","pending_sheep","chests","opened_chests","roll_time","roll_player","roll_result","frenzy_notified","bots_dash_global_left"]:
 		var value: Variant = get(key)
 		result[key] = value.duplicate(true) if value is Array or value is Dictionary else value
 	result["finished"] = finished
@@ -260,11 +272,13 @@ func _update_player(index: int, delta: float) -> void:
 	var had_timed_item: bool = float(player.item_time) > 0.0
 	player.item_time = maxf(0.0, player.item_time - delta)
 	if had_timed_item and player.item_time == 0.0:
+		if player.item == "sheep": events.append({"type":"sheep_ended","player":index,"pos":player.pos})
 		player.item = ""
 	if player.stun > 0.0:
 		return
 	if direction != Vector2.ZERO:
 		player.dash_dir = direction
+		player.look_dir = direction
 	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
 	var speed := GameConfig.PLAYER_SPEED * (1.6 if SpellRules.is_active(player, "boots") else 1.0) * _terrain_speed(player.pos) * zone_speed
 	if mode == "greed": speed *= TeamRules.speed(int(player.coins))
@@ -305,7 +319,9 @@ func _update_bot(index: int, delta: float) -> void:
 		return
 	var had_timed_item: bool = float(player.item_time) > 0.0
 	player.item_time = maxf(0.0, player.item_time - delta)
-	if had_timed_item and player.item_time == 0.0: player.item = ""
+	if had_timed_item and player.item_time == 0.0:
+		if player.item == "sheep": events.append({"type":"sheep_ended","player":index,"pos":player.pos})
+		player.item = ""
 	if player.stun > 0.0:
 		return
 	var coin_positions: Array[Vector2] = []
@@ -371,6 +387,7 @@ func _update_bot(index: int, delta: float) -> void:
 			player.dash_cd = GameConfig.SPELL_BOOTS_DASH_COOLDOWN if SpellRules.is_active(player, "boots") else GameConfig.DASH_COOLDOWN
 			bots_dash_global_left = GameConfig.BOT_TEAM_DASH_INTERVAL
 		player.bot_dash_target = -1
+	if direction.length() > 0.1: player.look_dir = direction.normalized()
 	var zone_speed := GameConfig.ZONE_SPEED_MULTIPLIER if not ZoneRules.is_inside(player.pos, safe_zone_step) else 1.0
 	var speed_scale := (0.6 if SpellRules.is_active(player, "sheep") else (1.6 if SpellRules.is_active(player, "boots") else 1.0)) * _terrain_speed(player.pos) * zone_speed
 	if mode == "greed": speed_scale *= TeamRules.speed(int(player.coins))
@@ -554,6 +571,7 @@ func _apply_hit(victim_index: int, attacker_index: int, fraction: float, minimum
 	var previous_combo := int(players[victim_index].combo)
 	var result := HazardRules.resolve_hit(players[victim_index], fraction, minimum, maximum, stun_seconds)
 	if result.blocked:
+		events.append({"type":"cloak_broken","player":victim_index,"pos":players[victim_index].pos,"by":text_key})
 		_pop(_message("trap_blocked"), players[victim_index].pos + OFFSET, Color("7fe7ff"), victim_index)
 		_tone(720.0, 0.08)
 		return result
@@ -828,7 +846,7 @@ func _use_spell_for_bot(index: int) -> void:
 	var player: Dictionary = players[index]
 	if not SpellRules.can_activate(player): return
 	var item := String(player.item)
-	if SpellRules.duration(item) > 0.0:
+	if SpellRules.duration(item) > 0.0 and item != "sheep":
 		var useful := item in ["cloak", "boots", "ring"]
 		if item == "magnet":
 			for coin in coins:
@@ -858,42 +876,106 @@ func _spell_is_useful(index: int, item: String) -> bool:
 
 func _cast_instant_spell(index: int) -> void:
 	var player: Dictionary = players[index]
-	events.append({"type": "item_used", "player": index, "item": player.item})
-	match String(player.item):
+	var item := String(player.item)
+	var cast_event := {"type": "item_used", "player": index, "item": item}
+	if item == "sheep": cast_event["target"] = _spell_target(index)
+	if item == "frost": cast_event["targets"] = _spell_targets_in_radius(index, GameConfig.SPELL_FROST_RADIUS)
+	events.append(cast_event)
+	match item:
 		"frost":
 			for j in range(players.size()):
 				if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
 				if j == index or (mode == "greed" and players[j].team == player.team) or player.pos.distance_to(players[j].pos) > GameConfig.SPELL_FROST_RADIUS: continue
 				if SpellRules.is_active(players[j], "cloak"):
+					events.append({"type":"cloak_broken","player":j,"pos":players[j].pos,"by":"frost"})
 					players[j].item = ""
 					players[j].item_time = 0.0
-				else: players[j].stun = GameConfig.SPELL_FROST_SECONDS
+				else:
+					players[j].stun = GameConfig.SPELL_FROST_SECONDS
+					players[j].frozen_left = GameConfig.SPELL_FROST_SECONDS
 		"sheep":
 			var leader := _spell_target(index)
 			if leader != index:
-				if SpellRules.is_active(players[leader], "cloak"):
-					players[leader].item = ""
-					players[leader].item_time = 0.0
-				else:
-					players[leader].item = "sheep"
-					players[leader].item_time = GameConfig.SPELL_SHEEP_SECONDS
-					players[leader].sheep += 1
+				pending_sheep.append({"owner":index,"target":leader,"time":GameConfig.SPELL_SHEEP_TRAVEL_SECONDS})
 		"pin":
-			var target := -1
-			var best := GameConfig.SPELL_PIN_RANGE * GameConfig.SPELL_PIN_RANGE
-			for j in range(players.size()):
-				if bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
-				if mode == "greed" and players[j].team == player.team: continue
-				if j != index and player.pos.distance_squared_to(players[j].pos) < best:
-					best = player.pos.distance_squared_to(players[j].pos)
-					target = j
-			if target >= 0:
-				var outcome := _apply_hit(target, index, GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS)
-				if outcome.applied:
-					players[target].pos += player.pos.direction_to(players[target].pos) * GameConfig.SPELL_PIN_PUSH_DISTANCE
+			var aim: Vector2 = player.look_dir.normalized()
+			if bool(player.get("is_bot", false)):
+				var nearest := -1
+				var nearest_distance := GameConfig.SPELL_PIN_RANGE
+				for j in players.size():
+					if j == index or bool(players[j].get("disconnected", false)) or bool(players[j].get("ghost", false)): continue
+					if mode == "greed" and players[j].team == player.team: continue
+					var distance: float = player.pos.distance_to(players[j].pos)
+					if distance < nearest_distance: nearest = j; nearest_distance = distance
+				if nearest >= 0: aim = player.pos.direction_to(players[nearest].pos)
+			_fire_pin(index, aim)
 	player.item = ""
 	player.item_time = 0.0
 	_tone(720.0, 0.2)
+
+func _spell_targets_in_radius(index: int, radius: float) -> Array[int]:
+	var result: Array[int] = []
+	for target in players.size():
+		if target == index or bool(players[target].get("disconnected", false)) or bool(players[target].get("ghost", false)): continue
+		if mode == "greed" and players[target].team == players[index].team: continue
+		if players[index].pos.distance_to(players[target].pos) <= radius: result.append(target)
+	return result
+
+func _fire_pin(index: int, direction: Vector2) -> void:
+	if direction.length_squared() < 0.001: direction = Vector2.RIGHT
+	direction = direction.normalized()
+	pin_projectiles.append({"id":next_pin_id,"owner":index,"pos":players[index].pos + direction * GameConfig.SPELL_PIN_SPAWN_OFFSET,"direction":direction,"distance":0.0})
+	next_pin_id += 1
+
+func _update_pin_projectiles(delta: float) -> void:
+	for projectile_index in range(pin_projectiles.size() - 1, -1, -1):
+		var projectile: Dictionary = pin_projectiles[projectile_index]
+		var start: Vector2 = projectile.pos
+		var direction: Vector2 = projectile.direction
+		var step_distance := minf(GameConfig.SPELL_PIN_SPEED * delta, GameConfig.SPELL_PIN_RANGE - float(projectile.distance))
+		var finish := start + direction * step_distance
+		var remove := finish.x <= 0.0 or finish.y <= 0.0 or finish.x >= GameConfig.ARENA_SIZE.x or finish.y >= GameConfig.ARENA_SIZE.y
+		if not remove and not ArenaPhysics.segment_clear(start, finish, player_hitbox_rects): remove = true
+		if not remove:
+			for target in players.size():
+				if target == int(projectile.owner) or bool(players[target].get("disconnected", false)) or bool(players[target].get("ghost", false)): continue
+				if mode == "greed" and players[target].team == players[int(projectile.owner)].team: continue
+				var segment := finish - start
+				var ratio := clampf((players[target].pos - start).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
+				if players[target].pos.distance_to(start + segment * ratio) > GameConfig.SPELL_PIN_HIT_RADIUS: continue
+				var outcome := _apply_hit(target, int(projectile.owner), GameConfig.HIT_DROP_FRACTION, GameConfig.HIT_DROP_MIN, GameConfig.HIT_DROP_MAX, GameConfig.HIT_STUN_SECONDS)
+				if bool(outcome.get("applied", false)):
+					players[target].pos = _move_player(players[target].pos, direction * GameConfig.SPELL_PIN_PUSH_DISTANCE)
+				events.append({"type":"spell_projectile_impact","pos":finish,"target":target,"owner":int(projectile.owner)})
+				remove = true
+				break
+		if remove:
+			events.append({"type":"spell_projectile_end","pos":finish})
+			pin_projectiles.remove_at(projectile_index)
+		else:
+			projectile.pos = finish
+			projectile.distance = float(projectile.distance) + step_distance
+			if float(projectile.distance) >= GameConfig.SPELL_PIN_RANGE:
+				events.append({"type":"spell_projectile_end","pos":finish})
+				pin_projectiles.remove_at(projectile_index)
+
+func _update_pending_sheep(delta: float) -> void:
+	for index in range(pending_sheep.size() - 1, -1, -1):
+		var curse: Dictionary = pending_sheep[index]
+		curse.time = maxf(0.0, float(curse.time) - delta)
+		if float(curse.time) > 0.0: continue
+		var target := int(curse.target)
+		if target >= 0 and target < players.size() and not bool(players[target].get("disconnected", false)) and not bool(players[target].get("ghost", false)):
+			if SpellRules.is_active(players[target], "cloak"):
+				events.append({"type":"cloak_broken","player":target,"pos":players[target].pos,"by":"sheep"})
+				players[target].item = ""
+				players[target].item_time = 0.0
+			else:
+				players[target].item = "sheep"
+				players[target].item_time = GameConfig.SPELL_SHEEP_SECONDS
+				players[target].sheep += 1
+				events.append({"type":"sheep_transformed","player":target,"owner":int(curse.owner),"pos":players[target].pos})
+		pending_sheep.remove_at(index)
 
 
 func _use_spell(index: int) -> void:
@@ -905,7 +987,7 @@ func _use_spell(index: int) -> void:
 		players[index].item = ""
 		events.append({"type":"item_used","player":index,"item":"stitch"})
 		return
-	if SpellRules.duration(item) > 0.0:
+	if SpellRules.duration(item) > 0.0 and item != "sheep":
 		events.append({"type": "item_used", "player": index, "item": item})
 		players[index] = SpellRules.activate(players[index])
 		_tone(720.0, 0.2)

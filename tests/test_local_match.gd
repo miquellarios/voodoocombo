@@ -23,6 +23,19 @@ func run() -> void:
 		push_error("El snapshot permite modificar la simulación")
 		quit(1)
 		return
+	var players: Array = game.get("players")
+	players[0].item = "boots"
+	players[0].item_time = GameConfig.SPELL_BOOTS_SECONDS
+	game.set("players", players)
+	game.call("_update_hud")
+	game.call("_handle_events", [{"type":"item_used","player":0,"item":"boots"}])
+	var effects: Array = game.get("spell_effects")
+	var hud := game.get("hud_root") as Control
+	var duration_ring := hud.get_node_or_null("SpellDurationRing") as Control
+	if effects.is_empty() or duration_ring == null or not duration_ring.visible:
+		push_error("El hechizo no crea su feedback y aro de duración")
+		quit(1)
+		return
 	game.call("_build_menu")
 	await process_frame
 	game.queue_free()
