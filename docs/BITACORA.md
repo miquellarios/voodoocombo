@@ -1,5 +1,13 @@
 # Bitácora de desarrollo
 
+## Registro de Codex
+
+### Fase 13a — Ajustes y accesibilidad
+- Reemplazada la pantalla antigua por `scenes/settings/settings_view.gd`, con pestañas de partida, pantalla, sonido y online. Las opciones persistentes usan flechas clicables, foco, campos numéricos/servidor y controles de audio; el tamaño de ventana queda inactivo en pantalla completa. Ajustes se abre también desde pausa.
+- Incorporadas las referencias y assets de fase 13, y actualizado el `AGENTS.md` de raíz según el paquete entregado. La escala de ajustes adapta controles y tipografía; el contenido de opciones puede desplazarse verticalmente a escalas altas para conservar el área de lectura.
+- Añadidas pruebas de persistencia de escala al subir y bajar, y de que accesibilidad no cambia el idioma. `tests/run_tests.gd` pasa en Godot 4.7.2. Capturas de las cuatro pestañas a 1280×720 y 1920×1080, con escalas 75 %, 100 % y 130 %, en `docs/capturas/fase-13/`.
+- Pruebas humanas pendientes: ratón, teclado y mando a 75 % y 150 %; probar ventana/pantalla completa, audio y el retorno desde pausa. No se ha probado todavía el tamaño de ventana en un monitor real.
+
 ## Registro humano
 
 Lo rellenáis vosotros después de cada fase. Son las preguntas que hace el profesorado.

@@ -1,13 +1,15 @@
-# AGENTS.md — VoodooCombo (versión para la fase 12)
+# AGENTS.md — VoodooCombo (versión para la fase 13)
 
 > Instrucciones permanentes para el agente (Codex las lee en cada tarea). Es la fuente de verdad del proyecto:
 > si un prompt contradice este archivo, pregunta antes de programar.
-> **Esta versión describe cómo tiene que quedar el juego al terminar la fase 12.** Incluye:
-> - todo lo de las fases 10 y 11: letra "Brasa minimal", online con salas, lobby y votación;
-> - la dopamina de la fase 12;
-> - los modos nuevos, sin el Clásico.
+> **Esta versión describe cómo tiene que quedar el juego al terminar la fase 13.** Incluye todo lo de las fases 10-12, y además:
+> - ajustes en filas con flechas;
+> - alojar partida desde el juego y el ejecutable;
+> - menos texto en partida;
+> - efectos visuales de los hechizos;
+> - pantalla de elegir modo.
 >
-> Antes de empezar la fase 12, copia este archivo a la raíz del proyecto como `AGENTS.md`. Sustituye a la versión de la fase 11.
+> Antes de empezar la fase 13, copia este archivo a la raíz del proyecto como `AGENTS.md`. Sustituye a la versión de la fase 12.
 > Visión y referencias del diseño para humanos: `docs/DISENO.md`. Requisitos del enunciado y plan: `docs/PLAN.md`.
 
 ## 1. Qué es
@@ -331,7 +333,16 @@ Plan completo del equipo: `docs/codex/plan-multijugador.md`. Guía para desplega
   - `MAX_PEERS = 32` (8 salas de 4);
   - cada sala con su propia `MatchSim` a **30 Hz**.
 - **Dónde corre:** Oracle Cloud Always Free para jugar desde casa y, de respaldo, un PC de clase en la red local.
-- **En AJUSTES → "Servidor":** Oracle (`GameConfig.ONLINE_HOST`), Red local (IP a mano) o Este PC (`127.0.0.1`).
+- **Alojar desde el juego:** JUGAR ONLINE → CREAR SALA EN ESTE PC.
+  - Lanza el servidor dedicado como proceso aparte con el mismo ejecutable (`--headless -- --server --port 7777`) y se conecta a `127.0.0.1`.
+  - Enseña tu IP local para que los demás entren.
+  - Al salir o cerrar el juego, mata ese proceso.
+- **Unirse:** con la IP del anfitrión y el código de sala, en la misma pantalla. La última IP se recuerda.
+- **En AJUSTES → ONLINE:** Este PC (`127.0.0.1`), Red local (IP a mano) u Oracle (`GameConfig.ONLINE_HOST`).
+- **Si no conecta en 6 s:** mensaje claro con la IP y el puerto. Nunca se queda colgado.
+- **Ejecutable:** `build/VoodooCombo-v<versión>-Windows.zip`, con el exe, `LEEME.txt` y `servidor.bat`.
+  - `build/` no se sube al repositorio.
+  - La versión del juego se ve en el menú y tiene que coincidir con la del servidor.
 - **Contra bots:** la misma `MatchSim` en local, sin red.
 - **Solo hay una fuente de verdad de la red:** el autoload `Net`. Todas las RPC viven ahí, para que la ruta `/root/Net` sea igual en todos los peers.
 
@@ -409,9 +420,25 @@ Plan completo del equipo: `docs/codex/plan-multijugador.md`. Guía para desplega
 
 Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por los autoloads `Fx` y `Sfx` y respeta el ajuste "Reducir movimiento".
 
+**Textos en partida: pocos y que importen.** La dopamina la pone el movimiento, no la cantidad de texto.
+- **Qué ves:** solo los textos de lo tuyo, de lo que te hacen y de lo que haces a otros. De los demás jugadores, solo chispas y sonido.
+- **Como mucho 3 textos a la vez,** y nunca uno encima de otro.
+- **Racha:** en vez de un "+1" por doblón, **un solo contador** junto a tu muñeco que suma mientras dura la racha ("+1 → +2 → +4…"), crece y hace *pop* en cada doblón. Al acabar la racha, vuela a tu ficha.
+- **Avisos grandes:** uno cada vez, en el centro arriba. "¡VOODOO COMBO!" solo si es tuyo.
+- **Al abrir un cofre** no sale el nombre del hechizo encima del muñeco: lo explica la tarjeta de tu ranura.
+- **Hechizos:** se ven, no se leen (tabla de abajo y `docs/media/hechizos_efectos_referencia.png`).
+
 | Evento | Qué tiene que pasar |
 |---|---|
-| Recoger | "+N" que salta (§7), 6 chispas, el personaje se aplasta un poco y un *cling* que sube un semitono por cada paso de combo (hasta 12). Un doblón pequeño vuela en arco a tu ficha, y el número sube contando y hace *pop* |
+| Recoger | El contador de racha suma y hace *pop* (§6, arriba), 6 chispas, el personaje se aplasta un poco y un *cling* que sube un semitono por cada paso de combo (hasta 12). Un doblón pequeño vuela en arco a tu ficha, y el número sube contando y hace *pop* |
+| Lanzar un hechizo (todos) | Círculo de runas en brasa bajo los pies (0,25 s), el icono del hechizo sube desde el muñeco y un sonido propio. Si es tuyo, el borde de la pantalla parpadea suave del color del hechizo |
+| Imán activo | Aura `iman` girando y doblones que vuelan en espiral |
+| Botas activas | Estela verde y 3 copias fantasma detrás del muñeco |
+| Capa activa | Burbuja cian. Al bloquear, se rompe en cristales con "¡clin!" |
+| Alfiler | Proyectil que vuela de verdad a 700 px/s hacia donde miras |
+| Escarcha | Onda que crece hasta 180 px; los congelados llevan un bloque de hielo y al acabar se rompe |
+| Oveja | Rayo morado en arco hasta el líder, nube de humo y el líder se dibuja como oveja durante 3 s |
+| Anillo activo | Aura dorada con destellos detrás del muñeco |
 | Combo | Anillo junto al personaje que se vacía en 1,5 s (hueso en x2, brasa en x3). Al perderlo, se rompe con un *pff* suave; si era de 10 o más, sale "¡Combo de N!" en gris |
 | Subir de multiplicador | El número tiembla y pasa de hueso a brasa, aparece el aviso y suena un acorde que sube |
 | "¡VOODOO COMBO!" | Cartel grande, golpe de cámara (+4 %), flash corto (si se permiten) y chispas por el borde 1 s; aura de brasa en el personaje |
@@ -498,9 +525,20 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 - **Logo:** `assets/ui/logo_brasa.png`.
 - **Botones del menú:** solo texto, sin caja. El que tiene el foco va en brasa, con un punto a la izquierda y una línea fina debajo.
 - **HUD:** solo 3 elementos fijos.
-  1. **Fichas de los jugadores:** retrato con su marco, nombre del jugador, "J1 · TÚ", puntuación y la corona en el líder.
+  1. **Fichas de los jugadores:**
+     - la tuya, más grande y siempre a la izquierda;
+     - las de los rivales, más pequeñas;
+     - la corona en el líder;
+     - al cambiar de posición, se reordenan deslizándose.
   2. **Tiempo:** en grande arriba, en el centro.
-  3. **Ranura del hechizo:** abajo a la izquierda, 80×80 px, nunca cortada por el borde. Muestra la tecla (E o B) y el nombre del hechizo.
+  3. **Ranura del hechizo:** abajo a la izquierda, 80×80 px, nunca cortada por el borde.
+     - Vacía: solo el aro apagado, sin texto.
+     - Con hechizo: icono latiendo y la tecla (E o B).
+     - Con uno de duración: el aro se vacía, sin decimales.
+- **Encima de los muñecos:**
+  - los rivales llevan su forma de color, y su nombre solo los primeros 3 s o al ganar la corona;
+  - tú, la flecha y el aro;
+  - el círculo de combo solo dice "x2" o "x3".
   - Paneles `#241838` con borde de costura.
 - **Ambiente:** encima de la arena, niebla que se mueve despacio, velas que parpadean y viñeta oscura.
 
@@ -520,18 +558,25 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
 - **Menús:** se usan del todo con teclado y mando, con foco visible.
 - **Nunca solo color:** formas ● ▲ ■ ◆ e iconos.
-- **Ajustes:**
-  - reducir movimiento y reducir destellos;
-  - vibración del mando;
-  - escala de UI 100/125/150 %;
-  - pantalla (ventana o pantalla completa) y tamaño de ventana;
-  - volumen de música y de efectos;
-  - idioma;
-  - servidor.
+- **Ajustes** (`docs/media/ajustes_referencia.png`):
+  - **Pestañas:** PARTIDA · PANTALLA · SONIDO · ONLINE.
+  - **Cada opción es una fila** con **‹ valor ›** y flechas clicables. Con teclado o mando: izquierda y derecha cambian el valor, y arriba y abajo cambian de fila. Se guarda solo.
+  - **PARTIDA:**
+    - escala de la interfaz 75/85/100/115/130/150 %; escala **toda** la interfaz, sin solapes;
+    - reducir movimiento;
+    - reducir destellos;
+    - vibración;
+    - idioma (ESPAÑOL / CATALÀ / ENGLISH).
+  - **PANTALLA:** modo (ventana o pantalla completa) y tamaño de ventana.
+  - **SONIDO:** música y efectos.
+  - **ONLINE:** servidor e IP.
+  - También se abren desde la pausa.
+- **Layout:** los menús se montan con contenedores (`VBoxContainer`, `HBoxContainer`, `MarginContainer`), no con posiciones fijas, para que ningún texto se salga ni se pise en ningún idioma ni escala.
 
 ## 9. Cómo trabajar
 
-- **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 12a: <resumen>`).
+- **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 13a: <resumen>`).
+- **Capturas:** después de cada bloque de interfaz, guarda capturas en `docs/capturas/fase-N/` y revisa que nada se pisa.
 - **Antes de programar:** resume en 3-5 líneas qué vas a hacer.
 - **Tests:** si hay Godot en el PATH como `godot`, ejecuta `godot --headless --path . --script res://tests/run_tests.gd` y arregla lo que falle. Si no está, dilo.
 - **Al terminar cada bloque:**

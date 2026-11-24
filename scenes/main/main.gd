@@ -17,6 +17,7 @@ const TRAP_ICONS_TEXTURE := preload("res://assets/ui/trampas_iconos.png")
 const SAFE_ZONE_FOG_TEXTURE := preload("res://assets/ui/zona_niebla.png")
 const SAFE_ZONE_FOG_SHADER := preload("res://assets/ui/safe_zone_fog.gdshader")
 const BIOME_COLORS := [[Color("2b3a2a"), Color("243223")], [Color("33402a"), Color("2b3723")], [Color("2a3a4a"), Color("233241")], [Color("3a2a2a"), Color("322323")]]
+const SETTINGS_VIEW := preload("res://scenes/settings/settings_view.gd")
 
 var simulation: MatchSim
 var simulation_accumulator := 0.0
@@ -78,6 +79,7 @@ var results_xp := 0
 var results_characters: Array[TextureRect] = []
 var results_bubbles: Array[Dictionary] = []
 var results_emote_cooldown := 0.0
+var settings_return_state := "menu"
 var result_bot_emote_at: Array[float] = []
 var character_preview: TextureRect
 var character_preview_id := "mago"
@@ -923,62 +925,28 @@ func _build_history() -> void:
 	_button(root, I18n.t("menu"), Vector2(0, 590), _build_menu)
 
 func _build_settings() -> void:
-	_clear_hud()
-	var root := _new_overlay()
-	_label(root, I18n.t("settings"), Vector2(0, 130), 44, GameConfig.GOLD, true)
-	var server_button := _button(root, I18n.t("server"), Vector2.ZERO, _build_server_settings)
-	server_button.position = Vector2(980, 30)
-	server_button.size = Vector2(260, 55)
-	for index in 2:
-		var key: String = ["reduce_flashes", "vibration"][index]
-		var toggle := CheckButton.new()
-		toggle.text = I18n.t(key)
-		toggle.position = Vector2(35, 220 + index * 65)
-		toggle.button_pressed = bool(Settings.get(key))
-		toggle.toggled.connect(func(value: bool): Settings.set(key, value); Settings.save())
-		root.add_child(toggle)
-	_button(root, "%s: %s" % [I18n.t("settings_reduce_motion"), I18n.t("settings_yes") if Settings.reduce_motion else I18n.t("settings_no")], Vector2(0, 215), func():
-		Settings.reduce_motion = not Settings.reduce_motion
-		Settings.save()
-		_build_settings())
-	_button(root, "%s: %d%%" % [I18n.t("settings_ui_scale"), int(Settings.ui_scale * 100.0)], Vector2(0, 275), func():
-		Settings.ui_scale = 1.0 if Settings.ui_scale >= 1.5 else Settings.ui_scale + 0.25
-		Settings.save()
-		_build_settings())
-	for index in 2:
-		var audio_key := "music_volume" if index == 0 else "sfx_volume"
-		var title_key := "settings_music" if index == 0 else "settings_sfx"
-		var audio_label := _hud_label(root, Vector2(270.0, 340.0 + index * 55.0), Vector2(270.0, 36.0), 18, HORIZONTAL_ALIGNMENT_LEFT)
-		audio_label.text = I18n.t(title_key)
-		var slider := HSlider.new()
-		slider.position = Vector2(550.0, 340.0 + index * 55.0)
-		slider.size = Vector2(420.0, 36.0)
-		slider.min_value = 0.0
-		slider.max_value = 100.0
-		slider.value = float(Settings.get(audio_key)) * 100.0
-		slider.focus_mode = Control.FOCUS_ALL
-		slider.value_changed.connect(func(value: float): Settings.set(audio_key, value / 100.0); Settings.save())
-		root.add_child(slider)
-	var display_mode := I18n.t("settings_fullscreen") if Settings.window_fullscreen else I18n.t("settings_windowed")
-	_button(root, "%s: %s" % [I18n.t("settings_display_mode"), display_mode], Vector2(0, GameConfig.SETTINGS_DISPLAY_MODE_Y), func():
-		Settings.toggle_fullscreen()
-		_build_settings())
-	var window_size: Vector2i = GameConfig.WINDOW_SIZE_OPTIONS[Settings.window_size_index]
-	_button(root, "%s: %d×%d" % [I18n.t("settings_window_size"), window_size.x, window_size.y], Vector2(0, GameConfig.SETTINGS_WINDOW_SIZE_Y), func():
-		Settings.cycle_window_size()
-		_build_settings())
-	_button(root, "%s: %s" % [I18n.t("settings_language"), I18n.language], Vector2(0, GameConfig.SETTINGS_LANGUAGE_Y), func():
-		I18n.set_language("ca" if I18n.language == "es" else ("en" if I18n.language == "ca" else "es"))
-		Settings.save()
-		_build_settings())
-	_button(root, I18n.t("menu"), Vector2(0, GameConfig.SETTINGS_MENU_Y), _build_menu)
+	settings_return_state = state
+	if state != "paused": _clear_hud()
+	state = "settings"
+	var view := SETTINGS_VIEW.new()
+	add_child(view)
+	view.closed.connect(_on_settings_closed)
+
+func _on_settings_closed() -> void:
+	if settings_return_state == "paused":
+		state = "paused"
+		_build_pause()
+	else:
+		state = "menu"
+		_build_menu()
 
 func _build_pause() -> void:
 	_clear_hud()
 	var root := _new_overlay()
-	_label(root, "PAUSA", Vector2(0, 190), 48, GameConfig.GOLD, true)
-	_button(root, "Continuar", Vector2(0, 275), func(): state = "playing"; _build_hud())
-	_button(root, I18n.t("menu"), Vector2(0, 345), _build_menu)
+	_label(root, I18n.t("pause"), Vector2(0, 190), 48, GameConfig.GOLD, true)
+	_button(root, I18n.t("continue"), Vector2(0, 275), func(): state = "playing"; _build_hud())
+	_button(root, I18n.t("settings"), Vector2(0, 345), _build_settings)
+	_button(root, I18n.t("menu"), Vector2(0, 415), _build_menu)
 
 func _build_server_settings() -> void:
 	_clear_hud()
@@ -1107,7 +1075,7 @@ func _build_hud() -> void:
 	timer.position = Vector2(574, 2)
 	timer.size = Vector2(132, 58)
 	timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	timer.add_theme_font_size_override("font_size", roundi(44 * Settings.ui_scale))
+	timer.add_theme_font_size_override("font_size", 44)
 	var clock_font := ThemeBuilder.font("Oswald-Bold.woff2")
 	if clock_font != null: timer.add_theme_font_override("font", clock_font)
 	timer.add_theme_color_override("font_color", GameConfig.GOLD)
@@ -1192,7 +1160,7 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 	label.size = label_size
 	label.horizontal_alignment = alignment
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", roundi(font_size * Settings.ui_scale))
+	label.add_theme_font_size_override("font_size", font_size)
 	var font_path := "res://assets/fonts/Oswald-Bold.woff2" if font_size >= 30 else "res://assets/fonts/Oswald-Medium.woff2"
 	var hud_font := ThemeBuilder.font(font_path.get_file())
 	if hud_font != null: label.add_theme_font_override("font", hud_font)

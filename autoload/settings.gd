@@ -4,6 +4,7 @@ var reduce_motion := false
 var reduce_flashes := false
 var vibration := true
 var server_host := "127.0.0.1"
+var server_port := GameConfig.SETTINGS_PORT
 var server_choice := 2
 var ui_scale := 1.0
 var music_volume := 0.7
@@ -17,6 +18,7 @@ func _ready() -> void:
 		reduce_flashes = bool(config.get_value("accessibility", "reduce_flashes", false))
 		vibration = bool(config.get_value("accessibility", "vibration", true))
 		server_host = str(config.get_value("network", "host", server_host))
+		server_port = clampi(int(config.get_value("network", "port", server_port)), 1, 65535)
 		server_choice = int(config.get_value("network", "choice", server_choice))
 		reduce_motion = config.get_value("accessibility", "reduce_motion", false)
 		ui_scale = config.get_value("accessibility", "ui_scale", 1.0)
@@ -25,10 +27,18 @@ func _ready() -> void:
 		window_fullscreen = bool(config.get_value("display", "fullscreen", window_fullscreen))
 		window_size_index = clampi(int(config.get_value("display", "window_size_index", window_size_index)), 0, GameConfig.WINDOW_SIZE_OPTIONS.size() - 1)
 		I18n.set_language(str(config.get_value("general", "language", "es")))
+	ui_scale = _nearest_ui_scale(ui_scale)
+
+func _nearest_ui_scale(value: float) -> float:
+	var nearest: float = GameConfig.SETTINGS_UI_SCALE_VALUES[0]
+	for candidate: float in GameConfig.SETTINGS_UI_SCALE_VALUES:
+		if absf(candidate - value) < absf(nearest - value): nearest = candidate
+	return nearest
 
 func save() -> void:
 	var config := ConfigFile.new()
 	config.set_value("network", "host", server_host)
+	config.set_value("network", "port", server_port)
 	config.set_value("network", "choice", server_choice)
 	config.set_value("accessibility", "reduce_motion", reduce_motion)
 	config.set_value("accessibility", "reduce_flashes", reduce_flashes)

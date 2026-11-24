@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_test_safe_zone()
 	_test_ranking()
 	_test_match_sim()
+	_test_settings_state()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
 		quit(0)
@@ -28,6 +29,31 @@ func _check(condition: bool, label: String) -> void:
 	if not condition:
 		failures += 1
 		push_error("FAILED: " + label)
+
+func _test_settings_state() -> void:
+	var settings: Node = root.get_node_or_null("Settings")
+	var i18n: Node = root.get_node_or_null("I18n")
+	_check(settings != null and i18n != null, "settings and I18n autoloads are available to tests")
+	if settings == null or i18n == null: return
+	var old_language := str(i18n.get("language"))
+	var old_flashes := bool(settings.get("reduce_flashes"))
+	var old_vibration := bool(settings.get("vibration"))
+	var old_scale := float(settings.get("ui_scale"))
+	settings.set("reduce_flashes", not old_flashes)
+	settings.set("vibration", not old_vibration)
+	_check(str(i18n.get("language")) == old_language, "accessibility toggles do not change the selected language")
+	settings.set("ui_scale", 0.75)
+	settings.call("save")
+	var saved := ConfigFile.new()
+	_check(saved.load("user://settings.cfg") == OK and is_equal_approx(float(saved.get_value("accessibility", "ui_scale", 1.0)), 0.75), "UI scale decrease persists")
+	settings.set("ui_scale", 1.5)
+	settings.call("save")
+	saved = ConfigFile.new()
+	_check(saved.load("user://settings.cfg") == OK and is_equal_approx(float(saved.get_value("accessibility", "ui_scale", 1.0)), 1.5), "UI scale increase persists")
+	settings.set("reduce_flashes", old_flashes)
+	settings.set("vibration", old_vibration)
+	settings.set("ui_scale", old_scale)
+	settings.call("save")
 
 func _test_scoring() -> void:
 	_check(Scoring.multiplier(4) == 1 and Scoring.multiplier(5) == 2, "combo x2 threshold")
