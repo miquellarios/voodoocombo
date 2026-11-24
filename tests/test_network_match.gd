@@ -22,7 +22,7 @@ func _run() -> void:
 	if OS.get_cmdline_user_args().size() > 1: test_mode = OS.get_cmdline_user_args()[1]
 	net = root.get_node("Net")
 	net.connected.connect(func():
-		if role == "create": net.create_room.rpc_id(1, "Host", "mago", {}, GameConfig.NET_VERSION)
+		if role == "create": net.create_room.rpc_id(1, "Host", "mago", {}, GameConfig.NET_VERSION, test_mode)
 		else: net.join_room.rpc_id(1, FileAccess.get_file_as_string(code_path).strip_edges(), role, "trol", {}, GameConfig.NET_VERSION)
 	)
 	net.room_changed.connect(_room)

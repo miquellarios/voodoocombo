@@ -7,7 +7,13 @@ func _run() -> void:
 	root.get_node("Profile").nick = "Tester"
 	var lobby: Control = load("res://scenes/lobby/online_lobby.gd").new()
 	root.add_child(lobby)
-	lobby._local_room()
+	lobby._mode_select("bots")
+	var mode_buttons: Array[Button] = []
+	for child in lobby.view.get_children():
+		if child is Button and (child as Button).size == GameConfig.MODE_CARD_SIZE: mode_buttons.append(child)
+	assert(mode_buttons.size() == 3)
+	mode_buttons[1].emit_signal("pressed")
+	assert(lobby.room.mode == "survival")
 	assert(lobby.roster.size() == 4)
 	assert(lobby._display_order()[1] == 0)
 	lobby._open_wheel()

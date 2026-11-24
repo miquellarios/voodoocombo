@@ -63,7 +63,7 @@ func _request(sender: int, action: String, data: Dictionary) -> void:
 		"ping": Net.pong.rpc_id(sender, int(data.stamp))
 		"create", "join":
 			if action == "create":
-				room = directory.create(sender, data.nick, data.character, data.cosmetics, data.version)
+				room = directory.create(sender, data.nick, data.character, data.cosmetics, data.version, str(data.get("mode", "voodoo")))
 			else:
 				room = directory.join(sender, data.code, data.nick, data.character, data.cosmetics, data.version)
 			if room.is_empty():

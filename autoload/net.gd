@@ -75,8 +75,8 @@ func _receive(action: String, data: Dictionary) -> void:
 		request_received.emit(multiplayer.get_remote_sender_id(), action, data)
 
 @rpc("any_peer", "call_remote", "reliable")
-func create_room(nick: String, character: String, cosmetics: Dictionary, version: String) -> void:
-	_receive("create", {"nick": nick, "character": character, "cosmetics": cosmetics, "version": version})
+func create_room(nick: String, character: String, cosmetics: Dictionary, version: String, mode: String = "voodoo") -> void:
+	_receive("create", {"nick": nick, "character": character, "cosmetics": cosmetics, "version": version, "mode": mode})
 
 @rpc("any_peer", "call_remote", "reliable")
 func join_room(code: String, nick: String, character: String, cosmetics: Dictionary, version: String) -> void:

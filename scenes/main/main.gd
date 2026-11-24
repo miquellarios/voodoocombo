@@ -774,7 +774,7 @@ func _layout_score_cards(order: Array[int]) -> void:
 		score_tag_labels[player_index].size.x = 158.0
 		score_number_labels[player_index].add_theme_font_size_override("font_size", 32 if local else GameConfig.SCORE_CARD_RIVAL_NUMBER_SIZE)
 		for stitch in GameConfig.SURVIVAL_LIVES:
-			score_life_icons[player_index][stitch].position = Vector2(x + 209.0 + stitch * 18.0, 15.0)
+			score_life_icons[player_index][stitch].position = Vector2(x + 204.0 + stitch * GameConfig.SURVIVAL_HUD_STITCH_GAP, 13.0)
 
 func _build_menu() -> void:
 	Sfx.stop_music()
@@ -1327,8 +1327,8 @@ func _build_hud() -> void:
 			atlas.atlas = STITCHES_TEXTURE
 			atlas.region = Rect2(0.0, 0.0, 128.0, 128.0)
 			icon.texture = atlas
-			icon.position = Vector2(card_x[slot] + 209.0 + stitch * 18.0, 15.0)
-			icon.size = Vector2(24.0, 24.0)
+			icon.position = Vector2(card_x[slot] + 204.0 + stitch * GameConfig.SURVIVAL_HUD_STITCH_GAP, 13.0)
+			icon.size = Vector2.ONE * GameConfig.SURVIVAL_HUD_STITCH_SIZE
 			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			root.add_child(icon)
 			life_icons.append(icon)
@@ -1880,7 +1880,7 @@ func _draw() -> void:
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
 				var texture: Texture2D = STITCHES_TEXTURE
-				draw_texture_rect_region(texture,Rect2(pos + Vector2(-30 + stitch * 20,-75),Vector2(20,20)),Rect2(0 if stitch < int(player.lives) else 128,0,128,128))
+				draw_texture_rect_region(texture,Rect2(pos + Vector2(-27 + stitch * GameConfig.SURVIVAL_HEAD_STITCH_SIZE,-75),Vector2.ONE * GameConfig.SURVIVAL_HEAD_STITCH_SIZE),Rect2(0 if stitch < int(player.lives) else 128,0,128,128))
 		if int(player.combo) > 0:
 			var combo_left := clampf(1.0 - (elapsed - float(player.last_pickup)) / GameConfig.COMBO_WINDOW, 0, 1)
 			var multiplier := Scoring.multiplier(int(player.combo))

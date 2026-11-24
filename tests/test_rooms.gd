@@ -2,8 +2,8 @@ extends SceneTree
 
 func _initialize() -> void:
 	var service := RoomDirectory.new()
-	var room := service.create(2, "Ana", "mago", {}, GameConfig.NET_VERSION)
-	assert(not room.is_empty() and room.code.length() == 5)
+	var room := service.create(2, "Ana", "mago", {}, GameConfig.NET_VERSION, "survival")
+	assert(not room.is_empty() and room.code.length() == 5 and room.mode == "survival")
 	var code: String = room.code
 	for id in [3, 4, 5]: assert(not service.join(id, code, "Jugador", "trol", {}, GameConfig.NET_VERSION).is_empty())
 	assert(service.join(6, code, "Extra", "mago", {}, GameConfig.NET_VERSION).is_empty() and service.error == "full")

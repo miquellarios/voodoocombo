@@ -21,7 +21,7 @@ func validate(nick: String, character: String, cosmetics: Dictionary, version: S
 		if nick.unicode_at(index) < 32 or nick.unicode_at(index) == 127: error = "nickname"
 	return error.is_empty()
 
-func create(sender: int, nick: String, character: String, cosmetics: Dictionary, version: String) -> Dictionary:
+func create(sender: int, nick: String, character: String, cosmetics: Dictionary, version: String, mode: String = "voodoo") -> Dictionary:
 	if not validate(nick, character, cosmetics, version): return {}
 	if membership.has(sender): error = "already_joined"; return {}
 	if rooms.size() >= GameConfig.NET_MAX_ROOMS: error = "server_full"; return {}
@@ -30,7 +30,8 @@ func create(sender: int, nick: String, character: String, cosmetics: Dictionary,
 		code = ""
 		for index in GameConfig.ROOM_CODE_LENGTH:
 			code += GameConfig.ROOM_ALPHABET[rng.randi_range(0, GameConfig.ROOM_ALPHABET.length() - 1)]
-	rooms[code] = {"code": code, "players": [], "host": sender, "mode": "voodoo", "duration": 90, "phase": "lobby", "empty_since": clock, "arena_id": "", "bots": 0}
+	var selected_mode := mode if GameConfig.MODES.has(mode) else "voodoo"
+	rooms[code] = {"code": code, "players": [], "host": sender, "mode": selected_mode, "duration": 90, "phase": "lobby", "empty_since": clock, "arena_id": "", "bots": 0}
 	return _insert(sender, code, nick, character, cosmetics)
 
 func join(sender: int, code: String, nick: String, character: String, cosmetics: Dictionary, version: String) -> Dictionary:

@@ -2,6 +2,12 @@
 
 ## Registro de Codex
 
+### Fase 13g — Selector de modo visible
+- Añadida una pantalla de tres tarjetas ilustradas antes de crear una sala online o una partida contra bots; unirse por código sigue entrando directamente. El modo elegido viaja en la solicitud de sala y se conserva en el directorio local.
+- El lobby muestra la tarjeta del modo y deja cambiarla al anfitrión; los invitados ven que debe elegir el anfitrión. La práctica local ya no muestra código ni botón de copiar. Se ampliaron las costuras del marcador a 28 px y las que aparecen sobre los personajes a 18 px.
+- Pasaron `tests/test_lobby_view.gd`, `tests/test_rooms.gd` y `tests/run_tests.gd` con Godot 4.7.2. La prueba ENet de varios procesos no se pudo completar dentro del aislamiento local en el intento previo; se repetirá con permiso de sockets locales. No se validó visualmente esta pantalla mediante captura.
+- Humanos: probar las tres tarjetas con ratón, teclado y mando; crear partidas de bots y salas online en cada modo; verificar cambio de modo solo por el anfitrión, entrada directa por código y legibilidad de las costuras.
+
 ### Fase 13a — Ajustes y accesibilidad
 - Reemplazada la pantalla antigua por `scenes/settings/settings_view.gd`, con pestañas de partida, pantalla, sonido y online. Las opciones persistentes usan flechas clicables, foco, campos numéricos/servidor y controles de audio; el tamaño de ventana queda inactivo en pantalla completa. Ajustes se abre también desde pausa.
 - Incorporadas las referencias y assets de fase 13, y actualizado el `AGENTS.md` de raíz según el paquete entregado. La escala de ajustes adapta controles y tipografía; el contenido de opciones puede desplazarse verticalmente a escalas altas para conservar el área de lectura.

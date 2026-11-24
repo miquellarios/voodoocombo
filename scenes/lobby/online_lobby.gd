@@ -29,6 +29,7 @@ var connection_elapsed := 0.0
 var retry_elapsed := 0.0
 var hosting_here := false
 var local_host_ip := ""
+var pending_mode := "voodoo"
 var local_vote: ArenaVote
 var vote_view: ArenaVoteView
 var background := preload("res://assets/ui/lobby_mazmorra.png")
@@ -77,7 +78,7 @@ func _button(key: String, at: Vector2, dimensions: Vector2, action: Callable) ->
 func _entry() -> void:
 	_new_view()
 	_label(I18n.t("online"), Vector2(0, 55), Vector2(1280, 65), 40)
-	_button("host_here", GameConfig.ONLINE_HOST_BUTTON_POSITION, GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _connect_to("create")).grab_focus()
+	_button("host_here", GameConfig.ONLINE_HOST_BUTTON_POSITION, GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _mode_select("create")).grab_focus()
 	ip_field = LineEdit.new()
 	ip_field.max_length = GameConfig.SETTINGS_INPUT_MAX_LENGTH
 	ip_field.placeholder_text = I18n.t("host_ip")
@@ -98,7 +99,7 @@ func _entry() -> void:
 	)
 	view.add_child(code_field)
 	_button("join_room", Vector2(390, 380), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _connect_to("join"))
-	_button("bots", Vector2(390, 455), GameConfig.ONLINE_ACTION_BUTTON_SIZE, _local_room)
+	_button("bots", Vector2(390, 455), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _mode_select("bots"))
 	_button("network_help", Vector2(390, 528), GameConfig.ONLINE_ACTION_BUTTON_SIZE, _open_network_help)
 	_button("menu", Vector2(390, 600), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): exit_requested.emit())
 
@@ -136,14 +137,102 @@ func _connected() -> void:
 	connection_pending = false
 	local_id = multiplayer.get_unique_id()
 	if connecting_action == "create":
-		Net.create_room.rpc_id(1, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION)
+		Net.create_room.rpc_id(1, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION, pending_mode)
 	else:
 		Net.join_room.rpc_id(1, code_field.text, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION)
 
-func _local_room() -> void:
+func _mode_select(action: String) -> void:
+	_new_view()
+	_label(I18n.t("choose_mode"), Vector2(0, 52), Vector2(1280, 62), 42)
+	var modes: Array = GameConfig.MODES
+	var card_buttons: Array[Button] = []
+	for index in modes.size():
+		var mode_id := str(modes[index])
+		var card := Panel.new()
+		card.position = Vector2(GameConfig.MODE_CARD_X[index], GameConfig.MODE_CARD_Y)
+		card.size = GameConfig.MODE_CARD_SIZE
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("241838")
+		style.border_color = Color("5c496d")
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(12)
+		card.add_theme_stylebox_override("panel", style)
+		view.add_child(card)
+		_add_mode_illustration(mode_id, card.position + Vector2(132, 32))
+		var name_label := _label(I18n.t(mode_id), card.position + Vector2(16, 150), Vector2(328, 48), GameConfig.MODE_CARD_TITLE_SIZE)
+		name_label.add_theme_font_override("font", ThemeBuilder.title_font(GameConfig.MODE_CARD_TITLE_SIZE))
+		name_label.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
+		var rules := _label(I18n.t("rules_" + mode_id), card.position + Vector2(24, 208), Vector2(312, 142), GameConfig.MODE_CARD_RULE_SIZE)
+		rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var players_label := _label(I18n.t("mode_players_" + mode_id), card.position + Vector2(16, 358), Vector2(328, 40), GameConfig.MODE_CARD_PLAYERS_SIZE)
+		players_label.add_theme_color_override("font_color", GameConfig.EMBER)
+		var button := Button.new()
+		button.set_script(load("res://ui/widgets/ember_button.gd"))
+		button.position = card.position
+		button.size = card.size
+		button.text = ""
+		button.tooltip_text = I18n.t(mode_id)
+		button.focus_mode = Control.FOCUS_ALL
+		for state_name in ["normal", "hover", "pressed", "focus", "disabled"]: button.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+		button.focus_entered.connect(func() -> void: style.border_color = GameConfig.EMBER; style.set_border_width_all(4))
+		button.focus_exited.connect(func() -> void: style.border_color = Color("5c496d"); style.set_border_width_all(2))
+		button.mouse_entered.connect(button.grab_focus)
+		button.pressed.connect(func() -> void:
+			pending_mode = mode_id
+			if action == "bots": _local_room(mode_id)
+			else: _connect_to("create")
+		)
+		view.add_child(button)
+		card_buttons.append(button)
+	_button("menu", Vector2(490, 638), Vector2(300, 54), _entry)
+	if not card_buttons.is_empty(): card_buttons[0].grab_focus()
+
+func _add_mode_illustration(mode_id: String, at: Vector2, include_detail: bool = true) -> void:
+	if mode_id == "voodoo":
+		var coin := TextureRect.new()
+		coin.position = at
+		coin.size = Vector2(GameConfig.MODE_CARD_ICON_SIZE, GameConfig.MODE_CARD_ICON_SIZE)
+		coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var atlas := AtlasTexture.new()
+		atlas.atlas = load("res://assets/items/doblon.png")
+		atlas.region = Rect2(0, 0, 64, 64)
+		coin.texture = atlas
+		view.add_child(coin)
+		if include_detail:
+			var combo := _label("x3", at + Vector2(82, 28), Vector2(110, 48), 34)
+			combo.add_theme_color_override("font_color", GameConfig.EMBER)
+	elif mode_id == "survival":
+		var stitches := TextureRect.new()
+		stitches.position = at + Vector2(5, 5)
+		stitches.size = Vector2(84, 84)
+		stitches.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		var atlas := AtlasTexture.new()
+		atlas.atlas = load("res://assets/ui/costuras.png")
+		atlas.region = Rect2(0, 0, 128, 128)
+		stitches.texture = atlas
+		view.add_child(stitches)
+		if include_detail:
+			var stitch_label := _label("×3", at + Vector2(88, 28), Vector2(80, 48), 32)
+			stitch_label.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
+	else:
+		for team in 2:
+			var chest := TextureRect.new()
+			chest.position = at + Vector2(team * 48, 7)
+			chest.size = Vector2(58, 82)
+			chest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			chest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			var chest_texture: Texture2D = load("res://assets/items/cofre_equipo_%s.png" % ("coral" if team == 0 else "azul"))
+			var chest_atlas := AtlasTexture.new()
+			chest_atlas.atlas = chest_texture
+			chest_atlas.region = Rect2(0, 0, 224, 256)
+			chest.texture = chest_atlas
+			view.add_child(chest)
+
+func _local_room(selected_mode: String = "voodoo") -> void:
 	local = true
 	local_id = 2
-	room = local_directory.create(local_id, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION)
+	room = local_directory.create(local_id, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION, selected_mode)
 	room.bots = 3
 	_room_changed(room)
 
@@ -176,17 +265,46 @@ func _load_sheets() -> void:
 
 func _build_room() -> void:
 	_new_view()
-	_label(I18n.t("room_code") + "  " + ("—" if local else str(room.code)), Vector2(20, 30), Vector2(540, 60), 30)
-	_button("copy", Vector2(40, 94), Vector2(180, 45), func(): DisplayServer.clipboard_set(str(room.code)))
+	if local:
+		_label(I18n.t("bots_match"), Vector2(20, 30), Vector2(360, 60), 26)
+	else:
+		_label(I18n.t("room_code") + "  " + str(room.code), Vector2(20, 30), Vector2(360, 60), 26)
+		_button("copy", Vector2(35, 94), Vector2(150, 42), func(): DisplayServer.clipboard_set(str(room.code)))
 	if hosting_here:
 		var address_text := local_host_ip if not local_host_ip.is_empty() else I18n.t("host_ip_none")
-		_label(I18n.t("hosting_ip") % address_text, GameConfig.ONLINE_HOSTING_LABEL_POSITION, GameConfig.ONLINE_HOSTING_LABEL_SIZE, 20)
-		_button("copy_ip", Vector2(445, 126), Vector2(170, 45), func(): if not local_host_ip.is_empty(): DisplayServer.clipboard_set(local_host_ip))
-		_button("network_help", Vector2(625, 126), Vector2(320, 45), _open_network_help)
-	var mode_button := _button(str(room.mode), Vector2(850, 40), Vector2(400, 55), func(): _action("mode", {"mode": GameConfig.MODES[(GameConfig.MODES.find(str(room.mode)) + 1) % GameConfig.MODES.size()]}))
-	mode_button.disabled = int(room.host) != local_id
-	_label(I18n.t("rules_" + str(room.mode)), Vector2(850,105),Vector2(400,120),20)
-	var duration := _button(str(room.duration) + " s",Vector2(570,40),Vector2(220,55),func(): _action("duration",{"seconds":GameConfig.MATCH_DURATIONS[(GameConfig.MATCH_DURATIONS.find(int(room.duration))+1)%3]}))
+		_label(I18n.t("hosting_ip") % address_text, Vector2(20, 144), Vector2(375, 48), 18)
+		_button("copy_ip", Vector2(25, 197), Vector2(160, 42), func(): if not local_host_ip.is_empty(): DisplayServer.clipboard_set(local_host_ip))
+		_button("network_help", Vector2(195, 197), Vector2(200, 42), _open_network_help)
+	var mode_panel := Panel.new()
+	mode_panel.position = Vector2(430, 18)
+	mode_panel.size = Vector2(408, 158)
+	var mode_style := StyleBoxFlat.new()
+	mode_style.bg_color = Color("241838")
+	mode_style.border_color = GameConfig.EMBER if int(room.host) == local_id else Color("5c496d")
+	mode_style.set_border_width_all(2)
+	mode_style.set_corner_radius_all(10)
+	mode_panel.add_theme_stylebox_override("panel", mode_style)
+	view.add_child(mode_panel)
+	_add_mode_illustration(str(room.mode), Vector2(445, 42), false)
+	_label(I18n.t(str(room.mode)), Vector2(552, 28), Vector2(210, 38), 24).add_theme_font_override("font", ThemeBuilder.title_font(24))
+	_label(I18n.t("rules_" + str(room.mode)), Vector2(552, 69), Vector2(210, 76), 17)
+	var host_hint := _label("", Vector2(552, 146), Vector2(210, 24), 15)
+	if int(room.host) != local_id: host_hint.text = I18n.t("host_chooses_mode")
+	var mode_left := Button.new()
+	mode_left.text = "‹"
+	mode_left.position = Vector2(770, 32)
+	mode_left.size = Vector2(28, 35)
+	mode_left.pressed.connect(func(): _cycle_room_mode(-1))
+	mode_left.disabled = int(room.host) != local_id
+	view.add_child(mode_left)
+	var mode_right := Button.new()
+	mode_right.text = "›"
+	mode_right.position = Vector2(805, 32)
+	mode_right.size = Vector2(28, 35)
+	mode_right.pressed.connect(func(): _cycle_room_mode(1))
+	mode_right.disabled = int(room.host) != local_id
+	view.add_child(mode_right)
+	var duration := _button(str(room.duration) + " s",Vector2(870,40),Vector2(180,55),func(): _action("duration",{"seconds":GameConfig.MATCH_DURATIONS[(GameConfig.MATCH_DURATIONS.find(int(room.duration))+1)%3]}))
 	duration.disabled = local_id != int(room.host) or room.mode == "survival"
 	var order := _display_order()
 	for slot in GameConfig.ROOM_CAPACITY:
@@ -232,6 +350,12 @@ func _display_order() -> Array[int]:
 	var slots := [0, 2, 3]
 	for index in others.size(): order[slots[index]] = others[index]
 	return order
+
+func _cycle_room_mode(step: int) -> void:
+	if int(room.host) != local_id: return
+	var current := GameConfig.MODES.find(str(room.mode))
+	var next_index := posmod(current + step, GameConfig.MODES.size())
+	_action("mode", {"mode":GameConfig.MODES[next_index]})
 
 func _action(action: String, data: Dictionary = {}) -> void:
 	if local:
