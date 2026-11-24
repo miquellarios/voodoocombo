@@ -86,3 +86,9 @@ static func box(path: String) -> StyleBoxTexture:
 |---|---|---|
 | `cuadrante_marco.png`, `cuadrante_brillo.png` | 240×160 | Marco 9-slice (margen 40) de cada mapa en la votación; el de brillo es para la ruleta y el ganador |
 | `medallas.png` | 8 × 128×128 | Medallas en partida: primera sangre, venganza, remontada, robo maestro, racha, por los pelos, intocable, rey del combo |
+
+## Fase 13: efectos de hechizos
+
+| Archivo | Frame (px) | Frames | Uso |
+|---|---|---|---|
+| `efectos_hechizos.png` | 192×192 | 10 | Orden en `efectos_hechizos.json`: `oveja_a`, `oveja_b`, `hielo`, `capa`, `iman`, `botas`, `anillo`, `alfiler`, `lanzar`, `escarcha`. Se dibujan a escala 0,5. El centro del frame es el centro del muñeco (su posición − 40 px en y). Cómo se usa cada uno: `docs/codex/fase-13/FASE-13.md`, bloque 13f |
