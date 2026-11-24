@@ -575,6 +575,13 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 
 ## 9. Cómo trabajar
 
+### Fase 13 — decisiones de implementación
+
+- El anfitrión y la práctica local pasan por `ELIGE MODO`; unirse con código entra directamente. La sala guarda el modo elegido y lo anuncia también en la carga. Los snapshots online pasan por `net/snapshot_codec.gd`: quitan datos exclusivos del servidor y codifican en arrays breves los estados visuales activos de raíces y barriles; `Net` los restaura antes de entregar el estado a la vista. El paquete comprimido se mantiene por debajo de 1.536 bytes en la prueba de cuatro jugadores y las cuatro arenas.
+- La carga usa una miniatura grande, trampas en columna, retos en filas y reglas del modo, con progreso brasa. El podio coloca placas bajo cada puesto, reserva el pie inferior para botones y estiliza la barra de XP.
+- Los textos añadidos a controles e historial pasan por I18n en español, catalán e inglés. El historial traduce el modo y usa el número de partidas válidas para decidir si muestra el estado vacío. Los textos de interfaz van en hueso/brasa; el dorado se reserva para doblones y sus efectos.
+- Revisión de cierre: Godot 4.7.2, `tests/run_tests.gd`, pruebas de vista/escena y `tools/test-network.ps1` por modo. Consulta resultados y pendientes de revisión humana en `docs/BITACORA.md`.
+
 - **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 13a: <resumen>`).
 - **Capturas:** después de cada bloque de interfaz, guarda capturas en `docs/capturas/fase-N/` y revisa que nada se pisa.
 - **Antes de programar:** resume en 3-5 líneas qué vas a hacer.
