@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_ranking()
 	_test_match_sim()
 	_test_settings_state()
+	_test_history_i18n()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
 		quit(0)
@@ -55,6 +56,17 @@ func _test_settings_state() -> void:
 	settings.set("vibration", old_vibration)
 	settings.set("ui_scale", old_scale)
 	settings.call("save")
+
+func _test_history_i18n() -> void:
+	var i18n: Node = root.get_node_or_null("I18n")
+	if i18n == null: return
+	var old_language := str(i18n.get("language"))
+	for language in ["es", "ca", "en"]:
+		i18n.call("set_language", language)
+		_check(str(i18n.call("t", "history_empty")) != "history_empty", "empty-history text is translated in " + language)
+		for mode in GameConfig.MODES:
+			_check(str(i18n.call("t", mode)) != mode, "history mode name is translated in " + language + ": " + mode)
+	i18n.call("set_language", old_language)
 
 func _test_scoring() -> void:
 	_check(Scoring.multiplier(4) == 1 and Scoring.multiplier(5) == 2, "combo x2 threshold")

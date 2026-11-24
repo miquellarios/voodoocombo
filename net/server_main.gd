@@ -1,5 +1,7 @@
 extends Node
 
+const SNAPSHOT_CODEC = preload("res://net/snapshot_codec.gd")
+
 var directory := RoomDirectory.new()
 var rooms: Dictionary = directory.rooms
 var rate_limits: Dictionary = {}
@@ -165,13 +167,8 @@ func _step_match(room: Dictionary) -> void:
 	room.snapshot_left -= GameConfig.NET_TICK
 	if room.snapshot_left <= 0.0:
 		room.snapshot_left += GameConfig.NET_SNAPSHOT_TICK
-		var snapshot: Dictionary = room.sim.snapshot()
-		for key in ["arena", "obstacle_rects", "player_hitbox_rects"]: snapshot.erase(key)
-		for player: Dictionary in snapshot.players:
-			for key: String in player.keys():
-				if key.begins_with("bot_"): player.erase(key)
-		# Se envía el conjunto actual comprimido: perder un paquete nunca pierde un doblón para siempre.
-		snapshot["ack"] = room.sequences.duplicate()
+		var snapshot := SNAPSHOT_CODEC.prepare(room.sim.snapshot(), room.sequences)
+		# Se envía el estado completo comprimido: perder un paquete no deja posiciones ni monedas desactualizadas.
 		for player: Dictionary in room.players: Net.send_snapshot(int(player.peer_id), snapshot)
 
 func _publish(room: Dictionary) -> void:

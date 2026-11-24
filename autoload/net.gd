@@ -1,5 +1,7 @@
 extends Node
 
+const SNAPSHOT_CODEC = preload("res://net/snapshot_codec.gd")
+
 signal connected
 signal disconnected(reason: String)
 signal request_received(sender: int, action: String, data: Dictionary)
@@ -144,7 +146,7 @@ func snapshot_chunk(serial: int, part: int, total: int, raw_size: int, data: Pac
 	for index in total: packed.append_array(incoming_chunks[index])
 	var decoded: Variant = bytes_to_var(packed.decompress(raw_size, FileAccess.COMPRESSION_ZSTD))
 	incoming_chunks.clear()
-	if decoded is Dictionary: snapshot_received.emit(decoded)
+	if decoded is Dictionary: snapshot_received.emit(SNAPSHOT_CODEC.restore(decoded))
 
 @rpc("authority", "call_remote", "reliable", 2)
 func match_events(events: Array) -> void:

@@ -14,6 +14,12 @@
 - No pude verificar el aspecto con captura gráfica en modo headless; queda revisión visual humana en las resoluciones previstas.
 - Humanos: revisar la carga de los tres modos en los cuatro mapas, barra de progreso y retos; revisar podio con 2, 3 y 4 jugadores, que el ordinal permanezca visible y que placa, medallas y botones no se solapen.
 
+### Fase 13i — Auditoría general y snapshots
+- El texto de controles del menú y el aviso de historial vacío ahora pasan por I18n en español, catalán e inglés; el historial muestra el nombre localizado del modo y detecta correctamente cero partidas. Los títulos, contador y marco de voto usan hueso/brasa en lugar de dorado de interfaz.
+- Medidos snapshots reales preparados para red con cuatro jugadores en las cuatro arenas. El máximo fue 1.526 B comprimidos (Biblioteca), por debajo de 1,5 KiB/1.536 B. `SnapshotCodec` omite campos de servidor y empaqueta estados visuales activos de raíces/barril; el cliente los restaura al formato de dibujo.
+- Godot 4.7.2 escaneó el proyecto sin errores de scripts. Pasaron la suite core, integración local, partidas completas en los tres modos, medición de snapshots y prueba ENet de cuatro clientes más un quinto rechazado en VoodooCombo, Último en Pie y Codicia; los clientes coinciden en resultados y `/results` anuncia el modo correcto.
+- Humanos: abrir Historial sin partidas y con resultados de cada modo en es/ca/en; revisar la paleta hueso/brasa y validar trampas de raíces/barril sincronizadas entre clientes durante una partida real.
+
 ### Fase 13a — Ajustes y accesibilidad
 - Reemplazada la pantalla antigua por `scenes/settings/settings_view.gd`, con pestañas de partida, pantalla, sonido y online. Las opciones persistentes usan flechas clicables, foco, campos numéricos/servidor y controles de audio; el tamaño de ventana queda inactivo en pantalla completa. Ajustes se abre también desde pausa.
 - Incorporadas las referencias y assets de fase 13, y actualizado el `AGENTS.md` de raíz según el paquete entregado. La escala de ajustes adapta controles y tipografía; el contenido de opciones puede desplazarse verticalmente a escalas altas para conservar el área de lectura.

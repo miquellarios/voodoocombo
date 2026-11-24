@@ -528,7 +528,7 @@ func _build_loading() -> void:
 	var backdrop := _screen_backdrop()
 	root.add_child(backdrop)
 	root.move_child(backdrop, 0)
-	var title := _label(root, I18n.t("arena_" + String(arena.map_id)), Vector2(0.0, GameConfig.LOADING_TITLE_Y), GameConfig.LOADING_TITLE_SIZE, GameConfig.GOLD, true)
+	var title := _label(root, I18n.t("arena_" + String(arena.map_id)), Vector2(0.0, GameConfig.LOADING_TITLE_Y), GameConfig.LOADING_TITLE_SIZE, GameConfig.BONE_TEXT, true)
 	var title_font := ThemeBuilder.font("Cinzel-Bold.woff2")
 	if title_font != null: title.add_theme_font_override("font", title_font)
 	var thumbnail := TextureRect.new()
@@ -666,7 +666,7 @@ func _update_hud() -> void:
 	if time_label:
 		var seconds := maxi(0, ceili(remaining))
 		time_label.text = ("3 · 2 · 1" if state == "countdown" else "%d:%02d" % [seconds / 60, seconds % 60])
-		time_label.add_theme_color_override("font_color", GameConfig.GOLD if remaining <= 15.0 and mode == "voodoo" else Color.WHITE)
+		time_label.add_theme_color_override("font_color", GameConfig.EMBER if remaining <= 15.0 and mode == "voodoo" else GameConfig.BONE_TEXT)
 	var leader := _leader_index() if not players.is_empty() else -1
 	if leader != last_leader_index:
 		last_leader_index = leader
@@ -835,7 +835,7 @@ func _build_menu() -> void:
 			var tween := create_tween()
 			tween.tween_interval(index * 0.05)
 			tween.tween_property(button, "modulate:a", 1.0, 0.2)
-	_label(root, "WASD mover · Espacio dash · E hechizo · Esc atrás", Vector2(210, 666), 16, Color("b8a9d1"), false)
+	_label(root, I18n.t("menu_controls"), Vector2(210, 666), 16, Color("b8a9d1"), false)
 	var version_label := _hud_label(root, Vector2(1050, 674), Vector2(200, 28), 16, HORIZONTAL_ALIGNMENT_RIGHT)
 	version_label.text = "v" + GameConfig.PROJECT_VERSION
 
@@ -1131,7 +1131,7 @@ func _build_nickname_dialog(return_to_characters: bool = false) -> void:
 	var backdrop := _screen_backdrop()
 	root.add_child(backdrop)
 	root.move_child(backdrop, 0)
-	_label(root, I18n.t("name_title"), Vector2(0.0, GameConfig.NICK_DIALOG_TITLE_Y), GameConfig.NICK_DIALOG_TITLE_SIZE, GameConfig.GOLD, true)
+	_label(root, I18n.t("name_title"), Vector2(0.0, GameConfig.NICK_DIALOG_TITLE_Y), GameConfig.NICK_DIALOG_TITLE_SIZE, GameConfig.BONE_TEXT, true)
 	var hint := _hud_label(root, GameConfig.NICK_DIALOG_HINT_POSITION, GameConfig.NICK_DIALOG_HINT_SIZE, GameConfig.NICK_DIALOG_HINT_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
 	hint.text = I18n.t("name_hint")
 	nick_line_edit = LineEdit.new()
@@ -1187,12 +1187,13 @@ func _update_character_preview() -> void:
 func _build_history() -> void:
 	_clear_hud()
 	var root := _new_overlay()
-	_label(root, I18n.t("history"), Vector2(0, 95), 42, GameConfig.GOLD, true)
+	_label(root, I18n.t("history"), Vector2(0, 95), 42, GameConfig.BONE_TEXT, true)
 	var dir := DirAccess.open("user://matches")
 	var medal_count := 0
 	for count: Variant in Profile.medal_totals.values(): medal_count += int(count)
 	_label(root, I18n.t("history_medals") % medal_count, Vector2(0, 148), 20, GameConfig.BONE_TEXT, false)
 	var y := 202.0
+	var match_count := 0
 	if dir:
 		var files := dir.get_files()
 		files.sort()
@@ -1202,10 +1203,12 @@ func _build_history() -> void:
 			if not file: continue
 			var data: Variant = JSON.parse_string(file.get_as_text())
 			if data is Dictionary:
-				_label(root, "%s · %s · %s" % [data.get("date", ""), data.get("mode", ""), data.get("winner", "")], Vector2(0, y), 18, Color.WHITE, false)
+				var mode_name := I18n.t(str(data.get("mode", "voodoo")))
+				_label(root, "%s · %s · %s" % [data.get("date", ""), mode_name, data.get("winner", "")], Vector2(0, y), 18, GameConfig.BONE_TEXT, false)
 				y += 43.0
-	if y == 170.0:
-		_label(root, "Aún no hay partidas guardadas", Vector2(0, 210), 20, Color("b8a9d1"), false)
+				match_count += 1
+	if match_count == 0:
+		_label(root, I18n.t("history_empty"), Vector2(0, 210), 20, Color("b8a9d1"), false)
 	_button(root, I18n.t("menu"), Vector2(0, 590), _build_menu)
 
 func _build_settings() -> void:
@@ -1227,7 +1230,7 @@ func _on_settings_closed() -> void:
 func _build_pause() -> void:
 	_clear_hud()
 	var root := _new_overlay()
-	_label(root, I18n.t("pause"), Vector2(0, 190), 48, GameConfig.GOLD, true)
+	_label(root, I18n.t("pause"), Vector2(0, 190), 48, GameConfig.BONE_TEXT, true)
 	_button(root, I18n.t("continue"), Vector2(0, 275), func(): state = "playing"; _build_hud())
 	_button(root, I18n.t("settings"), Vector2(0, 345), _build_settings)
 	_button(root, I18n.t("menu"), Vector2(0, 415), _build_menu)
@@ -1364,7 +1367,7 @@ func _build_hud() -> void:
 	timer.add_theme_font_size_override("font_size", 44)
 	var clock_font := ThemeBuilder.font("Oswald-Bold.woff2")
 	if clock_font != null: timer.add_theme_font_override("font", clock_font)
-	timer.add_theme_color_override("font_color", GameConfig.GOLD)
+	timer.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
 	root.add_child(timer)
 	var slot_texture := TextureRect.new()
 	slot_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1552,9 +1555,9 @@ func _show_results() -> void:
 		podium_rank_for_player.append(place_index)
 		_update_result_character(place_index, "win" if place == 1 else ("hurt" if place == 4 else "idle"))
 		var plaque_x := center.x - 96.0
-		if place == 4: plaque_x = 1000.0
+		if place == 4: plaque_x = GameConfig.RESULTS_PLAQUE_FOURTH_X
 		var plaque := Panel.new()
-		plaque.position = Vector2(plaque_x, 590.0 if place < 4 else 555.0)
+		plaque.position = Vector2(plaque_x, minf(GameConfig.RESULTS_PLAQUE_TOP_MAX, center.y + GameConfig.RESULTS_PLAQUE_GAP) if place < 4 else GameConfig.RESULTS_PLAQUE_FOURTH_Y)
 		plaque.size = Vector2(192.0, 48.0)
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color("241838", 0.94)
@@ -1609,6 +1612,15 @@ func _show_results() -> void:
 	progress.position = Vector2(390,150)
 	progress.size = Vector2(500,24)
 	progress.max_value = GameConfig.PROFILE_XP_PER_LEVEL
+	progress.show_percentage = false
+	var xp_background := StyleBoxFlat.new()
+	xp_background.bg_color = Color("241838")
+	xp_background.set_corner_radius_all(5)
+	progress.add_theme_stylebox_override("background", xp_background)
+	var xp_fill := StyleBoxFlat.new()
+	xp_fill.bg_color = GameConfig.EMBER
+	xp_fill.set_corner_radius_all(5)
+	progress.add_theme_stylebox_override("fill", xp_fill)
 	root.add_child(progress)
 	var start_xp := Profile.xp - results_xp
 	var level_label := _hud_label(root, Vector2(390, 115), Vector2(500, 30), 18, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1741,7 +1753,7 @@ func _add_unlock_card(root: Control, unlock: Dictionary) -> void:
 	card.size = Vector2(230.0, 112.0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("241838", 0.96)
-	style.border_color = GameConfig.GOLD
+	style.border_color = GameConfig.EMBER
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(10)
 	card.add_theme_stylebox_override("panel", style)
@@ -2216,7 +2228,7 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 	var label_font_path := "res://assets/fonts/Oswald-Bold.woff2" if _bold else "res://assets/fonts/Oswald-Medium.woff2"
 	var label_font := ThemeBuilder.title_font(roundi(size * Settings.ui_scale)) if _bold else ThemeBuilder.font("Oswald-Medium.woff2")
 	if label_font != null: label.add_theme_font_override("font", label_font)
-	label.add_theme_color_override("font_color", GameConfig.BONE_TEXT if tint == GameConfig.GOLD else tint)
+	label.add_theme_color_override("font_color", tint)
 	label.add_theme_color_override("font_shadow_color", Color("160e22"))
 	label.add_theme_constant_override("shadow_offset_x", 2)
 	label.add_theme_constant_override("shadow_offset_y", 3)
@@ -2352,7 +2364,7 @@ func _animate_score(label: Label, old_value: int, value: int) -> void:
 	label.pivot_offset = label.size * 0.5
 	label.scale = Vector2.ONE
 	var tint := GameConfig.LOSS_TEXT if value < old_value else GameConfig.EMBER
-	label.add_theme_color_override("font_color", GameConfig.BONE_TEXT if tint == GameConfig.GOLD else tint)
+	label.add_theme_color_override("font_color", tint)
 	var tween := label.create_tween().set_parallel(true)
 	label.set_meta("score_tween", tween)
 	tween.tween_method(func(display_value: float): label.text = str(roundi(display_value)), float(old_value), float(value), 0.3).set_delay(GameConfig.JUICE_FLIGHT_SECONDS if value > old_value and not Settings.reduce_motion else 0.0)

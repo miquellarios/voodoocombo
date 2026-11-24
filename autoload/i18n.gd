@@ -85,6 +85,9 @@ func _init() -> void:
 	}, true)
 	strings.ca.merge({"settings_music": "Volum de música", "settings_sfx": "Volum d'efectes", "history_medals": "Medalles aconseguides: %d"}, true)
 	strings.en.merge({"settings_music": "Music volume", "settings_sfx": "Effects volume", "history_medals": "Medals earned: %d"}, true)
+	strings.es.merge({"menu_controls": "WASD mover · Espacio dash · E hechizo · Esc atrás", "history_empty": "Aún no hay partidas guardadas"}, true)
+	strings.ca.merge({"menu_controls": "WASD moure · Espai dash · E encanteri · Esc enrere", "history_empty": "Encara no hi ha partides desades"}, true)
+	strings.en.merge({"menu_controls": "WASD move · Space dash · E spell · Esc back", "history_empty": "No saved matches yet"}, true)
 	strings.ca.merge({
 		"settings_tab_game": "PARTIDA",
 		"settings_tab_display": "PANTALLA",

@@ -25,7 +25,7 @@ func _ready() -> void:
 	medallion.size = Vector2(148, 148)
 	var medallion_style := StyleBoxFlat.new()
 	medallion_style.bg_color = Color("241838")
-	medallion_style.border_color = GameConfig.GOLD
+	medallion_style.border_color = GameConfig.EMBER
 	medallion_style.set_border_width_all(4)
 	medallion_style.set_corner_radius_all(74)
 	medallion_style.shadow_color = Color(0, 0, 0, 0.65)
