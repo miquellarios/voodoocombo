@@ -8,6 +8,12 @@
 - Pasaron `tests/test_lobby_view.gd`, `tests/test_rooms.gd` y `tests/run_tests.gd` con Godot 4.7.2. La prueba ENet de varios procesos no se pudo completar dentro del aislamiento local en el intento previo; se repetirá con permiso de sockets locales. No se validó visualmente esta pantalla mediante captura.
 - Humanos: probar las tres tarjetas con ratón, teclado y mando; crear partidas de bots y salas online en cada modo; verificar cambio de modo solo por el anfitrión, entrada directa por código y legibilidad de las costuras.
 
+### Fase 13h — Carga y podio
+- Recompuesta la carga: miniatura grande, trampas en columna, personaje/consejo/retos abajo, reglas del modo elegido y barra de carga con relleno brasa. La barra de XP del podio también tiene estilos propios y oculta el porcentaje automático.
+- Las placas pasan debajo de los bloques, el cuarto personaje y su placa se colocan a la derecha y los botones comparten una fila inferior con 40 px de margen. Pasaron la suite core, `test_local_match.gd` y `test_full_modes.gd`.
+- No pude verificar el aspecto con captura gráfica en modo headless; queda revisión visual humana en las resoluciones previstas.
+- Humanos: revisar la carga de los tres modos en los cuatro mapas, barra de progreso y retos; revisar podio con 2, 3 y 4 jugadores, que el ordinal permanezca visible y que placa, medallas y botones no se solapen.
+
 ### Fase 13a — Ajustes y accesibilidad
 - Reemplazada la pantalla antigua por `scenes/settings/settings_view.gd`, con pestañas de partida, pantalla, sonido y online. Las opciones persistentes usan flechas clicables, foco, campos numéricos/servidor y controles de audio; el tamaño de ventana queda inactivo en pantalla completa. Ajustes se abre también desde pausa.
 - Incorporadas las referencias y assets de fase 13, y actualizado el `AGENTS.md` de raíz según el paquete entregado. La escala de ajustes adapta controles y tipografía; el contenido de opciones puede desplazarse verticalmente a escalas altas para conservar el área de lectura.

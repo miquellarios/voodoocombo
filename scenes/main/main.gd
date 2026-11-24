@@ -560,6 +560,9 @@ func _build_loading() -> void:
 		trap_text.text = I18n.t("loading_trap_" + trap_name)
 	var controls := _hud_label(root, Vector2(48.0, GameConfig.LOADING_CONTROLS_Y), GameConfig.LOADING_CONTROLS_SIZE, GameConfig.LOADING_CONTROLS_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
 	controls.text = I18n.t("loading_controls")
+	var mode_rules := _hud_label(root, GameConfig.LOADING_MODE_RULES_POSITION, GameConfig.LOADING_MODE_RULES_SIZE, GameConfig.LOADING_MODE_RULES_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+	mode_rules.text = I18n.t("rules_" + mode)
+	mode_rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var tip := _hud_label(root, GameConfig.LOADING_TIP_POSITION, GameConfig.LOADING_TIP_SIZE, GameConfig.LOADING_TIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
 	tip.name = "LoadingTip"
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -580,6 +583,16 @@ func _build_loading() -> void:
 	progress.size = GameConfig.LOADING_PROGRESS_SIZE
 	progress.max_value = GameConfig.LOADING_PERCENT_MAX
 	progress.show_percentage = false
+	var progress_background := StyleBoxFlat.new()
+	progress_background.bg_color = Color("241838")
+	progress_background.border_color = GameConfig.EMBER
+	progress_background.set_border_width_all(GameConfig.LOADING_PROGRESS_BORDER)
+	progress_background.set_corner_radius_all(4)
+	progress.add_theme_stylebox_override("background", progress_background)
+	var progress_fill := StyleBoxFlat.new()
+	progress_fill.bg_color = GameConfig.EMBER
+	progress_fill.set_corner_radius_all(4)
+	progress.add_theme_stylebox_override("fill", progress_fill)
 	root.add_child(progress)
 	var skip_text := _hud_label(root, GameConfig.LOADING_SKIP_POSITION, GameConfig.LOADING_SKIP_SIZE, GameConfig.LOADING_SKIP_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER)
 	skip_text.name = "LoadingSkip"
@@ -587,9 +600,11 @@ func _build_loading() -> void:
 	skip_text.visible = false
 	_update_loading_text()
 	var challenge_text := ""
-	for id in challenges: challenge_text += I18n.t("challenge_" + id) + "   "
-	_label(root, challenge_text, Vector2(0,620),18,GameConfig.BONE_TEXT,false)
-	_label(root,I18n.t("rules_" + mode),Vector2(820,350),20,GameConfig.BONE_TEXT,false)
+	for index in challenges.size():
+		challenge_text += "%d. %s%s" % [index + 1, I18n.t("challenge_" + str(challenges[index])), "\n" if index < challenges.size() - 1 else ""]
+	var challenge_label := _hud_label(root, GameConfig.LOADING_CHALLENGE_POSITION, GameConfig.LOADING_CHALLENGE_SIZE, GameConfig.LOADING_CHALLENGE_FONT_SIZE, HORIZONTAL_ALIGNMENT_LEFT)
+	challenge_label.text = challenge_text
+	challenge_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _update_loading_text() -> void:
 	var tip := hud_root.get_node_or_null("LoadingTip") as Label if is_instance_valid(hud_root) else null
@@ -1488,7 +1503,7 @@ func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -
 		Fx.sparks(results_ranking[0].pos + OFFSET, GameConfig.GOLD, 60)
 		_camera_punch()
 	var root := _new_overlay()
-	_label(root, I18n.t("time_up"), Vector2(0, 285), 64, GameConfig.GOLD, true)
+	_label(root, I18n.t("time_up"), Vector2(0, 285), 64, GameConfig.EMBER, true)
 
 func _show_results() -> void:
 	Fx.clear_text()
@@ -1517,13 +1532,13 @@ func _show_results() -> void:
 	podium.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	podium.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(podium)
-	_label(root, I18n.t("winner_named") % String(results_ranking[0].get("name", "")), Vector2(0, 26), 44, GameConfig.GOLD, true)
+	_label(root, I18n.t("winner_named") % String(results_ranking[0].get("name", "")), Vector2(0, 26), 44, GameConfig.BONE_TEXT, true)
 	if bool(results_ranking[0].get("last_at_half", false)): _label(root, I18n.t("comeback"), Vector2(0,90),30,GameConfig.EMBER,true)
 	var podium_rank_for_player: Array[int] = []
 	for place_index in range(results_ranking.size()):
 		var player: Dictionary = results_ranking[place_index]
 		var place := place_index + 1
-		var center: Vector2 = GameConfig.RESULTS_PODIUM_TOPS.get(place, Vector2(1100.0, 602.0))
+		var center: Vector2 = GameConfig.RESULTS_PODIUM_TOPS.get(place, GameConfig.RESULTS_FOURTH_TOP)
 		var sprite := TextureRect.new()
 		sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		sprite.name = "ResultCharacter%d" % place_index
@@ -1578,7 +1593,7 @@ func _show_results() -> void:
 		plaque.add_child(coin_icon)
 		var score_label := _hud_label(plaque, Vector2(151.0, 0.0), Vector2(34.0, 48.0), 18, HORIZONTAL_ALIGNMENT_RIGHT)
 		score_label.text = str(int(player.get("score", 0)))
-		score_label.add_theme_color_override("font_color", GameConfig.GOLD)
+		score_label.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
 		if place == 1:
 			var crown := TextureRect.new()
 			crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
