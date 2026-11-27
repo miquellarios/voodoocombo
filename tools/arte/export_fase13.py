@@ -249,3 +249,61 @@ def reference_settings():
 
 if __name__ == '__main__':
     reference_settings()
+
+
+def reference_online():
+    """Fase 14: pantalla JUGAR ONLINE pensada para que conectar sea fácil."""
+    Wr, Hr = 1920, 1080
+    s = cairo.ImageSurface(cairo.FORMAT_ARGB32, Wr, Hr); c = cairo.Context(s)
+    c.set_source_rgba(*hexc('#120B1A')); c.paint()
+    draw_text(c, "JUGAR ONLINE", Wr / 2, 80, 60, fam="Cinzel", fill=BONEW, ow=0, bold=True)
+    MUTED = hexc('#B8A9D1'); PANELC = hexc('#1E1430'); LINE = hexc('#3A2A52'); OK = hexc('#63E6A8')
+    # columna izquierda: crear
+    x0, y0, w, h = 140, 160, 780, 780
+    rrect(c, x0, y0, w, h, 22); c.set_source_rgba(*PANELC); c.fill_preserve(); c.set_source_rgba(*EMBER); c.set_line_width(2.5); c.stroke()
+    draw_text(c, "CREAR PARTIDA", x0 + w / 2, y0 + 60, 36, fam="Cinzel", fill=EMBER, ow=0, bold=True)
+    draw_text(c, "Tu código de invitación", x0 + w / 2, y0 + 150, 26, fam="Oswald", fill=MUTED, ow=0)
+    rrect(c, x0 + 90, y0 + 185, w - 180, 120, 16); c.set_source_rgba(*hexc('#2A1C3E')); c.fill()
+    draw_text(c, "KWET7-B2QX4MA", x0 + w / 2, y0 + 245, 62, fam="Oswald", fill=BONEW, ow=0, bold=True)
+    rrect(c, x0 + 200, y0 + 335, w - 400, 70, 35); c.set_source_rgba(*EMBER); c.fill()
+    draw_text(c, "COPIAR INVITACIÓN", x0 + w / 2, y0 + 370, 28, fam="Oswald", fill=DARK, ow=0, bold=True)
+    draw_text(c, "Mándalo por WhatsApp. Lleva tu dirección y la sala.", x0 + w / 2, y0 + 440, 22, fam="Oswald", fill=MUTED, ow=0)
+    checks = [("Misma red (wifi / clase)", "Te verán solos en su lista", True),
+              ("Desde otras casas", "Puerto abierto automático (UPnP)", True),
+              ("Red usada", "Wifi de casa · 192.168.1.23   [cambiar]", None)]
+    yy = y0 + 520
+    for (t1, t2, okv) in checks:
+        if okv is not None:
+            c.arc(x0 + 110, yy, 14, 0, 6.28); c.set_source_rgba(*(OK if okv else hexc('#FF3B3B'))); c.fill()
+            draw_text(c, "✓" if okv else "✕", x0 + 110, yy, 20, fam="DejaVu Sans", fill=DARK, ow=0, bold=True)
+        draw_text(c, t1, x0 + 140, yy - 14, 24, fam="Oswald", fill=BONEW, ow=0, align='l')
+        draw_text(c, t2, x0 + 140, yy + 16, 20, fam="Oswald", fill=MUTED, ow=0, align='l')
+        yy += 80
+    # columna derecha: unirse
+    x1 = 1000
+    rrect(c, x1, y0, w, h, 22); c.set_source_rgba(*PANELC); c.fill_preserve(); c.set_source_rgba(*LINE); c.set_line_width(2); c.stroke()
+    draw_text(c, "UNIRSE", x1 + w / 2, y0 + 60, 36, fam="Cinzel", fill=BONEW, ow=0, bold=True)
+    draw_text(c, "Partidas en tu red", x1 + 60, y0 + 135, 26, fam="Oswald", fill=MUTED, ow=0, align='l')
+    rooms = [("Sala de Joel", "VoodooCombo · 2/4", "ENTRAR"), ("Sala de Pau", "Codicia 2v2 · 3/4", "ENTRAR")]
+    ry = y0 + 170
+    for (n1, n2, b) in rooms:
+        rrect(c, x1 + 60, ry, w - 120, 90, 14); c.set_source_rgba(*hexc('#2A1C3E')); c.fill()
+        draw_text(c, n1, x1 + 90, ry + 30, 28, fam="Oswald", fill=BONEW, ow=0, align='l', bold=True)
+        draw_text(c, n2, x1 + 90, ry + 64, 20, fam="Oswald", fill=MUTED, ow=0, align='l')
+        rrect(c, x1 + w - 250, ry + 20, 160, 50, 25); c.set_source_rgba(*EMBER); c.fill()
+        draw_text(c, b, x1 + w - 170, ry + 45, 22, fam="Oswald", fill=DARK, ow=0, bold=True)
+        ry += 110
+    draw_text(c, "Buscando partidas en tu red…", x1 + w / 2, ry + 10, 20, fam="Oswald", fill=MUTED, ow=0)
+    draw_text(c, "¿Te han pasado un código?", x1 + 60, ry + 80, 26, fam="Oswald", fill=MUTED, ow=0, align='l')
+    rrect(c, x1 + 60, ry + 110, w - 300, 80, 14); c.set_source_rgba(*hexc('#2A1C3E')); c.fill_preserve(); c.set_source_rgba(*LINE); c.stroke()
+    draw_text(c, "KWET7-B2QX4MA", x1 + 90, ry + 150, 34, fam="Oswald", fill=BONEW, ow=0, align='l')
+    rrect(c, x1 + w - 220, ry + 110, 160, 80, 14); c.set_source_rgba(*hexc('#3A2A52')); c.fill()
+    draw_text(c, "PEGAR", x1 + w - 140, ry + 150, 26, fam="Oswald", fill=BONEW, ow=0, bold=True)
+    rrect(c, x1 + 200, ry + 220, w - 400, 70, 35); c.set_source_rgba(*EMBER); c.fill()
+    draw_text(c, "ENTRAR", x1 + w / 2, ry + 255, 28, fam="Oswald", fill=DARK, ow=0, bold=True)
+    draw_text(c, "CONTRA BOTS        MENÚ", Wr / 2, 1010, 28, fam="Cinzel", fill=BONEW, ow=0, bold=True)
+    s.write_to_png(os.path.join(REF, 'online_facil_referencia.png'))
+
+
+if __name__ == '__main__':
+    reference_online()

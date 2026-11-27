@@ -22,20 +22,27 @@
 
 **Claude normalmente no programa el juego.** Si hay que cambiarlo, escribe o amplía un bloque en `docs/codex/`, salvo que el equipo pida lo contrario.
 
-## 3. Estado actual (24/11/2026)
+## 3. Estado actual (27/11/2026)
 
 | Fase | Estado |
 |---|---|
-| 1-12 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
-| **13** | Escrita, pendiente: `docs/codex/fase-13/FASE-13.md` y su `AGENTS.md`. Arregla lo que falló al probar la 12 (ajustes, taquilla, demasiado texto, hechizos sin efecto, modos escondidos, carga y podio) y prepara el ejecutable para probar online alojando desde el juego. |
+| 1-13 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
+| **14** | Escrita, pendiente: `docs/codex/fase-14/FASE-14.md` y su `AGENTS.md`. |
 
-Capturas de cómo quedó la fase 12: `docs/capturas/fase-12/`.
+**Qué arregla la fase 14:**
+- **El cuelgue:** `to_local()` en un `Control` crea un `Label` en cada fotograma.
+- **Online a tirones:** el servidor sobrescribe las entradas y cada snapshot va en 2 paquetes.
+- **Conectar fácil:** código de invitación, lista de partidas de la red local, UPnP y VPN.
+- **Registros**, para saber por qué se cierra.
+- **Lo que quedó a medias de la fase 13:** escala de la interfaz, marcador y podio.
+
+Capturas de la revisión: `docs/capturas/fase-13-revision/`.
 
 Cada fase de la 11 en adelante tiene su carpeta con dos archivos:
 - `FASE-N.md`: los bloques para Codex;
 - `AGENTS.md`: cómo queda el juego al terminar esa fase.
 
-Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 12.
+Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 13.
 
 Lo que falló al probar la fase 9 (todo está en la fase 10):
 - los hechizos se lanzaban solos, sin pulsar E;
