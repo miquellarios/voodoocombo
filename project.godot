@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="VoodooCombo 0.13.0"
+config/name="VoodooCombo"
 config/description="Party game vudú local: recoge doblones, encadena combos y golpea con el dash."
 config/version="0.13.0"
 run/main_scene="res://scenes/boot.tscn"
@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+SessionLog="*res://autoload/session_log.gd"
 I18n="*res://autoload/i18n.gd"
 Settings="*res://autoload/settings.gd"
 Profile="*res://autoload/profile.gd"
@@ -90,3 +91,8 @@ use_spell={
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[debug]
+
+file_logging/enable_file_logging=true
+file_logging/log_path="user://logs/godot.log"

@@ -242,6 +242,58 @@ func _ready() -> void:
 		_build_nickname_dialog()
 	else:
 		_build_menu()
+	if SessionLog.previous_session_crashed: call_deferred("_show_crash_notice")
+
+func _show_crash_notice() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var backdrop := ColorRect.new()
+	backdrop.color = Color("0b0710", 0.86)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(backdrop)
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-320, -130)
+	panel.size = Vector2(640, 260)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color("241838")
+	panel_style.border_color = GameConfig.EMBER
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(14)
+	panel.add_theme_stylebox_override("panel", panel_style)
+	layer.add_child(panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 18)
+	content.add_theme_constant_override("margin_left", 24)
+	content.add_theme_constant_override("margin_right", 24)
+	content.add_theme_constant_override("margin_top", 22)
+	content.add_theme_constant_override("margin_bottom", 22)
+	panel.add_child(content)
+	var title := Label.new()
+	title.text = I18n.t("crash_notice_title")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_override("font", ThemeBuilder.title_font(25))
+	title.add_theme_color_override("font_color", GameConfig.EMBER)
+	content.add_child(title)
+	var message := Label.new()
+	message.text = I18n.t("crash_notice_body")
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.add_theme_font_size_override("font_size", 18)
+	content.add_child(message)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 18)
+	content.add_child(buttons)
+	var open_logs := Button.new()
+	open_logs.text = I18n.t("logs_open")
+	open_logs.pressed.connect(func(): OS.shell_open(ProjectSettings.globalize_path("user://logs")))
+	buttons.add_child(open_logs)
+	var close := Button.new()
+	close.text = I18n.t("menu")
+	close.pressed.connect(layer.queue_free)
+	buttons.add_child(close)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST: Net.stop_host_server()

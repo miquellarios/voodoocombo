@@ -39,7 +39,8 @@ func _ready() -> void:
 
 func start_host_server(port: int = GameConfig.NET_PORT) -> int:
 	if hosted_server_pid > 0 and OS.is_process_running(hosted_server_pid): return hosted_server_pid
-	hosted_server_pid = OS.create_process(OS.get_executable_path(), ["--headless", "--", "--server", "--port", str(port)])
+	var log_path := ProjectSettings.globalize_path("user://logs/servidor.log")
+	hosted_server_pid = OS.create_process(OS.get_executable_path(), ["--headless", "--log-file", log_path, "--", "--server", "--port", str(port)])
 	return hosted_server_pid
 
 func stop_host_server() -> void:

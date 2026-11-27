@@ -102,6 +102,7 @@ func _refresh() -> void:
 			_add_choice("settings_server", ["settings_local", "settings_lan", "settings_oracle"], func() -> int: return Settings.server_choice, _set_server_choice, true)
 			_add_text_field("settings_address", "server_host", GameConfig.SETTINGS_INPUT_MAX_LENGTH)
 			_add_text_field("settings_port", "server_port", 5, true)
+			_add_action("logs_open", _open_logs_folder)
 	if focusables.size() > 0: focusables[0].grab_focus()
 
 func _new_row(key: String) -> HBoxContainer:
@@ -231,6 +232,21 @@ func _add_text_field(key: String, setting: String, max_chars: int, read_only := 
 		input.focus_exited.connect(func() -> void: _store_field(setting, input.text))
 	row.add_child(input)
 	if not read_only: focusables.append(input)
+
+func _add_action(key: String, action: Callable) -> void:
+	var row := _new_row(key)
+	var button := Button.new()
+	button.text = I18n.t(key)
+	button.custom_minimum_size = Vector2(GameConfig.SETTINGS_VALUE_WIDTH * Settings.ui_scale, 48.0 * Settings.ui_scale)
+	button.add_theme_font_size_override("font_size", roundi(19.0 * Settings.ui_scale))
+	button.pressed.connect(action)
+	row.add_child(button)
+	focusables.append(button)
+
+func _open_logs_folder() -> void:
+	var logs_path := ProjectSettings.globalize_path("user://logs")
+	var error := OS.shell_open(logs_path)
+	if error != OK: push_warning("No se pudo abrir la carpeta de registros: %s" % logs_path)
 
 func _store_field(setting: String, text: String) -> void:
 	if setting == "server_port":
