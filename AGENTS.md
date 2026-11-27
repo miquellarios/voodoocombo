@@ -1,15 +1,14 @@
-# AGENTS.md — VoodooCombo (versión para la fase 13)
+# AGENTS.md — VoodooCombo (versión para la fase 14)
 
 > Instrucciones permanentes para el agente (Codex las lee en cada tarea). Es la fuente de verdad del proyecto:
 > si un prompt contradice este archivo, pregunta antes de programar.
-> **Esta versión describe cómo tiene que quedar el juego al terminar la fase 13.** Incluye todo lo de las fases 10-12, y además:
-> - ajustes en filas con flechas;
-> - alojar partida desde el juego y el ejecutable;
-> - menos texto en partida;
-> - efectos visuales de los hechizos;
-> - pantalla de elegir modo.
+> **Esta versión describe cómo tiene que quedar el juego al terminar la fase 14.** Incluye todo lo de las fases 10-13, y además:
+> - conectar con código de invitación, lista de partidas en la red local y UPnP;
+> - online fluido (cola de entradas, snapshot en un paquete);
+> - registros para saber por qué se cierra;
+> - escala de la interfaz en todo el juego.
 >
-> Antes de empezar la fase 13, copia este archivo a la raíz del proyecto como `AGENTS.md`. Sustituye a la versión de la fase 12.
+> Antes de empezar la fase 14, copia este archivo a la raíz del proyecto como `AGENTS.md`. Sustituye a la versión de la fase 13.
 > Visión y referencias del diseño para humanos: `docs/DISENO.md`. Requisitos del enunciado y plan: `docs/PLAN.md`.
 
 ## 1. Qué es
@@ -333,15 +332,28 @@ Plan completo del equipo: `docs/codex/plan-multijugador.md`. Guía para desplega
   - `MAX_PEERS = 32` (8 salas de 4);
   - cada sala con su propia `MatchSim` a **30 Hz**.
 - **Dónde corre:** Oracle Cloud Always Free para jugar desde casa y, de respaldo, un PC de clase en la red local.
-- **Alojar desde el juego:** JUGAR ONLINE → CREAR SALA EN ESTE PC.
-  - Lanza el servidor dedicado como proceso aparte con el mismo ejecutable (`--headless -- --server --port 7777`) y se conecta a `127.0.0.1`.
-  - Enseña tu IP local para que los demás entren.
-  - Al salir o cerrar el juego, mata ese proceso.
-- **Unirse:** con la IP del anfitrión y el código de sala, en la misma pantalla. La última IP se recuerda.
-- **En AJUSTES → ONLINE:** Este PC (`127.0.0.1`), Red local (IP a mano) u Oracle (`GameConfig.ONLINE_HOST`).
-- **Si no conecta en 6 s:** mensaje claro con la IP y el puerto. Nunca se queda colgado.
+- **Conectar tiene que ser fácil** (pantalla JUGAR ONLINE, `docs/media/online_facil_referencia.png`):
+  - **Crear partida:**
+    - arranca el servidor dedicado como proceso aparte con el mismo ejecutable y se conecta a `127.0.0.1`;
+    - enseña un **código de invitación** (`SALA-DIRECCIÓN`, clase `InviteCode`) con COPIAR INVITACIÓN.
+  - **Qué dirección lleva el código** (en este orden):
+    1. la IP pública, si el UPnP abre el puerto 7777 UDP solo;
+    2. la IP de la VPN (Radmin 26.x, Tailscale 100.64-127.x, ZeroTier);
+    3. la IP de la red local, sin adaptadores virtuales.
+  - Se ve qué red se ha usado y se puede cambiar.
+  - Al cerrar la sala o el juego: se quita el puerto UPnP y se mata el proceso del servidor.
+- **Unirse:**
+  - **Partidas en tu red:** lista automática por broadcast UDP 7778 (`LanDiscovery`); ENTRAR con un clic.
+  - **Código:** campo con PEGAR. Vale el código de invitación entero o solo los 5 caracteres de la sala; con solo la sala, se busca en la red local.
+  - **Misma red:** si la partida está en tu red, se entra por la IP local aunque el código lleve la pública.
+  - La IP a mano solo está en AJUSTES → ONLINE → Avanzado.
+- **Servidor del equipo (Oracle):** cuando esté, tercera opción "Servidor VoodooCombo", solo con código de sala (`GameConfig.ONLINE_HOST`).
+- **Si no conecta:** 3 reintentos y un mensaje en una línea que diga qué hacer. Nunca se queda colgado. Antes de alojar por primera vez, aviso del cortafuegos de Windows.
+- **Registros:**
+  - `user://logs/godot.log` y `user://logs/servidor.log`, con un botón para abrir la carpeta en AJUSTES → ONLINE;
+  - aviso al arrancar si la última vez el juego se cerró mal.
 - **Ejecutable:** `build/VoodooCombo-v<versión>-Windows.zip`, con el exe, `LEEME.txt` y `servidor.bat`.
-  - `build/` no se sube al repositorio.
+  - `build/` no se sube al repositorio; el zip va en GitHub Releases.
   - La versión del juego se ve en el menú y tiene que coincidir con la del servidor.
 - **Contra bots:** la misma `MatchSim` en local, sin red.
 - **Solo hay una fuente de verdad de la red:** el autoload `Net`. Todas las RPC viven ahí, para que la ruta `/root/Net` sea igual en todos los peers.
@@ -386,6 +398,10 @@ Plan completo del equipo: `docs/codex/plan-multijugador.md`. Guía para desplega
     - `GET /status`: partida en curso;
     - `GET /results`: últimas partidas con ganador, ranking y premios;
     - `GET /`: página HTML mínima con el marcador en directo, para la presentación.
+- **Entradas en el servidor:** una cola por jugador; se aplica una por paso de simulación (dos si hay más de 3 esperando). El `ack` es la última aplicada, no la última recibida.
+- **Snapshot:** un solo paquete de menos de 1000 bytes comprimido. Jugadores solo con los campos que se dibujan; doblones completos solo cada segundo o cuando cambian.
+- **Ping:** por un RPC `unreliable`. Interpolación de 100 a 160 ms según el *jitter*.
+- **Textos flotantes:** como mucho 12 en total, y ningún error puede crear nodos en bucle.
 - **Por qué este protocolo (para la documentación):** ENet manda mensajes asíncronos sobre UDP.
   - La entrada y las posiciones van por un canal no fiable: si se pierde un paquete, el siguiente ya lo corrige.
   - Los eventos importantes (doblones, golpes, ganador) van por un canal fiable.
@@ -582,7 +598,7 @@ Cada acción tiene respuesta visual y sonora en menos de 100 ms. Todo pasa por l
 - Los textos añadidos a controles e historial pasan por I18n en español, catalán e inglés. El historial traduce el modo y usa el número de partidas válidas para decidir si muestra el estado vacío. Los textos de interfaz van en hueso/brasa; el dorado se reserva para doblones y sus efectos.
 - Revisión de cierre: Godot 4.7.2, `tests/run_tests.gd`, pruebas de vista/escena y `tools/test-network.ps1` por modo. Consulta resultados y pendientes de revisión humana en `docs/BITACORA.md`.
 
-- **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 13a: <resumen>`).
+- **Una fase cada vez:** trabaja solo en la fase que se pide. Hay un commit por bloque (`Fase 14a: <resumen>`).
 - **Capturas:** después de cada bloque de interfaz, guarda capturas en `docs/capturas/fase-N/` y revisa que nada se pisa.
 - **Antes de programar:** resume en 3-5 líneas qué vas a hacer.
 - **Tests:** si hay Godot en el PATH como `godot`, ejecuta `godot --headless --path . --script res://tests/run_tests.gd` y arregla lo que falle. Si no está, dilo.

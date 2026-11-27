@@ -126,6 +126,10 @@ var pickup_streak_value := 0
 var pickup_streak_count := 0
 var pickup_streak_time := 0.0
 var pickup_streak_position := Vector2.ZERO
+var hud_floating_labels: Array[Label] = []
+var match_node_baseline := 0
+var match_node_audit_time := 0.0
+var match_node_warning_logged := false
 var last_leader_index := -1
 var leader_name_since := -100.0
 
@@ -243,6 +247,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST: Net.stop_host_server()
 
 func _process(delta: float) -> void:
+	if state in ["loading", "countdown", "playing"]: _audit_match_node_growth(delta)
 	if state == "playing" and pickup_streak_value > 0:
 		pickup_streak_time = maxf(0.0, pickup_streak_time - delta)
 		if pickup_streak_time <= 0.0: _finish_pickup_streak()
@@ -383,6 +388,9 @@ func _begin_match(arena_id: String = "", overrides: Dictionary = {}) -> void:
 	var config := {"seed": seed_value, "mode": "voodoo", "arena_id": arena_id, "previous_arena": previous_arena_id, "players": roster}
 	config.merge(overrides, true)
 	simulation.setup(config)
+	match_node_baseline = get_tree().get_node_count()
+	match_node_audit_time = 0.0
+	match_node_warning_logged = false
 	_read_simulation()
 	rng.seed = seed_value
 	simulation_accumulator = 0.0
@@ -701,10 +709,9 @@ func _update_hud() -> void:
 		var value := int(player.score)
 		if score_values[player_index] != value:
 			var previous_value := maxi(0, score_values[player_index])
-			if player_index != local_player or pickup_streak_value <= 0:
-				score_values[player_index] = value
-				score_change_times[player_index] = Time.get_ticks_msec()
-				_animate_score(score_number_labels[player_index], previous_value, value)
+			score_values[player_index] = value
+			score_change_times[player_index] = Time.get_ticks_msec()
+			_animate_score(score_number_labels[player_index], previous_value, value)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
 				var atlas := score_life_icons[player_index][stitch].texture as AtlasTexture
@@ -1464,6 +1471,10 @@ func _build_hud() -> void:
 	pause.size = Vector2(48, 44)
 	pause.pressed.connect(func(): state = "paused"; _build_pause())
 	root.add_child(pause)
+	hud_floating_labels.clear()
+	match_node_baseline = get_tree().get_node_count()
+	match_node_audit_time = 0.0
+	match_node_warning_logged = false
 	_update_hud()
 
 func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size: int, alignment: HorizontalAlignment) -> Label:
@@ -1481,6 +1492,7 @@ func _hud_label(root: Control, position: Vector2, label_size: Vector2, font_size
 
 func _finish_match(server_ranking: Array = [], server_awards: Dictionary = {}) -> void:
 	if state in ["match_end", "results"]: return
+	if pickup_streak_value > 0: _finish_pickup_streak()
 	Sfx.stop_music()
 	results_ranking.assign(server_ranking if not server_ranking.is_empty() else MatchRanking.rank(players))
 	var place := 1
@@ -2332,8 +2344,15 @@ func _spell_screen_flash(color: Color) -> void:
 func _finish_pickup_streak() -> void:
 	if pickup_streak_value <= 0: return
 	var total := pickup_streak_value
+	pickup_streak_value = 0
+	pickup_streak_count = 0
+	pickup_streak_time = 0.0
 	var from := pickup_streak_position + OFFSET - Vector2(0.0, GameConfig.PICKUP_STREAK_HEIGHT)
 	if is_instance_valid(hud_root) and local_player >= 0 and local_player < score_number_labels.size() and is_instance_valid(score_number_labels[local_player]):
+		hud_floating_labels = hud_floating_labels.filter(func(active: Label) -> bool: return is_instance_valid(active))
+		while hud_floating_labels.size() >= GameConfig.MAX_FLOATING_LABELS:
+			var oldest: Label = hud_floating_labels.pop_front()
+			if is_instance_valid(oldest): oldest.queue_free()
 		var label := Label.new()
 		label.text = "+%d" % total
 		label.add_theme_font_override("font", ThemeBuilder.font("Oswald-Bold.woff2"))
@@ -2345,15 +2364,32 @@ func _finish_pickup_streak() -> void:
 		label.position = from - label.size * 0.5
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hud_root.add_child(label)
-		var destination: Vector2 = hud_root.to_local(score_number_labels[local_player].global_position + score_number_labels[local_player].size * 0.5 - label.size * 0.5)
+		hud_floating_labels.append(label)
+		var target_label := score_number_labels[local_player]
+		var destination: Vector2 = target_label.global_position + target_label.size * 0.5 - hud_root.global_position - label.size * 0.5
 		var tween := label.create_tween()
 		tween.tween_property(label, "position", destination, GameConfig.JUICE_FLIGHT_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-		tween.tween_callback(label.queue_free)
+		tween.tween_callback(func():
+			hud_floating_labels.erase(label)
+			if is_instance_valid(label): label.queue_free()
+		)
 	else:
 		Fx.pop("+%d" % total, from, GameConfig.EMBER)
-	pickup_streak_value = 0
-	pickup_streak_count = 0
-	pickup_streak_time = 0.0
+	if local_player >= 0 and local_player < players.size() and local_player < score_number_labels.size():
+		var value := int(players[local_player].score)
+		if score_values[local_player] != value:
+			var old_value := maxi(0, score_values[local_player])
+			score_values[local_player] = value
+			_animate_score(score_number_labels[local_player], old_value, value)
+
+func _audit_match_node_growth(delta: float) -> void:
+	if match_node_warning_logged or match_node_baseline <= 0 or not is_inside_tree(): return
+	match_node_audit_time += delta
+	if match_node_audit_time < 1.0: return
+	match_node_audit_time = 0.0
+	if get_tree().get_node_count() - match_node_baseline > GameConfig.MATCH_NODE_GROWTH_WARNING_THRESHOLD:
+		match_node_warning_logged = true
+		push_warning("La partida ha creado más de %d nodos desde el inicio; revisa la limpieza de nodos temporales." % GameConfig.MATCH_NODE_GROWTH_WARNING_THRESHOLD)
 
 func _animate_score(label: Label, old_value: int, value: int) -> void:
 	if label.has_meta("score_tween"):

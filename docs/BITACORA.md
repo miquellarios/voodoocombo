@@ -2,6 +2,12 @@
 
 ## Registro de Codex
 
+### Fase 14a — cierre del bucle de racha y textos acotados
+- Copiada la fuente de verdad de fase 14 a `AGENTS.md` y archivados el enunciado, sus capturas de referencia y la imagen de conexión online.
+- `_finish_pickup_streak()` ahora guarda y reinicia su estado antes de crear UI, calcula el destino con coordenadas de `Control`, limita las etiquetas del HUD a 12 y vacía la racha al acabar la partida. El marcador actualiza el valor local aunque la racha siga activa. `Fx` también recorta su cola a 12 textos y se avisa una sola vez si el árbol de nodos crece más de 500 durante la partida.
+- `tests/test_local_match.gd` ejercita 90 segundos con recogidas locales, controla que el HUD no añada más de 40 hijos en 30 segundos, comprueba que marcador y jugador coinciden y estresa el límite de textos. Godot 4.7.2 pasó la prueba sin `SCRIPT ERROR`.
+- Humanos: repetir una partida de 90 s contra tres bots recogiendo doblones; comprobar que el marcador local avanza mientras el contador de racha sigue visible y que el juego no acumula textos ni se ralentiza.
+
 ### Fase 13g — Selector de modo visible
 - Añadida una pantalla de tres tarjetas ilustradas antes de crear una sala online o una partida contra bots; unirse por código sigue entrando directamente. El modo elegido viaja en la solicitud de sala y se conserva en el directorio local.
 - El lobby muestra la tarjeta del modo y deja cambiarla al anfitrión; los invitados ven que debe elegir el anfitrión. La práctica local ya no muestra código ni botón de copiar. Se ampliaron las costuras del marcador a 28 px y las que aparecen sobre los personajes a 18 px.

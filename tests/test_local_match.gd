@@ -36,6 +36,36 @@ func run() -> void:
 		push_error("El hechizo no crea su feedback y aro de duración")
 		quit(1)
 		return
+	for _index in range(20):
+		game.set("pickup_streak_value", 1)
+		game.call("_finish_pickup_streak")
+	var fx: Node = root.get_node("Fx")
+	for _index in range(20): fx.call("render_pop", "+1", Vector2(640, 360), GameConfig.BONE_TEXT)
+	if game.get("hud_floating_labels").size() > GameConfig.MAX_FLOATING_LABELS or fx.get("active_texts").size() > GameConfig.MAX_FLOATING_LABELS:
+		push_error("El HUD o Fx supera el límite de textos flotantes")
+		quit(1)
+		return
+	fx.call("clear_text")
+	var floating_start := hud.get_child_count()
+	for frame in range(90 * 30):
+		if frame % 30 == 0 and game.get("state") == "playing":
+			sim.players[0].score += 1
+			game.call("_handle_events", [{"type":"coin_taken", "player":0, "value":1, "combo":1, "pos":sim.players[0].pos}])
+		game.call("_process", 1.0 / 30.0)
+		await process_frame
+		if frame == 30 * 30 - 1:
+			if hud.get_child_count() - floating_start > 40:
+				push_error("El HUD acumula más de 40 nodos durante 30 s de recogidas")
+				quit(1)
+				return
+			await create_timer(0.5).timeout
+			var score_labels: Array = game.get("score_number_labels")
+			var view_players: Array = game.get("players")
+			if int(game.get("score_values")[0]) != int(view_players[0].score) or str(score_labels[0].text) != str(view_players[0].score):
+				push_error("El marcador local no coincide con players[local].score tras 30 s")
+				quit(1)
+				return
+		if game.get("state") in ["match_end", "results"]: break
 	game.call("_build_menu")
 	await process_frame
 	game.queue_free()

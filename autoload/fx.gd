@@ -120,7 +120,7 @@ func _render_pop(text: String, position: Vector2, tint: Color, banner: bool) -> 
 	var loss := text.begins_with("-")
 	if banner: banner_active = true
 	active_texts = active_texts.filter(func(active: Label) -> bool: return is_instance_valid(active))
-	while active_texts.size() >= GameConfig.FLOAT_TEXT_MAX_VISIBLE:
+	while active_texts.size() >= GameConfig.MAX_FLOATING_LABELS:
 		var oldest: Label = active_texts.pop_front()
 		if is_instance_valid(oldest): oldest.queue_free()
 	var label := Label.new()
