@@ -417,3 +417,8 @@ Formato de cada entrada:
 - La escala se aplica con una transformación centrada a las capas CanvasLayer del HUD, menús, Ajustes y Fx; la escena 2D de la arena queda fuera. Quitados los multiplicadores de tamaño de letra dispersos. Ajustes usa Cinzel en título y pestañas, Oswald en filas, y foco brasa en la fila sin rectángulo blanco. Los extremos 75 % y 150 % desactivan su flecha; el cambio de escala conserva la misma fila y actualiza su valor sin reconstruir la página.
 - Pruebas Godot 4.7.2: extremos, estado de flechas, misma instancia de fila, lobby, logs y suite core pasan; el escaneo headless del editor no reporta errores. La captura de ventana no quedó guardada desde este entorno; queda inspección visual humana.
 - Humanos: comprobar menú, lobby, HUD, podio y ajustes al 75 %, 100 % y 150 % en ventana 1920×1080, incluyendo puntero y mando; confirmar que la arena mantiene su tamaño y ningún control queda fuera.
+
+### Fase 14f — Marcador
+- Número, nombre, retrato, marco, corona y costuras ahora son hijos de la misma tarjeta y solo se desliza la tarjeta al cambiar el orden. Las tarjetas inactivas se ocultan. En Codicia se bajan las fichas para dejar arriba los cofres coral y azul y sus totales grandes, a ambos lados del reloj.
+- Añadida prueba headless de HUD con 2, 3 y 4 jugadores: verifica los padres, visibilidad, asignación de puntos y distribución de los totales de Codicia. Godot 4.7.2 pasa sin errores.
+- Humanos: revisar en partida la clasificación que cambia, especialmente al final; confirmar que los totales quedan legibles junto al reloj y que las costuras se ven a 28 px.

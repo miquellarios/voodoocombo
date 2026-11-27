@@ -122,6 +122,8 @@ var round_number := 1
 var round_wait := 0.0
 var sudden_death := false
 var team_scores: Array[int] = [0,0]
+var team_score_labels: Array[Label] = []
+var team_chest_icons: Array[TextureRect] = []
 var pickup_streak_value := 0
 var pickup_streak_count := 0
 var pickup_streak_time := 0.0
@@ -157,6 +159,7 @@ func _begin_online_match(room: Dictionary) -> void:
 	pickup_streak_value = 0
 	pickup_streak_count = 0
 	pickup_streak_time = 0.0
+	team_scores = [0, 0]
 	last_leader_index = -1
 	simulation = null
 	client_match = ClientMatch.new()
@@ -427,6 +430,7 @@ func _begin_match(arena_id: String = "", overrides: Dictionary = {}) -> void:
 	pickup_streak_value = 0
 	pickup_streak_count = 0
 	pickup_streak_time = 0.0
+	team_scores = [0, 0]
 	last_leader_index = -1
 	network_match = false
 	local_player = 0
@@ -701,18 +705,8 @@ func _update_hud() -> void:
 		fog_material.set_shader_parameter("scroll_time",0.0 if Settings.reduce_motion else elapsed * GameConfig.ZONE_FOG_SCROLL_SPEED)
 	if state == "playing" and not players.is_empty(): Sfx.music(int(players[local_player].combo), frenzy_notified, remaining)
 	if mode == "greed":
-		var coral_score := hud_root.get_node_or_null("TeamCoral") as Label
-		if coral_score == null:
-			coral_score = _hud_label(hud_root, Vector2(420, 66), Vector2(190, 36), 24, HORIZONTAL_ALIGNMENT_CENTER)
-			coral_score.name = "TeamCoral"
-		var blue_score := hud_root.get_node_or_null("TeamBlue") as Label
-		if blue_score == null:
-			blue_score = _hud_label(hud_root, Vector2(670, 66), Vector2(190, 36), 24, HORIZONTAL_ALIGNMENT_CENTER)
-			blue_score.name = "TeamBlue"
-		coral_score.text = "● %d" % team_scores[0]
-		blue_score.text = "◆ %d" % team_scores[1]
-		coral_score.add_theme_color_override("font_color", GameConfig.COLORS[0])
-		blue_score.add_theme_color_override("font_color", GameConfig.COLORS[1])
+		for team_index in range(mini(team_score_labels.size(), team_scores.size())):
+			team_score_labels[team_index].text = str(team_scores[team_index])
 	if state == "playing" and remaining <= 5 and ceili(remaining) != tension_second:
 		tension_second = ceili(remaining)
 		Fx.pop(str(tension_second), Vector2(640,330), GameConfig.EMBER)
@@ -817,41 +811,29 @@ func _update_hud() -> void:
 
 func _layout_score_cards(order: Array[int]) -> void:
 	var positions := [8.0, 294.0, 706.0, 992.0]
-	for player_index in range(mini(order.size(), score_cards.size())):
+	for player_index in range(score_cards.size()):
 		var visual_slot := order.find(player_index)
-		if visual_slot < 0: continue
+		var active := visual_slot >= 0
+		score_cards[player_index].visible = active
+		if not active: continue
 		var x: float = positions[visual_slot]
 		var local := player_index == local_player
 		score_cards[player_index].size.x = GameConfig.SCORE_CARD_LOCAL_WIDTH if local else 280.0
-		var targets: Array = [
-			[score_cards[player_index], Vector2(x, 8.0)],
-			[score_portraits[player_index], Vector2(x + 6.0, 13.0)],
-			[score_frames[player_index], Vector2(x + 3.0, 10.0)],
-			[score_frame_skulls[player_index], Vector2(x + 12.0, 23.0)],
-			[score_crowns[player_index], Vector2(x + 11.0, 3.0)],
-			[score_name_labels[player_index], Vector2(x + 58.0, 9.0)],
-			[score_tag_labels[player_index], Vector2(x + 58.0, 31.0)],
-			[score_number_labels[player_index], Vector2(x + 216.0, 6.0)]
-		]
-		for pair in targets:
-			var control := pair[0] as Control
-			var target: Vector2 = pair[1]
-			if control.get_meta("score_layout_target", Vector2(-10000.0, -10000.0)) == target: continue
-			control.set_meta("score_layout_target", target)
-			if Settings.reduce_motion or not control.is_inside_tree():
-				control.position = target
+		var target := Vector2(x, 72.0 if mode == "greed" else 8.0)
+		if score_cards[player_index].get_meta("score_layout_target", Vector2(-10000.0, -10000.0)) != target:
+			score_cards[player_index].set_meta("score_layout_target", target)
+			if Settings.reduce_motion or not score_cards[player_index].is_inside_tree():
+				score_cards[player_index].position = target
 			else:
-				if control.has_meta("score_layout_tween"):
-					var previous := control.get_meta("score_layout_tween") as Tween
+				if score_cards[player_index].has_meta("score_layout_tween"):
+					var previous := score_cards[player_index].get_meta("score_layout_tween") as Tween
 					if is_instance_valid(previous): previous.kill()
-				var slide := control.create_tween()
-				slide.tween_property(control, "position", target, GameConfig.SCORE_CARD_SLIDE_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-				control.set_meta("score_layout_tween", slide)
-		score_name_labels[player_index].size.x = 154.0
-		score_tag_labels[player_index].size.x = 158.0
+				var slide := score_cards[player_index].create_tween()
+				slide.tween_property(score_cards[player_index], "position", target, GameConfig.SCORE_CARD_SLIDE_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+				score_cards[player_index].set_meta("score_layout_tween", slide)
 		score_number_labels[player_index].add_theme_font_size_override("font_size", 32 if local else GameConfig.SCORE_CARD_RIVAL_NUMBER_SIZE)
 		for stitch in GameConfig.SURVIVAL_LIVES:
-			score_life_icons[player_index][stitch].position = Vector2(x + 204.0 + stitch * GameConfig.SURVIVAL_HUD_STITCH_GAP, 13.0)
+			score_life_icons[player_index][stitch].position = Vector2(198.0 + stitch * GameConfig.SURVIVAL_HUD_STITCH_GAP, 5.0)
 
 func _build_menu() -> void:
 	Sfx.stop_music()
@@ -1353,9 +1335,12 @@ func _build_hud() -> void:
 	score_frames.clear()
 	score_frame_skulls.clear()
 	score_crowns.clear()
+	team_score_labels.clear()
+	team_chest_icons.clear()
 	score_values.clear()
 	score_change_times.clear()
 	var card_x := [8.0, 294.0, 706.0, 992.0]
+	var card_top := 72.0 if mode == "greed" else 8.0
 	for slot in range(4):
 		var card := NinePatchRect.new()
 		card.texture = load("res://assets/ui/panel.png")
@@ -1363,42 +1348,42 @@ func _build_hud() -> void:
 		card.patch_margin_top = 24
 		card.patch_margin_right = 24
 		card.patch_margin_bottom = 24
-		card.position = Vector2(card_x[slot], 8)
+		card.position = Vector2(card_x[slot], card_top)
 		card.size = Vector2(280, 54)
 		root.add_child(card)
 		score_cards.append(card)
 		var portrait := TextureRect.new()
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.position = Vector2(card_x[slot] + 6, 13)
+		portrait.position = Vector2(6, 5)
 		portrait.size = Vector2(44, 44)
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		portrait.texture = load("res://assets/ui/retrato_mago_coral.png")
-		root.add_child(portrait)
+		card.add_child(portrait)
 		var frame := TextureRect.new()
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		frame.position = Vector2(card_x[slot] + 3.0, 10.0)
+		frame.position = Vector2(3.0, 2.0)
 		frame.size = Vector2(50.0, 50.0)
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		root.add_child(frame)
-		var skull_overlay := _hud_label(root, Vector2(card_x[slot] + 12.0, 23.0), Vector2(32.0, 28.0), 18, HORIZONTAL_ALIGNMENT_CENTER)
+		card.add_child(frame)
+		var skull_overlay := _hud_label(card, Vector2(12.0, 15.0), Vector2(32.0, 28.0), 18, HORIZONTAL_ALIGNMENT_CENTER)
 		skull_overlay.text = "☠"
 		skull_overlay.visible = false
 		score_frame_skulls.append(skull_overlay)
 		var crown := TextureRect.new()
 		crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		crown.position = Vector2(card_x[slot] + 11, 3)
+		crown.position = Vector2(11, -5)
 		crown.size = Vector2(34, 20)
 		crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		crown.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		crown.texture = load("res://assets/characters/crown.png")
 		crown.visible = false
-		root.add_child(crown)
-		var name_label := _hud_label(root, Vector2(card_x[slot] + 58, 9), Vector2(154, 25), 18, HORIZONTAL_ALIGNMENT_LEFT)
-		var tag_label := _hud_label(root, Vector2(card_x[slot] + 58, 31), Vector2(158, 22), 13, HORIZONTAL_ALIGNMENT_LEFT)
+		card.add_child(crown)
+		var name_label := _hud_label(card, Vector2(58, 1), Vector2(154, 25), 18, HORIZONTAL_ALIGNMENT_LEFT)
+		var tag_label := _hud_label(card, Vector2(58, 23), Vector2(158, 22), 13, HORIZONTAL_ALIGNMENT_LEFT)
 		tag_label.add_theme_color_override("font_color", Color("b8a9d1"))
-		var number := _hud_label(root, Vector2(card_x[slot] + 216, 6), Vector2(58, 48), 32, HORIZONTAL_ALIGNMENT_RIGHT)
+		var number := _hud_label(card, Vector2(216, -2), Vector2(58, 48), 32, HORIZONTAL_ALIGNMENT_RIGHT)
 		var life_icons: Array[TextureRect] = []
 		for stitch in GameConfig.SURVIVAL_LIVES:
 			var icon := TextureRect.new()
@@ -1407,10 +1392,10 @@ func _build_hud() -> void:
 			atlas.atlas = STITCHES_TEXTURE
 			atlas.region = Rect2(0.0, 0.0, 128.0, 128.0)
 			icon.texture = atlas
-			icon.position = Vector2(card_x[slot] + 204.0 + stitch * GameConfig.SURVIVAL_HUD_STITCH_GAP, 13.0)
+			icon.position = Vector2(198.0 + stitch * GameConfig.SURVIVAL_HUD_STITCH_GAP, 5.0)
 			icon.size = Vector2.ONE * GameConfig.SURVIVAL_HUD_STITCH_SIZE
 			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			root.add_child(icon)
+			card.add_child(icon)
 			life_icons.append(icon)
 		score_name_labels.append(name_label)
 		score_tag_labels.append(tag_label)
@@ -1421,6 +1406,29 @@ func _build_hud() -> void:
 		score_crowns.append(crown)
 		score_values.append(-1)
 		score_change_times.append(0)
+	if mode == "greed":
+		var team_chest_textures: Array[Texture2D] = [TEAM_CHEST_TEXTURES[0], TEAM_CHEST_TEXTURES[1]]
+		var chest_x := [434.0, 802.0]
+		var total_x := [476.0, 710.0]
+		for team_index in range(2):
+			var chest := TextureRect.new()
+			chest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			chest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			var source: Texture2D = team_chest_textures[team_index]
+			var frame_width := source.get_width() / 2.0
+			var atlas := AtlasTexture.new()
+			atlas.atlas = source
+			atlas.region = Rect2(0.0, 0.0, frame_width, source.get_height())
+			chest.texture = atlas
+			chest.position = Vector2(chest_x[team_index], 7.0)
+			chest.size = Vector2(46.0, 46.0)
+			chest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			root.add_child(chest)
+			team_chest_icons.append(chest)
+			var total := _hud_label(root, Vector2(total_x[team_index], 1.0), Vector2(86.0, 58.0), 38, HORIZONTAL_ALIGNMENT_CENTER)
+			total.name = "TeamCoral" if team_index == 0 else "TeamBlue"
+			total.add_theme_color_override("font_color", GameConfig.COLORS[team_index])
+			team_score_labels.append(total)
 	var timer := Label.new()
 	timer.name = "Timer"
 	timer.position = Vector2(574, 2)
