@@ -1,15 +1,14 @@
 # Fase 14 — Que no se cuelgue, que el online vaya fluido y que conectarse sea fácil
 
 > **Para Codex.** Antes de empezar:
-> 1. **Copia `docs/codex/fase-14/AGENTS.md` a la raíz como `AGENTS.md`.** Cambia §5.1: conectar con código de invitación, lista de partidas en tu red y UPnP.
+> 1. **Copia `docs/codex/fase-14/AGENTS.md` a la raíz como `AGENTS.md`.** Cambia §5.1: lista de partidas en tu red y alojar en mi PC.
 > 2. Capturas de cómo está ahora en `docs/capturas/fase-13-revision/`. Claude las sacó ejecutando el juego (commit `96cd5da`) y comprobó cada fallo.
-> 3. Referencia de la pantalla online nueva: `docs/media/online_facil_referencia.png`.
 
 ## Qué nos ha pasado al probar la fase 13
 
 - **El juego va cada vez más lento, online y contra bots, y acaba colgándose o cerrándose.**
 - **Online va a tirones:** tu muñeco da saltitos hacia atrás.
-- **Conectarse desde otro ordenador cuesta:** hay que saber qué IP poner, abrir puertos, etc.
+- **Conectarse desde otro ordenador cuesta:** hay que saber qué IP poner, abrir puertos, etc. Desde casa se arregla en la fase 15, con un servidor en internet; aquí, el modo sin internet.
 - Varias cosas de la fase 13 están a medias: escala de la interfaz, marcador, podio y algunos detalles.
 
 ## Cómo trabajar esta fase
@@ -99,66 +98,36 @@ Tras 14a el juego ya no se va frenando. Pero los saltitos online tienen **otra c
 - simula pérdida y *jitter*: tira el 5 % de los snapshots y retrasa entre 0 y 60 ms las entradas en el cliente de prueba;
 - en 30 s de movimiento recto, el error medio entre la posición predicha y la del servidor tiene que ser menor de 6 px.
 
-## 14c · Conectarse desde otro ordenador: fácil de verdad
+## 14c · Jugar sin internet: partida en mi red y alojar en mi PC
 
-Referencia: `docs/media/online_facil_referencia.png`.
+> **Cambio del equipo (27/11):** jugar **desde casa** va por un **servidor en internet** con enlaces de invitación. Es la **fase 15**, que va justo después de esta.
+> Aquí solo se deja bien el modo **sin internet** (clase, misma wifi), que sirve de reserva.
+> **No hagas UPnP, ni códigos con la IP dentro, ni la detección de VPN:** ya no hacen falta.
 
 **Lo que molesta ahora:**
-- hay que escribir la IP del anfitrión y el código por separado;
-- y la IP que enseña el juego **a veces es la equivocada**: `_find_private_ipv4()` coge la primera privada.
-  - En Windows, eso suele ser un adaptador virtual (Hyper-V, WSL, VirtualBox: 172.x).
-  - Las VPN de juego que recomendamos **no salen nunca**: Radmin usa 26.x.x.x y Tailscale 100.64-127.x.x, que no son "privadas".
+- hay que escribir la IP del anfitrión a mano;
+- la IP que enseña el juego **a veces es la equivocada**: `_find_private_ipv4()` coge la primera privada, y en Windows suele ser un adaptador virtual (Hyper-V, WSL, VirtualBox: 172.x).
 
-**Pantalla JUGAR ONLINE nueva:** dos columnas.
-
-**Izquierda · CREAR PARTIDA** (eres el anfitrión: arranca el servidor como ahora):
-- **Código de invitación**, un solo código que lleva la dirección y la sala:
-  - formato `SALA-DIRECCIÓN`, por ejemplo `KWET7-B2QX4MA`;
-  - la dirección es la IPv4 en base 32 con el mismo alfabeto que los códigos de sala, 7 caracteres;
-  - si el puerto no es 7777, se añade al final.
-  - Clase `InviteCode` en `core/` con `encode(room, ip, port)` y `decode(text)`, con tests de ida y vuelta.
-- **COPIAR INVITACIÓN**, botón grande, con la frase: "Mándalo por WhatsApp".
-- **Debajo, tres comprobaciones** con ✓ o ✕ que se hacen solas:
-  1. **Misma red:** "Te verán solos en su lista" (anuncio LAN activo).
-  2. **Desde otras casas** (ver "Qué dirección va en la invitación" más abajo).
-     - Si el UPnP funciona: ✓ "Puerto abierto automático".
-     - Si no: ✕ "Tu router no deja abrir el puerto solo" y un botón **¿QUÉ HAGO?**, que abre la ayuda en un panel del juego, no en una ventana de sistema.
-  3. **Red usada:** el nombre ("Wifi/cable", "Radmin VPN", "Tailscale", "ZeroTier", "Internet (UPnP)") y la IP, con **[cambiar]** para elegir otra de la lista si el juego se equivoca.
-
-**Qué dirección va en la invitación** (en este orden):
-1. **IP pública con UPnP:**
-   - al crear la partida, con la clase `UPNP` de Godot: `discover()`, `add_port_mapping(7777, 7777, "VoodooCombo", "UDP")` y `query_external_address()`;
-   - en un hilo, para no congelar la pantalla, con 4 s como máximo;
-   - al cerrar la sala o el juego: `delete_port_mapping`.
-2. **IP de VPN:**
-   - si hay un adaptador con 26.x.x.x (Radmin), 100.64-127.x.x (Tailscale) o la red de ZeroTier (10.147.x, 172.22-30.x…);
-   - `IP.get_local_interfaces()` da el nombre del adaptador: úsalo para reconocerlas.
-3. **IP de la red local:** 192.168.x.x primero, luego 10.x y luego 172.16-31.x. **Descarta** los adaptadores con "vEthernet", "VirtualBox", "VMware" o "WSL" en el nombre.
-
-**Derecha · UNIRSE:**
-- **Partidas en tu red**, una lista que se actualiza sola cada segundo con el `LanDiscovery` que ya existe. **Ahora no lo usa nadie.**
+**Qué hacer:**
+- **Partidas en tu red:** una lista que se actualiza sola cada segundo, con el `LanDiscovery` que ya existe y que **ahora no usa nadie**.
   - El anfitrión anuncia por broadcast UDP 7778: nombre del anfitrión, modo, jugadores, versión, IP local, puerto y código.
-  - Cada partida es una tarjeta con **ENTRAR**: un clic y dentro, sin escribir nada.
+  - Cada partida es una tarjeta con **ENTRAR**: un clic y dentro.
   - Si la versión no coincide, la tarjeta sale en gris con "Versión distinta".
-- **¿Te han pasado un código?**:
-  - campo + **PEGAR** (lee el portapapeles) + **ENTRAR**;
-  - acepta el código de invitación completo o solo los 5 caracteres de la sala;
-  - **si solo pones la sala**, el juego pregunta por broadcast en la red local "¿quién tiene la sala KWET7?" y entra si alguien contesta. Así, en clase basta con decir el código en voz alta.
-  - **Si el código lleva dirección pero la partida está en tu misma red** (está en la lista), usa la IP local, porque muchos routers no dejan entrar a la IP pública desde dentro.
-- **Fuera** de esta pantalla el campo "IP del anfitrión". Pasa a AJUSTES → ONLINE → "Avanzado".
-
-**Al conectar:**
-- **Mensajes claros**, en una línea, con qué hacer:
+- **Unirse solo con el código en la misma red:** si escribes los 5 caracteres, el juego pregunta por broadcast "¿quién tiene la sala KWET7?" y entra si alguien contesta.
+- **IP del anfitrión:**
+  - 192.168.x.x primero, luego 10.x y luego 172.16-31.x;
+  - **descarta** los adaptadores con "vEthernet", "VirtualBox", "VMware" o "WSL" en el nombre (`IP.get_local_interfaces()`);
+  - se ve y se puede cambiar en una lista pequeña.
+  - El campo de IP a mano pasa a AJUSTES → ONLINE → "Avanzado".
+- **Mensajes claros** al conectar, en una línea:
   - "No contesta nadie en esa dirección. ¿Tiene el anfitrión la partida abierta?"
-  - "La sala ya ha empezado"
   - "Sala llena"
-  - "Tu versión es 0.14.0 y la del anfitrión 0.13.0: actualizad los dos"
-- **Reintenta solo 3 veces** antes de mostrar el error.
-- El **cortafuegos de Windows**: la primera vez que alojas, avisa antes con un cartel: "Windows te preguntará si dejas que VoodooCombo use la red: pulsa Permitir (redes privadas)".
-
-**Y el servidor del equipo (Oracle), cuando esté:**
-- en el menú online, **una tercera opción**, "Servidor VoodooCombo", con solo código de sala, sin IP ni puertos;
-- es la mejor forma de jugar desde casas distintas sin tirones. `GameConfig.ONLINE_HOST` ya existe.
+  - "Versión distinta"
+  - Como mucho 3 reintentos.
+- **Antes de alojar por primera vez:** aviso del cortafuegos de Windows ("pulsa Permitir, redes privadas").
+- **Dónde va:**
+  - todo esto se queda en un botón **SIN INTERNET (EN CLASE)** de la pantalla JUGAR;
+  - la pantalla JUGAR entera se rehace en la fase 15 (`docs/media/jugar_online_referencia.png`), así que aquí no la rediseñes.
 
 ## 14d · Si se cierra, que sepamos por qué
 
@@ -234,8 +203,6 @@ Referencia: `docs/media/online_facil_referencia.png`.
 |---|---|
 | Dos PCs en la misma wifi | El segundo ve la partida en la lista y entra con un clic |
 | Mismo caso, escribiendo solo los 5 caracteres de la sala | Entra |
-| Desde otra casa con el código de invitación | Si el UPnP funciona, entra. Si no, el aviso y la ayuda salen bien |
-| Con Radmin VPN o Tailscale | La invitación lleva la IP de la VPN y entra |
 | Partida completa de 90 s online | Sin saltitos visibles y sin `SCRIPT ERROR` en `godot.log` |
 | 3 partidas seguidas sin cerrar el juego | La memoria (Administrador de tareas) no sube más de 50 MB |
 | El anfitrión cierra el juego | Al otro le sale el aviso y vuelve al menú, sin cerrarse |

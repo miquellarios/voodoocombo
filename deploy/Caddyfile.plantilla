@@ -1,0 +1,29 @@
+# Caddy: HTTPS automático (Let's Encrypt), versión web del juego y túnel WebSocket al servidor.
+# instalar_servidor.sh cambia __DOMINIO__ por el dominio real.
+__DOMINIO__ {
+	encode zstd gzip
+
+	# Conexión del juego (web y .exe): wss://__DOMINIO__/ws  ->  servidor Godot en 127.0.0.1:7780
+	@juego path /ws
+	handle @juego {
+		reverse_proxy 127.0.0.1:7780
+	}
+
+	# Estado y resultados (el endpoint HTTP del juego, que no se abre a internet directamente)
+	handle /estado {
+		rewrite * /status
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle /resultados {
+		rewrite * /results
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Versión web del juego y descargas
+	handle {
+		root * /opt/voodoocombo/web
+		@inicio path / /index.html
+		header @inicio Cache-Control "no-cache"
+		file_server
+	}
+}

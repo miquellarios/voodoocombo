@@ -1,0 +1,15 @@
+VOODOO COMBO · Windows
+======================
+
+1. Descomprime la carpeta entera y abre VoodooCombo.exe.
+2. Si Windows dice "Windows protegió su PC": pulsa "Más información" y "Ejecutar de todas formas"
+   (el juego no está firmado porque es un proyecto de clase).
+3. JUGAR ONLINE  -> creas una partida en el servidor del equipo. Pulsa INVITAR y manda el enlace.
+   PARTIDA RÁPIDA -> te junta con quien esté buscando partida.
+   UNIRSE -> pega el enlace o el código de 5 letras que te han pasado.
+
+También se puede jugar sin instalar nada desde el navegador, en la dirección del enlace.
+
+Sin internet (en clase): JUGAR -> Sin internet -> Partida en mi red.
+
+Si el juego se cierra: AJUSTES -> ONLINE -> ABRIR CARPETA DE REGISTROS y mándanos godot.log.

@@ -3,7 +3,7 @@
 > Instrucciones permanentes para el agente (Codex las lee en cada tarea). Es la fuente de verdad del proyecto:
 > si un prompt contradice este archivo, pregunta antes de programar.
 > **Esta versión describe cómo tiene que quedar el juego al terminar la fase 14.** Incluye todo lo de las fases 10-13, y además:
-> - conectar con código de invitación, lista de partidas en la red local y UPnP;
+> - jugar sin internet con la lista de partidas en la red local;
 > - online fluido (cola de entradas, snapshot en un paquete);
 > - registros para saber por qué se cierra;
 > - escala de la interfaz en todo el juego.
@@ -332,22 +332,12 @@ Plan completo del equipo: `docs/codex/plan-multijugador.md`. Guía para desplega
   - `MAX_PEERS = 32` (8 salas de 4);
   - cada sala con su propia `MatchSim` a **30 Hz**.
 - **Dónde corre:** Oracle Cloud Always Free para jugar desde casa y, de respaldo, un PC de clase en la red local.
-- **Conectar tiene que ser fácil** (pantalla JUGAR ONLINE, `docs/media/online_facil_referencia.png`):
-  - **Crear partida:**
-    - arranca el servidor dedicado como proceso aparte con el mismo ejecutable y se conecta a `127.0.0.1`;
-    - enseña un **código de invitación** (`SALA-DIRECCIÓN`, clase `InviteCode`) con COPIAR INVITACIÓN.
-  - **Qué dirección lleva el código** (en este orden):
-    1. la IP pública, si el UPnP abre el puerto 7777 UDP solo;
-    2. la IP de la VPN (Radmin 26.x, Tailscale 100.64-127.x, ZeroTier);
-    3. la IP de la red local, sin adaptadores virtuales.
-  - Se ve qué red se ha usado y se puede cambiar.
-  - Al cerrar la sala o el juego: se quita el puerto UPnP y se mata el proceso del servidor.
-- **Unirse:**
+- **Jugar desde casa:** con el servidor en internet y enlaces de invitación (fase 15).
+- **Sin internet (en clase):**
   - **Partidas en tu red:** lista automática por broadcast UDP 7778 (`LanDiscovery`); ENTRAR con un clic.
-  - **Código:** campo con PEGAR. Vale el código de invitación entero o solo los 5 caracteres de la sala; con solo la sala, se busca en la red local.
-  - **Misma red:** si la partida está en tu red, se entra por la IP local aunque el código lleve la pública.
-  - La IP a mano solo está en AJUSTES → ONLINE → Avanzado.
-- **Servidor del equipo (Oracle):** cuando esté, tercera opción "Servidor VoodooCombo", solo con código de sala (`GameConfig.ONLINE_HOST`).
+  - **Unirse con código:** con solo los 5 caracteres de la sala, se busca en la red local.
+  - **Alojar en mi PC:** arranca el servidor dedicado como proceso aparte con el mismo ejecutable y se conecta a `127.0.0.1`. Al salir, se mata el proceso.
+  - **IP del anfitrión:** primero las de la red local real, sin adaptadores virtuales; se puede cambiar. La IP a mano solo está en AJUSTES → ONLINE → Avanzado.
 - **Si no conecta:** 3 reintentos y un mensaje en una línea que diga qué hacer. Nunca se queda colgado. Antes de alojar por primera vez, aviso del cortafuegos de Windows.
 - **Registros:**
   - `user://logs/godot.log` y `user://logs/servidor.log`, con un botón para abrir la carpeta en AJUSTES → ONLINE;

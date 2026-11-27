@@ -27,22 +27,43 @@
 | Fase | Estado |
 |---|---|
 | 1-13 | Hechas por Codex. Registro en `docs/BITACORA.md`. |
-| **14** | Escrita, pendiente: `docs/codex/fase-14/FASE-14.md` y su `AGENTS.md`. |
+| **14** | Escrita, pendiente: `docs/codex/fase-14/FASE-14.md`. |
+| **15** | Escrita, pendiente: `docs/codex/fase-15/FASE-15.md`. |
 
-**Qué arregla la fase 14:**
+**Fase 14:**
 - **El cuelgue:** `to_local()` en un `Control` crea un `Label` en cada fotograma.
 - **Online a tirones:** el servidor sobrescribe las entradas y cada snapshot va en 2 paquetes.
-- **Conectar fácil:** código de invitación, lista de partidas de la red local, UPnP y VPN.
+- **Modo sin internet:** partidas en tu red con un clic y alojar en mi PC.
 - **Registros**, para saber por qué se cierra.
 - **Lo que quedó a medias de la fase 13:** escala de la interfaz, marcador y podio.
 
-Capturas de la revisión: `docs/capturas/fase-13-revision/`.
+**Fase 15: jugar desde casa con un enlace** (es lo que más valora el profesor):
+- servidor en Oracle Cloud Madrid, con WebSocket seguro detrás de Caddy;
+- versión web;
+- botón INVITAR, que copia un enlace `https://<dominio>/?sala=CODIGO` que te mete directamente en la sala;
+- partida rápida;
+- reconexión automática.
+
+**Servidor online:**
+- Los scripts los hizo Claude y están en `deploy/`:
+  - `instalar_servidor.sh`;
+  - `actualizar.sh`;
+  - `voodoocombo.service`;
+  - `Caddyfile.plantilla`.
+- La guía para humanos está en `docs/SERVIDOR-ONLINE.md`.
+- Ya se ha comprobado:
+  - Godot `WebSocketMultiplayerPeer` funciona a través de Caddy en `/ws`;
+  - el proyecto exporta a web y arranca en Chrome;
+  - el preset Windows exporta desde Linux con las plantillas 4.7.2.
+- La cuenta de Oracle y DuckDNS las tienen que crear los humanos.
+
+Capturas de la revisión de la fase 13: `docs/capturas/fase-13-revision/`.
 
 Cada fase de la 11 en adelante tiene su carpeta con dos archivos:
 - `FASE-N.md`: los bloques para Codex;
 - `AGENTS.md`: cómo queda el juego al terminar esa fase.
 
-Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 13.
+Al empezar una fase, Codex copia ese `AGENTS.md` a la raíz. El de la raíz ahora es el de la fase 13 (la 14 y la 15 traen el suyo).
 
 Lo que falló al probar la fase 9 (todo está en la fase 10):
 - los hechizos se lanzaban solos, sin pulsar E;
@@ -93,8 +114,8 @@ Qué trae cada fase:
 - Quedan como ideas para más adelante, sin hacer: Patata Vudú, Altar, Cazador 1v3 y Fútbol Vudú.
 
 **Online**
-- Solo se entra con código de sala.
-- Servidor en Oracle Always Free, con un PC del aula en LAN como reserva.
+- Desde casa: servidor en Oracle Always Free (Madrid). Se entra con enlace de invitación o código de sala; versión web sin instalar nada.
+- Sin internet (clase): partidas en la red local, como reserva.
 - **No se activa ningún servicio de pago.**
 
 **Lobby**
@@ -144,6 +165,8 @@ python3 instalar_fuentes.py            # copia las fuentes de assets/fonts a ~/.
 | `export_fase12.py` | Votación y medallas |
 | `export_tipografia.py` | Logo "Brasa minimal" y referencias de letra |
 | `export_fase13.py` | Efectos de hechizos y referencias de hechizos y ajustes |
+| `export_fase15.py` | Referencias de la pantalla JUGAR (online) y de INVITAR |
+| `modular.py` | Muñecos por piezas (cabeza, ojos, cara, mano, espalda, ropa): propuesta de 8 personajes nuevos y cosméticos mezclables |
 | `trailer.py` | Tráiler, que necesita `ffmpeg` |
 
 **Cómo se trabaja el arte**

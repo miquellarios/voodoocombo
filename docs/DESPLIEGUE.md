@@ -1,3 +1,5 @@
+> **Sustituido (27/11/2026):** la guía buena es `docs/SERVIDOR-ONLINE.md`, con los scripts de `deploy/`: Oracle Madrid, Caddy con HTTPS, WebSocket, versión web y DuckDNS. Este documento queda como historial de la fase 11.
+
 # Servidor VoodooCombo
 
 El despliegue lo realiza el equipo humano. No se ha creado ninguna VM ni activado servicios.

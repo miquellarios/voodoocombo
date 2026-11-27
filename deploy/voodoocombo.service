@@ -1,0 +1,24 @@
+[Unit]
+Description=Servidor online de VoodooCombo (Godot sin pantalla)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=godotserver
+Group=godotserver
+Environment=HOME=/var/lib/voodoocombo
+WorkingDirectory=/opt/voodoocombo/src
+# WebSocket solo en local: Caddy lo publica en https://<dominio>/ws con certificado.
+# El puerto UDP 7777 (ENet) no se usa en el servidor de internet.
+ExecStart=/opt/voodoocombo/godot/godot --headless --path /opt/voodoocombo/src -- --server --ws --bind 127.0.0.1 --port 7780
+Restart=always
+RestartSec=2
+# Si se cuelga, systemd lo vuelve a arrancar.
+TimeoutStopSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/voodoocombo /opt/voodoocombo/src
+
+[Install]
+WantedBy=multi-user.target
