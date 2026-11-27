@@ -433,3 +433,8 @@ Formato de cada entrada:
 - La rueda del lobby usa iconos; la rueda de taquilla ocupa 360×360 px con iconos de 56 px. La colección se muestra en dos columnas con barra de desplazamiento siempre visible. El emote calavera tiene nombre propio. Imán, capa y anillo tienen escala +25 % y opacidad 85 %. Alojar desde el editor añade `--path` con la ruta del proyecto.
 - Godot 4.7.2: suite core, pruebas de sala online, ayuda/modal, argumentos de proceso del servidor, escala, marcador y podio pasan. La inspección visual mediante captura no está disponible en este entorno headless.
 - Humanos: revisar ayuda, títulos, equipos, taquilla y los tres efectos de hechizo; desde el editor comprobar que CREAR SALA aloja el servidor en el proyecto abierto.
+
+### Fase 14i — Versión y entrega
+- Actualizados el número de versión visible, los metadatos del proyecto y el preset Windows a 0.14.0. El README ya describe los tres modos y la red actual. Exportado el ejecutable release y creado `build/VoodooCombo-v0.14.0-Windows.zip` con `VoodooCombo.exe`, `LEEME.txt` y `servidor.bat`; el archivo se extrajo y el ejecutable arrancó/cerró en headless sin errores.
+- Las pruebas de dos PCs no se pueden ejecutar desde este entorno. Se anotarán sus siete resultados cuando se prueben manualmente. La rama remota `main` tiene cuatro commits adicionales frente al checkout; se integrarán antes de publicar el release para conservarlos.
+- Humanos: realizar la tabla de pruebas de red y estabilidad indicada en esta fase; confirmar invitación/LAN/VPN, partida online de 90 s, tres partidas seguidas y cierre del anfitrión.
