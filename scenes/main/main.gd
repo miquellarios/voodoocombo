@@ -1605,8 +1605,8 @@ func _show_results() -> void:
 	var podium := TextureRect.new()
 	podium.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	podium.texture = load("res://assets/ui/podio.png")
-	podium.position = Vector2(280.0, 413.0)
-	podium.size = Vector2(720.0, 267.0)
+	podium.position = Vector2(325.0, 325.0)
+	podium.size = Vector2(630.0, 230.0)
 	podium.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	podium.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(podium)
@@ -1632,8 +1632,9 @@ func _show_results() -> void:
 		var plaque_x := center.x - 96.0
 		if place == 4: plaque_x = GameConfig.RESULTS_PLAQUE_FOURTH_X
 		var plaque := Panel.new()
+		plaque.name = "ResultPlaque%d" % place
 		plaque.position = Vector2(plaque_x, minf(GameConfig.RESULTS_PLAQUE_TOP_MAX, center.y + GameConfig.RESULTS_PLAQUE_GAP) if place < 4 else GameConfig.RESULTS_PLAQUE_FOURTH_Y)
-		plaque.size = Vector2(192.0, 48.0)
+		plaque.size = Vector2(192.0, 72.0)
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color("241838", 0.94)
 		style.border_color = Color("8a6b45")
@@ -1714,6 +1715,7 @@ func _show_results() -> void:
 			Sfx.fanfare()
 	, float(start_xp), float(Profile.xp), 1.5)
 	var main_button := _button(root, I18n.t("main_menu"), Vector2(0.0, 600.0), _build_menu)
+	main_button.name = "ResultsMainMenu"
 	main_button.position = GameConfig.RESULTS_MAIN_BUTTON_POSITION
 	main_button.size = GameConfig.RESULTS_MAIN_BUTTON_SIZE
 	main_button.add_theme_font_size_override("font_size", GameConfig.RESULTS_BUTTON_FONT_SIZE)
@@ -1721,6 +1723,7 @@ func _show_results() -> void:
 		if network_match: Net.lobby_action.rpc_id(1, "rematch")
 		else: _build_online()
 	)
+	again_button.name = "ResultsAgain"
 	again_button.position = GameConfig.RESULTS_AGAIN_BUTTON_POSITION
 	again_button.size = GameConfig.RESULTS_AGAIN_BUTTON_SIZE
 	again_button.add_theme_font_size_override("font_size", GameConfig.RESULTS_BUTTON_FONT_SIZE)

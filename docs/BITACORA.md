@@ -422,3 +422,8 @@ Formato de cada entrada:
 - Número, nombre, retrato, marco, corona y costuras ahora son hijos de la misma tarjeta y solo se desliza la tarjeta al cambiar el orden. Las tarjetas inactivas se ocultan. En Codicia se bajan las fichas para dejar arriba los cofres coral y azul y sus totales grandes, a ambos lados del reloj.
 - Añadida prueba headless de HUD con 2, 3 y 4 jugadores: verifica los padres, visibilidad, asignación de puntos y distribución de los totales de Codicia. Godot 4.7.2 pasa sin errores.
 - Humanos: revisar en partida la clasificación que cambia, especialmente al final; confirmar que los totales quedan legibles junto al reloj y que las costuras se ven a 28 px.
+
+### Fase 14g — Podio
+- Subido y reducido el bloque del podio para despejar el pie de pantalla. Las placas se separan de los puestos dibujados dentro de cada bloque; la cuarta posición tiene espacio propio a la derecha. Ambos botones comparten una fila de 40 px a 80 px del borde inferior.
+- Prueba headless Godot 4.7.2 verifica que puestos, placas y botones no se cruzan con 2, 3 y 4 jugadores. No se pudo guardar captura gráfica en este entorno headless.
+- Humanos: revisar visualmente las placas debajo de cada puesto, el cuarto personaje a la derecha y la fila inferior en ventanas 1280×720 y 1920×1080.
