@@ -14,9 +14,14 @@ signal pong_received(stamp: int)
 var peer: ENetMultiplayerPeer
 var room: Dictionary = {}
 var server_mode := false
-var snapshot_sequence := 0
+var snapshot_sequences: Dictionary = {}
 var incoming_sequence := -1
+var last_complete_sequence := -1
 var incoming_chunks: Dictionary = {}
+var snapshots_received := 0
+var snapshots_lost := 0
+var snapshot_loss_percent := 0.0
+var snapshot_player_template: Array = []
 var hosted_server_pid := -1
 var hosted_server_ip := ""
 
@@ -45,7 +50,7 @@ func stop_host_server() -> void:
 
 func start_server(port: int = GameConfig.NET_PORT) -> Error:
 	peer = ENetMultiplayerPeer.new()
-	var error := peer.create_server(port, GameConfig.NET_MAX_PEERS, 3)
+	var error := peer.create_server(port, GameConfig.NET_MAX_PEERS, GameConfig.NET_CHANNEL_COUNT)
 	if error == OK:
 		multiplayer.server_relay = false
 		multiplayer.multiplayer_peer = peer
@@ -56,7 +61,7 @@ func start_server(port: int = GameConfig.NET_PORT) -> Error:
 func join_server(address: String, port: int = GameConfig.NET_PORT) -> Error:
 	leave_server()
 	peer = ENetMultiplayerPeer.new()
-	var error := peer.create_client(address, port, 3)
+	var error := peer.create_client(address, port, GameConfig.NET_CHANNEL_COUNT)
 	if error == OK: multiplayer.multiplayer_peer = peer
 	return error
 
@@ -67,7 +72,13 @@ func leave_server() -> void:
 	room.clear()
 	server_mode = false
 	incoming_sequence = -1
+	last_complete_sequence = -1
 	incoming_chunks.clear()
+	snapshot_sequences.clear()
+	snapshots_received = 0
+	snapshots_lost = 0
+	snapshot_loss_percent = 0.0
+	snapshot_player_template.clear()
 
 func log_line(message: String) -> void:
 	print("[%s] %s" % [Time.get_datetime_string_from_system(), message])
@@ -105,17 +116,19 @@ func room_joined(code: String, state: Dictionary) -> void:
 	state["code"] = code
 	room_state(state)
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_remote", "unreliable", GameConfig.NET_PING_CHANNEL)
 func ping(stamp: int) -> void:
 	_receive("ping", {"stamp": stamp})
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_remote", "unreliable", GameConfig.NET_PING_CHANNEL)
 func pong(stamp: int) -> void:
 	pong_received.emit(stamp)
 
 @rpc("authority", "call_remote", "reliable")
 func room_state(state: Dictionary) -> void:
 	room = state
+	if state.get("initial", {}).has("players"):
+		snapshot_player_template = state.initial.players.duplicate(true)
 	room_changed.emit(room)
 
 @rpc("authority", "call_remote", "reliable")
@@ -127,17 +140,21 @@ func can_send(id: int) -> bool:
 
 func send_snapshot(id: int, state: Dictionary) -> void:
 	if not can_send(id): return
-	snapshot_sequence += 1
+	var serial := int(snapshot_sequences.get(id, 0)) + 1
+	snapshot_sequences[id] = serial
 	var raw := var_to_bytes(state)
 	var packed := raw.compress(FileAccess.COMPRESSION_ZSTD)
+	if packed.size() > GameConfig.NET_CHUNK_BYTES: push_warning("Snapshot de %d B: supera el límite de un paquete" % packed.size())
 	var total := ceili(float(packed.size()) / GameConfig.NET_CHUNK_BYTES)
 	for part in total:
-		snapshot_chunk.rpc_id(id, snapshot_sequence, part, total, raw.size(), packed.slice(part * GameConfig.NET_CHUNK_BYTES, (part + 1) * GameConfig.NET_CHUNK_BYTES))
+		snapshot_chunk.rpc_id(id, serial, part, total, raw.size(), packed.slice(part * GameConfig.NET_CHUNK_BYTES, (part + 1) * GameConfig.NET_CHUNK_BYTES))
 
 @rpc("authority", "call_remote", "unreliable_ordered", 1)
 func snapshot_chunk(serial: int, part: int, total: int, raw_size: int, data: PackedByteArray) -> void:
 	if serial < incoming_sequence or raw_size < 1 or raw_size > GameConfig.NET_MAX_SNAPSHOT_BYTES or total < 1 or total > 64 or part < 0 or part >= total or data.size() > GameConfig.NET_CHUNK_BYTES: return
 	if serial > incoming_sequence:
+		if last_complete_sequence >= 0 and serial > last_complete_sequence + 1:
+			snapshots_lost += serial - last_complete_sequence - 1
 		incoming_sequence = serial
 		incoming_chunks.clear()
 	incoming_chunks[part] = data
@@ -146,8 +163,20 @@ func snapshot_chunk(serial: int, part: int, total: int, raw_size: int, data: Pac
 	for index in total: packed.append_array(incoming_chunks[index])
 	var decoded: Variant = bytes_to_var(packed.decompress(raw_size, FileAccess.COMPRESSION_ZSTD))
 	incoming_chunks.clear()
-	if decoded is Dictionary: snapshot_received.emit(SNAPSHOT_CODEC.restore(decoded))
+	if decoded is Dictionary:
+		last_complete_sequence = serial
+		snapshots_received += 1
+		var observed := snapshots_received + snapshots_lost
+		snapshot_loss_percent = 100.0 * float(snapshots_lost) / maxf(1.0, float(observed))
+		var restored := SNAPSHOT_CODEC.restore(decoded)
+		if restored.has("pv") and not snapshot_player_template.is_empty():
+			restored["players"] = SNAPSHOT_CODEC.expand_players(restored, snapshot_player_template)
+			restored.erase("pv")
+		snapshot_received.emit(restored)
 
 @rpc("authority", "call_remote", "reliable", 2)
 func match_events(events: Array) -> void:
+	for event: Dictionary in events:
+		if event.get("snapshot", {}).has("players"):
+			snapshot_player_template = event.snapshot.players.duplicate(true)
 	events_received.emit(events)

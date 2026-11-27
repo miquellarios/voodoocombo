@@ -451,6 +451,7 @@ func _handle_events(events: Array) -> void:
 		if event.type == "player_hit" and int(event.dropped) >= GameConfig.JUICE_HEAVY_COINS: _camera_punch()
 		match str(event.type):
 			"deposit":
+				if int(event.team) >= 0 and int(event.team) < team_scores.size(): team_scores[int(event.team)] += int(event.value)
 				Fx.fly_coin(event.pos + OFFSET, event.base + OFFSET)
 				Sfx.play_tone(420,0.04)
 			"round_over":
@@ -668,8 +669,9 @@ func _update_hud() -> void:
 		if ping == null:
 			ping = _hud_label(hud_root, Vector2(1150, 78), Vector2(110,28),18, HORIZONTAL_ALIGNMENT_RIGHT)
 			ping.name = "Ping"
-		ping.text = "%d ms" % ping_ms
-		ping.modulate = Color.GREEN if ping_ms < 80 else (Color.YELLOW if ping_ms < 150 else Color.RED)
+		var unstable := Net.snapshot_loss_percent > GameConfig.NET_UNSTABLE_LOSS_PERCENT
+		ping.text = (I18n.t("connection_unstable") + " · " if unstable else "") + "%d ms" % ping_ms
+		ping.modulate = Color.RED if unstable or ping_ms >= 150 else (Color.YELLOW if ping_ms >= 80 else Color.GREEN)
 	var time_label := hud_root.get_node_or_null("Timer") as Label
 	if time_label:
 		var seconds := maxi(0, ceili(remaining))

@@ -239,6 +239,9 @@ func _init() -> void:
 	strings.es.merge({"press_spell": "Pulsa"}, true)
 	strings.ca.merge({"press_spell": "Prem"}, true)
 	strings.en.merge({"press_spell": "Press"}, true)
+	strings.es.merge({"connection_unstable": "Conexión inestable"}, true)
+	strings.ca.merge({"connection_unstable": "Connexió inestable"}, true)
+	strings.en.merge({"connection_unstable": "Unstable connection"}, true)
 
 func t(key: String) -> String:
 	return str(strings.get(language, strings.es).get(key, key))

@@ -121,21 +121,26 @@ func _prepare_match(room: Dictionary) -> void:
 	room.sim.setup({"seed": room.vote.seed_value, "arena_id": room.arena_id, "mode": room.mode, "duration": room.duration, "players": LobbyRules.roster(room)})
 	room["inputs"] = {}
 	room["sequences"] = {}
+	room["applied_sequences"] = {}
+	room["input_queue"] = {}
 	room["action_sequences"] = {}
 	room["snapshot_left"] = 0.0
-	room["last_coins"] = []
+	room["coin_snapshot_left"] = 0.0
+	room["last_coin_marker"] = []
+	room["max_snapshot_bytes"] = 0
 
 func _accept_input(room: Dictionary, sender: int, action: String, data: Dictionary) -> void:
 	var seq := int(data.get("seq", -1))
 	if seq < 0 or seq > 2147483647: return
-	var input: Dictionary = room.inputs.get(sender, {"move": Vector2.ZERO, "dash": false, "spell": false, "time": 0})
 	if action == "input":
 		if seq <= int(room.sequences.get(sender, -1)): return
 		var move: Vector2 = data.move
 		if not move.is_finite(): return
-		input.move = move.limit_length()
-		input.time = Time.get_ticks_msec()
+		var queue: NetInputQueue = room.input_queue.get(sender, NetInputQueue.new())
+		queue.enqueue(seq, move, Time.get_ticks_msec())
+		room.input_queue[sender] = queue
 		room.sequences[sender] = seq
+	var input: Dictionary = room.inputs.get(sender, {"dash": false, "spell": false})
 	for ability in ["dash", "spell"]:
 		var requested: bool = (str(data.action) == ability) if action == "intent" else bool(data.get(ability, false))
 		var key := "%d:%s" % [sender, ability]
@@ -146,9 +151,15 @@ func _accept_input(room: Dictionary, sender: int, action: String, data: Dictiona
 
 func _step_match(room: Dictionary) -> void:
 	var inputs: Array[Dictionary] = []
+	var now := Time.get_ticks_msec()
 	for player: Dictionary in room.sim.players:
-		var input: Dictionary = room.inputs.get(int(player.peer_id), {}).duplicate()
-		if Time.get_ticks_msec() - int(input.get("time", 0)) > int(GameConfig.NET_INPUT_TIMEOUT * 1000): input["move"] = Vector2.ZERO
+		var peer_id := int(player.peer_id)
+		var queue: NetInputQueue = room.input_queue.get(peer_id, NetInputQueue.new())
+		var queued_input := queue.consume(now)
+		if int(queued_input.seq) >= 0: room.applied_sequences[peer_id] = int(queued_input.seq)
+		room.input_queue[peer_id] = queue
+		var input: Dictionary = room.inputs.get(peer_id, {"dash":false, "spell":false}).duplicate()
+		input["move"] = queued_input.move
 		inputs.append(input)
 	room.sim.step(GameConfig.NET_TICK, inputs)
 	for input: Dictionary in room.inputs.values():
@@ -160,15 +171,24 @@ func _step_match(room: Dictionary) -> void:
 			if event.type == "match_over":
 				event["snapshot"] = room.sim.snapshot()
 				room.phase = "results"
-				Net.log_line("match over %s" % str(room.code))
+				Net.log_line("match over %s; max compressed snapshot %d B" % [str(room.code), int(room.max_snapshot_bytes)])
 				_save_result(room, event)
 		for player: Dictionary in room.players:
 			if Net.can_send(int(player.peer_id)): Net.match_events.rpc_id(int(player.peer_id), events)
 	room.snapshot_left -= GameConfig.NET_TICK
 	if room.snapshot_left <= 0.0:
 		room.snapshot_left += GameConfig.NET_SNAPSHOT_TICK
-		var snapshot := SNAPSHOT_CODEC.prepare(room.sim.snapshot(), room.sequences)
-		# Se envía el estado completo comprimido: perder un paquete no deja posiciones ni monedas desactualizadas.
+		room.coin_snapshot_left -= GameConfig.NET_SNAPSHOT_TICK
+		var coin_marker: Array = []
+		for coin: Dictionary in room.sim.coins:
+			coin_marker.append([roundi(coin.pos.x), roundi(coin.pos.y), int(coin.get("owner", -1))])
+		var include_coins: bool = coin_marker != room.last_coin_marker or room.coin_snapshot_left <= 0.0
+		if include_coins:
+			room.last_coin_marker = coin_marker
+			room.coin_snapshot_left = GameConfig.NET_COIN_FULL_SNAPSHOT_SECONDS
+		var snapshot := SNAPSHOT_CODEC.prepare(room.sim.snapshot(), room.applied_sequences, include_coins)
+		var packed_size := var_to_bytes(snapshot).compress(FileAccess.COMPRESSION_ZSTD).size()
+		room.max_snapshot_bytes = maxi(int(room.max_snapshot_bytes), packed_size)
 		for player: Dictionary in room.players: Net.send_snapshot(int(player.peer_id), snapshot)
 
 func _publish(room: Dictionary) -> void:

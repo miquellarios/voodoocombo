@@ -20,6 +20,16 @@ func _initialize() -> void:
 			push_error("Compact snapshot did not restore client render defaults")
 			quit(1)
 			return
+		var expanded_players := SNAPSHOT_CODEC.expand_players(restored, sim.players)
+		if expanded_players.size() != 4 or expanded_players[0].pos.distance_to(sim.players[0].pos) > 1.0 or expanded_players[0].score != sim.players[0].score:
+			push_error("Compact player view did not restore visible values")
+			quit(1)
+			return
+		var coinless := SNAPSHOT_CODEC.prepare(sim.snapshot(), acknowledgements, false)
+		if coinless.has("coins"):
+			push_error("Coin list was sent during a non-refresh snapshot")
+			quit(1)
+			return
 		var compact_sample: Dictionary = packet.duplicate(true)
 		compact_sample.hazard_runtime[0] = [1, 2, 125.0, 275.0]
 		compact_sample.hazard_runtime[1] = [2, 3, 0.4]
@@ -32,8 +42,8 @@ func _initialize() -> void:
 		var compressed := bytes.compress(FileAccess.COMPRESSION_ZSTD)
 		largest_compressed = maxi(largest_compressed, compressed.size())
 		print("%s four-player snapshot: %d B raw, %d B compressed" % [arena_id, bytes.size(), compressed.size()])
-	if largest_compressed > 1536:
-		push_error("Snapshot exceeds 1.5 KB: %d B" % largest_compressed)
+	if largest_compressed >= GameConfig.NET_CHUNK_BYTES:
+		push_error("Snapshot exceeds one packet: %d B" % largest_compressed)
 		quit(1)
 		return
 	quit(0)

@@ -7,7 +7,7 @@ var results: Array[Dictionary] = []
 var current_status: Dictionary = {"mode": "", "time": 0, "players": []}
 
 func _ready() -> void:
-	if "--server" in OS.get_cmdline_user_args():
+	if "--server" in OS.get_cmdline_user_args() and "--no-http" not in OS.get_cmdline_user_args():
 		var error := start()
 		if error != OK:
 			push_error("HTTP endpoint no pudo abrir el puerto %d (%d)" % [PORT, error])

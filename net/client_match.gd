@@ -1,6 +1,8 @@
 class_name ClientMatch
 extends RefCounted
 
+const SNAPSHOT_CODEC = preload("res://net/snapshot_codec.gd")
+
 var state: Dictionary = {}
 var frames: Array[Dictionary] = []
 var player_index := 0
@@ -8,7 +10,11 @@ var peer_id := 0
 var predicted := Vector2.ZERO
 var target := Vector2.ZERO
 var correction := false
+var correction_duration := GameConfig.NET_CORRECTION_SMALL_SECONDS
 var clock := 0.0
+var last_snapshot_arrival_ms := -1
+var jitter_average_ms := 0.0
+var interpolation_delay := GameConfig.NET_INTERPOLATION_SECONDS
 var seq := 0
 var dash_left := 0.0
 var pending: Array[Dictionary] = []
@@ -27,7 +33,17 @@ func setup(initial: Dictionary, id: int) -> void:
 
 func receive(snapshot: Dictionary) -> void:
 	if float(snapshot.elapsed) < float(state.elapsed): return
-	state.merge(snapshot.duplicate(true), true)
+	var expanded := snapshot.duplicate(true)
+	if expanded.has("pv"):
+		expanded["players"] = SNAPSHOT_CODEC.expand_players(expanded, state.get("players", []))
+		expanded.erase("pv")
+	var arrival := Time.get_ticks_msec()
+	if last_snapshot_arrival_ms >= 0:
+		var jitter := absf(float(arrival - last_snapshot_arrival_ms) - 1000.0 * GameConfig.NET_SNAPSHOT_TICK)
+		jitter_average_ms = lerpf(jitter_average_ms, jitter, 0.2)
+		interpolation_delay = clampf(GameConfig.NET_INTERPOLATION_SECONDS + jitter_average_ms * GameConfig.NET_SNAPSHOT_JITTER_SCALE / 1000.0, GameConfig.NET_INTERPOLATION_SECONDS, GameConfig.NET_INTERPOLATION_MAX_SECONDS)
+	last_snapshot_arrival_ms = arrival
+	state.merge(expanded, true)
 	frames.append({"time": float(state.elapsed), "players": state.players.duplicate(true)})
 	while frames.size() > 12: frames.pop_front()
 	clock = maxf(clock, float(state.elapsed))
@@ -38,7 +54,9 @@ func receive(snapshot: Dictionary) -> void:
 		target = _move(target, input.move, float(input.dt), bool(input.dash))
 	var error := predicted.distance_to(target)
 	if error > GameConfig.NET_CORRECT_SNAP: predicted = target; correction = false
-	elif error >= GameConfig.NET_CORRECT_MIN: correction = true
+	elif error >= GameConfig.NET_CORRECT_MIN:
+		correction = true
+		correction_duration = GameConfig.NET_CORRECTION_SMALL_SECONDS if error < GameConfig.NET_CORRECT_MEDIUM else GameConfig.NET_CORRECTION_MEDIUM_SECONDS
 
 func predict(move: Vector2, delta: float, dash: bool) -> void:
 	seq += 1
@@ -54,7 +72,7 @@ func _move(position: Vector2, move: Vector2, delta: float, dashing: bool) -> Vec
 	var player: Dictionary = state.players[player_index]
 	if bool(player.get("ghost",false)):
 		return (position + move.limit_length() * delta * GameConfig.PLAYER_SPEED * GameConfig.SURVIVAL_GHOST_SPEED).clamp(Vector2.ZERO,GameConfig.ARENA_SIZE)
-	if float(player.stun) > 0 or float(player.rooted_left) > 0: return position
+	if float(player.stun) > 0 or float(player.rooted_left) > 0: move = Vector2.ZERO
 	var speed := GameConfig.PLAYER_SPEED
 	if state.mode == "greed": speed *= TeamRules.speed(int(player.coins))
 	if SpellRules.is_active(player, "boots"): speed *= 1.6
@@ -70,15 +88,24 @@ func _move(position: Vector2, move: Vector2, delta: float, dashing: bool) -> Vec
 		speed *= GameConfig.DASH_MULTIPLIER
 		if move.length() < 0.1: move = player.dash_dir
 	var feet := position + Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
-	return ArenaPhysics.move_circle(feet, move.limit_length() * speed * delta, GameConfig.PLAYER_FOOT_RADIUS, state.player_hitbox_rects) - Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
+	var moved := ArenaPhysics.move_circle(feet, move.limit_length() * speed * delta, GameConfig.PLAYER_FOOT_RADIUS, state.player_hitbox_rects) - Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
+	for hazard: Dictionary in state.arena.get("hazards", []):
+		if hazard.get("type") != "cinta": continue
+		var direction := Vector2(hazard.get("dir", [1.0, 0.0])[0], hazard.get("dir", [1.0, 0.0])[1]).normalized()
+		for tile in hazard.get("tiles", []):
+			var conveyor_rect := Rect2(Vector2(float(tile[0]), float(tile[1])), Vector2(float(tile[2]), float(tile[3])))
+			if conveyor_rect.has_point(moved):
+				var conveyor_feet := moved + Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
+				moved = ArenaPhysics.move_circle(conveyor_feet, direction * GameConfig.CONVEYOR_SPEED * delta, GameConfig.PLAYER_FOOT_RADIUS, state.player_hitbox_rects) - Vector2(0,GameConfig.PLAYER_FOOT_OFFSET)
+	return moved
 
 func render(delta: float) -> Dictionary:
 	clock += delta
 	if correction:
-		predicted = predicted.lerp(target, minf(1.0, delta * GameConfig.NET_CORRECT_SPEED))
+		predicted = predicted.lerp(target, minf(1.0, delta / maxf(0.001, correction_duration)))
 		if predicted.distance_to(target) < 1.0: correction = false
 	var result := state.duplicate(true)
-	var render_time := clock - GameConfig.NET_INTERPOLATION_SECONDS
+	var render_time := clock - interpolation_delay
 	var before: Dictionary = {}
 	var after: Dictionary = {}
 	for frame in frames:

@@ -2,6 +2,13 @@
 
 ## Registro de Codex
 
+### Fase 14b — cola de entrada y snapshots de un paquete
+- El servidor encola hasta seis entradas por jugador, aplica una por tick y dos cuando hay más de tres acumuladas; repite la última dirección hasta 0,25 s y el `ack` solo avanza cuando esa secuencia se aplica. Dash y hechizo conservan su intención fiable.
+- Los snapshots comprimen los campos visibles de jugadores, excluyen campos internos y refrescan doblones al cambiar o cada segundo. Ping usa el canal 3 no fiable; la interpolación se adapta entre 100 y 160 ms por jitter, la corrección usa 0,2/0,1 s y los dashes solo saltan por encima de 96 px. La predicción incluye cinta y lodo. El HUD señala pérdida de snapshots superior al 5 %.
+- Godot 4.7.2 pasó cola/timeout, codec y prueba de red de tres procesos con 30 s de movimiento, 0–60 ms de jitter y 5 % de snapshots omitidos: error medio reconciliado 1,11 px (30/600 omitidos). Cuatro arenas y cuatro jugadores dieron 841–847 B comprimidos; el servidor registró un máximo de 947 B en la partida ENet.
+- La prueba multiproceso existente llegó a completar la partida y todos los clientes imprimieron `MATCH PASS`; su script no aporta un código de salida legible en este entorno y el endpoint HTTP no pudo enlazar el puerto 8080. La prueba específica 14b evita ese puerto y sí concluyó.
+- Humanos: jugar con dos PCs en wifi y repetir con VPN; validar continuidad del movimiento, interpolación, indicador de ping/pérdida y que la cinta mueve al jugador predicho.
+
 ### Fase 14a — cierre del bucle de racha y textos acotados
 - Copiada la fuente de verdad de fase 14 a `AGENTS.md` y archivados el enunciado, sus capturas de referencia y la imagen de conexión online.
 - `_finish_pickup_streak()` ahora guarda y reinicia su estado antes de crear UI, calcula el destino con coordenadas de `Control`, limita las etiquetas del HUD a 12 y vacía la racha al acabar la partida. El marcador actualiza el valor local aunque la racha siga activa. `Fx` también recorta su cola a 12 textos y se avisa una sola vez si el árbol de nodos crece más de 500 durante la partida.

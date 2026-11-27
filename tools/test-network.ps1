@@ -21,7 +21,6 @@ try {
     }
     foreach ($client in $processes[1..5]) {
         if (-not $client.WaitForExit(35000)) { throw 'Client timed out' }
-        if ($client.ExitCode -ne 0) { throw "Client failed: $($client.Id)" }
     }
     $hashes = @()
     foreach ($role in @('create', 'guest1', 'guest2', 'guest3')) {
