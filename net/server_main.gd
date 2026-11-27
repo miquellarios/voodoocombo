@@ -8,15 +8,17 @@ var rate_limits: Dictionary = {}
 var vote_publish := 0.0
 var accumulator := 0.0
 var session_xp: Dictionary = {}
+var lan_ad_elapsed := 0.0
+var listen_port := GameConfig.NET_PORT
 
 func _ready() -> void:
 	Net.request_received.connect(_request)
 	Net.peer_left.connect(_depart)
-	var port := GameConfig.NET_PORT
+	LanDiscovery.start_discovery(GameConfig.LAN_DISCOVERY_PORT)
 	var args := OS.get_cmdline_user_args()
-	var index := args.find("--port")
-	if index >= 0 and index + 1 < args.size(): port = int(args[index + 1])
-	var error := Net.start_server(port)
+	var arg_index := args.find("--port")
+	if arg_index >= 0 and arg_index + 1 < args.size(): listen_port = int(args[arg_index + 1])
+	var error := Net.start_server(listen_port)
 	if error != OK:
 		push_error("ENet: %s" % error_string(error))
 		get_tree().quit(1)
@@ -53,6 +55,31 @@ func _process(delta: float) -> void:
 				if not bool(player.get("disconnected", false)): status.players.append({"name": player.name, "score": player.score})
 		public_rooms.append(status)
 	HttpEndpoint.set_status({"rooms": public_rooms})
+	lan_ad_elapsed += delta
+	if lan_ad_elapsed >= 1.0:
+		lan_ad_elapsed = 0.0
+		var open_rooms: Array = rooms.values().filter(func(value: Dictionary) -> bool: return value.phase in ["lobby", "voting"])
+		if open_rooms.is_empty():
+			LanDiscovery.stop_advertising()
+		else:
+			var addresses := NetworkAddresses.candidates()
+			var lan_address := ""
+			for candidate: Dictionary in addresses:
+				if int(candidate.rank) >= 2:
+					lan_address = str(candidate.ip)
+					break
+			if lan_address.is_empty() and not addresses.is_empty(): lan_address = str(addresses[0].ip)
+			if not lan_address.is_empty():
+				var advertisements: Array[Dictionary] = []
+				for room: Dictionary in open_rooms:
+					var host := "VoodooCombo"
+					var player_count := 0
+					for player: Dictionary in room.players:
+						if not bool(player.get("is_bot", false)):
+							player_count += 1
+							if int(player.peer_id) == int(room.host): host = str(player.name)
+					advertisements.append({"code": room.code, "host": host, "mode": room.mode, "players": "%d" % player_count, "player_count": player_count, "version": GameConfig.NET_VERSION, "ip": lan_address, "port": listen_port})
+				LanDiscovery.start_advertising({"kind": "rooms", "rooms": advertisements})
 
 func _request(sender: int, action: String, data: Dictionary) -> void:
 	if sender <= 1 or var_to_bytes(data).size() > GameConfig.RPC_MAX_BYTES or not _allow(sender, action): return

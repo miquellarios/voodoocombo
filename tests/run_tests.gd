@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_test_match_sim()
 	_test_settings_state()
 	_test_history_i18n()
+	_test_invite_codes()
 	if failures == 0:
 		print("All VoodooCombo core tests passed")
 		quit(0)
@@ -67,6 +68,19 @@ func _test_history_i18n() -> void:
 		for mode in GameConfig.MODES:
 			_check(str(i18n.call("t", mode)) != mode, "history mode name is translated in " + language + ": " + mode)
 	i18n.call("set_language", old_language)
+
+func _test_invite_codes() -> void:
+	var decoded := InviteCode.decode(InviteCode.encode("KWET7", "192.168.1.42"))
+	_check(decoded.get("room") == "KWET7" and decoded.get("ip") == "192.168.1.42" and int(decoded.get("port", 0)) == GameConfig.NET_PORT, "invite code encodes and decodes a default-port IPv4 address")
+	var custom := InviteCode.decode(InviteCode.encode("AB234", "26.4.8.16", 8888))
+	_check(custom.get("ip") == "26.4.8.16" and int(custom.get("port", 0)) == 8888, "invite code preserves VPN address and custom port")
+	_check(InviteCode.decode("BAD-B2QX4MA").is_empty(), "invite code rejects a room code with the wrong length")
+	var candidates := NetworkAddresses.candidates([
+		{"name": "vEthernet (WSL)", "addresses": ["172.24.1.2"]},
+		{"name": "Ethernet", "addresses": ["192.168.1.42"]},
+		{"name": "Tailscale", "addresses": ["100.88.9.3"]}
+	])
+	_check(candidates.size() == 2 and candidates[0].ip == "100.88.9.3", "VPN addresses rank before LAN and virtual adapters are excluded")
 
 func _test_scoring() -> void:
 	_check(Scoring.multiplier(4) == 1 and Scoring.multiplier(5) == 2, "combo x2 threshold")

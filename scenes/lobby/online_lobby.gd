@@ -16,7 +16,17 @@ var roster: Array[Dictionary] = []
 var view: Control
 var notice: Label
 var code_field: LineEdit
-var ip_field: LineEdit
+var invite_field: LineEdit
+var lan_list: VBoxContainer
+var discovered_rooms: Dictionary = {}
+var lan_refresh_elapsed := 0.0
+var invite_lookup_code := ""
+var invite_lookup_elapsed := 0.0
+var mapper := UPNPMapper.new()
+var external_address := ""
+var network_interfaces: Array[Dictionary] = []
+var selected_interface := 0
+var upnp_status := ""
 var wheel: Control
 var clock_label: Label
 var local_id := 2
@@ -27,6 +37,7 @@ var target_address := ""
 var connection_pending := false
 var connection_elapsed := 0.0
 var retry_elapsed := 0.0
+var retry_count := 0
 var hosting_here := false
 var local_host_ip := ""
 var pending_mode := "voodoo"
@@ -44,6 +55,9 @@ func _ready() -> void:
 	Net.room_failed.connect(_error)
 	Net.disconnected.connect(_error)
 	Net.events_received.connect(_events)
+	LanDiscovery.room_found.connect(_on_lan_room_found)
+	mapper.finished.connect(_on_upnp_finished)
+	LanDiscovery.start_discovery()
 	if not Net.room.is_empty(): _room_changed(Net.room)
 	else: _entry()
 
@@ -52,7 +66,7 @@ func _new_view() -> void:
 	view = Control.new()
 	view.size = size
 	add_child(view)
-	notice = _label("", Vector2(80, 130), Vector2(1120, 60), 24)
+	notice = _label("", Vector2(80, 588), Vector2(1120, 40), 24)
 
 func _label(value: String, at: Vector2, dimensions: Vector2, font_size: int = 24) -> Label:
 	var node := Label.new()
@@ -77,39 +91,161 @@ func _button(key: String, at: Vector2, dimensions: Vector2, action: Callable) ->
 
 func _entry() -> void:
 	_new_view()
-	_label(I18n.t("online"), Vector2(0, 55), Vector2(1280, 65), 40)
-	_button("host_here", GameConfig.ONLINE_HOST_BUTTON_POSITION, GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _mode_select("create")).grab_focus()
-	ip_field = LineEdit.new()
-	ip_field.max_length = GameConfig.SETTINGS_INPUT_MAX_LENGTH
-	ip_field.placeholder_text = I18n.t("host_ip")
-	ip_field.text = Settings.join_host
-	ip_field.position = GameConfig.ONLINE_IP_FIELD_POSITION
-	ip_field.size = GameConfig.ONLINE_IP_FIELD_SIZE
-	ip_field.text_submitted.connect(func(value: String) -> void: Settings.join_host = value.strip_edges(); Settings.save(); _connect_to("join"))
-	view.add_child(ip_field)
-	code_field = LineEdit.new()
-	code_field.max_length = GameConfig.ROOM_CODE_LENGTH
-	code_field.placeholder_text = I18n.t("room_code")
-	code_field.position = GameConfig.ONLINE_CODE_FIELD_POSITION
-	code_field.size = GameConfig.ONLINE_CODE_FIELD_SIZE
-	code_field.text_changed.connect(func(value: String):
-		var caret := code_field.caret_column
-		code_field.text = value.to_upper()
-		code_field.caret_column = caret
-	)
-	view.add_child(code_field)
-	_button("join_room", Vector2(390, 380), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _connect_to("join"))
-	_button("bots", Vector2(390, 455), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): _mode_select("bots"))
-	_button("network_help", Vector2(390, 528), GameConfig.ONLINE_ACTION_BUTTON_SIZE, _open_network_help)
-	_button("menu", Vector2(390, 600), GameConfig.ONLINE_ACTION_BUTTON_SIZE, func(): exit_requested.emit())
+	_refresh_interfaces()
+	_label(I18n.t("online"), Vector2(0, 38), Vector2(1280, 60), 40)
+	_entry_panel(Rect2(52, 112, 550, 510))
+	_entry_panel(Rect2(630, 112, 598, 510))
+	_label(I18n.t("online_create_title"), Vector2(80, 132), Vector2(490, 44), 28)
+	_button("host_here", Vector2(95, 195), Vector2(460, 58), func(): _mode_select("create")).grab_focus()
+	_label(I18n.t("online_host_hint"), Vector2(95, 263), Vector2(460, 48), 18)
+	_label(I18n.t("online_check_lan"), Vector2(95, 320), Vector2(460, 32), 17)
+	_label(("✓ " if external_address != "" else "… ") + (I18n.t("online_check_upnp_ok") if external_address != "" else I18n.t("online_check_upnp_idle")), Vector2(95, 356), Vector2(460, 40), 17)
+	_button("network_help", Vector2(95, 404), Vector2(460, 48), _open_network_help)
+	var change_network := _button("online_network_change", Vector2(95, 462), Vector2(460, 44), _cycle_interface)
+	if not network_interfaces.is_empty():
+		change_network.text = I18n.t("online_network_label") % [str(network_interfaces[selected_interface].name), str(network_interfaces[selected_interface].ip)]
+	_label(I18n.t("online_join_title"), Vector2(656, 132), Vector2(540, 40), 28)
+	_label(I18n.t("online_lan_rooms"), Vector2(656, 178), Vector2(540, 30), 20)
+	lan_list = VBoxContainer.new()
+	lan_list.position = Vector2(656, 214)
+	lan_list.size = Vector2(540, 188)
+	view.add_child(lan_list)
+	_label(I18n.t("online_invite_prompt"), Vector2(656, 414), Vector2(540, 30), 18)
+	invite_field = LineEdit.new()
+	invite_field.max_length = 32
+	invite_field.placeholder_text = I18n.t("online_invite_placeholder")
+	invite_field.position = Vector2(656, 449)
+	invite_field.size = Vector2(338, 48)
+	view.add_child(invite_field)
+	code_field = invite_field
+	_button("online_paste", Vector2(1004, 449), Vector2(192, 48), _paste_invite)
+	_button("join_room", Vector2(656, 506), Vector2(540, 48), _join_invite)
+	_button("bots", Vector2(300, 640), Vector2(300, 48), func(): _mode_select("bots"))
+	if not GameConfig.ONLINE_HOST.is_empty():
+		_button("online_oracle", Vector2(620, 640), Vector2(300, 48), _join_oracle)
+	_button("menu", Vector2(940, 640), Vector2(260, 48), func(): exit_requested.emit())
+	_refresh_room_list()
 
-func _connect_to(action: String) -> void:
+func _entry_panel(rect: Rect2) -> Panel:
+	var panel := Panel.new()
+	panel.position = rect.position
+	panel.size = rect.size
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("170f20", 0.96)
+	style.border_color = Color("5c496d")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	panel.add_theme_stylebox_override("panel", style)
+	view.add_child(panel)
+	return panel
+
+func _refresh_interfaces() -> void:
+	network_interfaces = NetworkAddresses.candidates()
+	selected_interface = clampi(selected_interface, 0, maxi(0, network_interfaces.size() - 1))
+
+func _cycle_interface() -> void:
+	_refresh_interfaces()
+	if network_interfaces.size() > 1: selected_interface = (selected_interface + 1) % network_interfaces.size()
+	if is_instance_valid(view): _entry()
+
+func _refresh_room_list() -> void:
+	if not is_instance_valid(lan_list): return
+	for code: String in discovered_rooms.keys():
+		if Time.get_ticks_msec() - int(discovered_rooms[code].get("seen_at", 0)) > GameConfig.LAN_DISCOVERY_STALE_SECONDS * 1000.0: discovered_rooms.erase(code)
+	for child in lan_list.get_children(): child.queue_free()
+	for code: String in discovered_rooms.keys():
+		var info: Dictionary = discovered_rooms[code]
+		var row := HBoxContainer.new()
+		row.custom_minimum_size.y = 42
+		lan_list.add_child(row)
+		var label := Label.new()
+		var version_ok := str(info.get("version", "")) == GameConfig.NET_VERSION
+		label.text = "%s · %s · %s/%d" % [str(info.get("host", "?")), I18n.t(str(info.get("mode", "voodoo"))), str(info.get("players", "1")), GameConfig.ROOM_CAPACITY]
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if not version_ok:
+			label.text += " · " + I18n.t("online_version_different")
+			label.modulate = Color("817b88")
+		row.add_child(label)
+		var enter := Button.new()
+		enter.text = I18n.t("online_enter")
+		enter.disabled = not version_ok or int(info.get("player_count", 0)) >= GameConfig.ROOM_CAPACITY
+		enter.pressed.connect(func(): _connect_resolved(str(info.get("ip", "")), int(info.get("port", GameConfig.NET_PORT)), code))
+		row.add_child(enter)
+	if discovered_rooms.is_empty():
+		var empty := Label.new()
+		empty.text = I18n.t("online_no_rooms")
+		lan_list.add_child(empty)
+
+func _on_lan_room_found(info: Dictionary) -> void:
+	var code := str(info.get("code", ""))
+	if code.is_empty(): return
+	discovered_rooms[code] = info
+	if invite_lookup_code == code and not connection_pending:
+		invite_lookup_elapsed = 0.0
+		_connect_resolved(str(info.get("ip", "")), int(info.get("port", GameConfig.NET_PORT)), code)
+
+func _on_upnp_finished(result: Dictionary) -> void:
+	external_address = str(result.get("ip", "")) if bool(result.get("mapped", false)) else ""
+	upnp_status = "mapped" if not external_address.is_empty() else "unavailable"
+	if not room.is_empty() and hosting_here: _build_room()
+
+func _paste_invite() -> void:
+	invite_field.text = DisplayServer.clipboard_get().strip_edges()
+	invite_field.grab_focus()
+
+func _join_invite() -> void:
+	var text := invite_field.text.strip_edges().to_upper()
+	var decoded := InviteCode.decode(text)
+	if not decoded.is_empty():
+		var local_room: Dictionary = discovered_rooms.get(str(decoded.room), {})
+		var address := str(local_room.get("ip", decoded.ip))
+		_connect_resolved(address, int(decoded.port), str(decoded.room))
+		return
+	var room_code := text.replace("-", "")
+	if room_code.length() != GameConfig.ROOM_CODE_LENGTH:
+		notice.text = I18n.t("online_invite_invalid")
+		return
+	room_code = room_code.to_upper()
+	if discovered_rooms.has(room_code):
+		var info: Dictionary = discovered_rooms[room_code]
+		_connect_resolved(str(info.get("ip", "")), int(info.get("port", GameConfig.NET_PORT)), room_code)
+	else:
+		invite_lookup_code = room_code
+		invite_lookup_elapsed = 0.001
+		LanDiscovery.request_room(room_code)
+		notice.text = I18n.t("online_searching_room") % room_code
+
+func _connect_resolved(address: String, port: int, code: String) -> void:
+	if address.is_empty():
+		notice.text = I18n.t("online_address_missing")
+		return
+	Settings.server_port = clampi(port, 1, 65535)
+	invite_field.text = code
+	code_field = invite_field
+	connecting_action = "join"
+	_connect_to("join", address)
+
+func _join_oracle() -> void:
+	Settings.server_host = GameConfig.ONLINE_HOST
+	Settings.server_port = GameConfig.NET_PORT
+	_connect_to("join", GameConfig.ONLINE_HOST)
+
+func _network_panel_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("170f20")
+	style.border_color = GameConfig.EMBER
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	return style
+
+func _connect_to(action: String, address: String = "") -> void:
 	if connection_pending: return
 	connecting_action = action
 	local = false
 	hosting_here = action == "create"
 	if hosting_here:
-		local_host_ip = _find_private_ipv4()
+		_refresh_interfaces()
+		local_host_ip = str(network_interfaces[selected_interface].ip) if not network_interfaces.is_empty() else ""
 		var server_pid := Net.start_host_server(Settings.server_port)
 		if server_pid <= 0:
 			hosting_here = false
@@ -117,19 +253,20 @@ func _connect_to(action: String) -> void:
 			return
 		Net.hosted_server_ip = local_host_ip
 		target_address = "127.0.0.1"
+		mapper.start(Settings.server_port)
 	else:
-		target_address = ip_field.text.strip_edges()
+		target_address = address.strip_edges()
 		if target_address.is_empty(): target_address = Settings.server_host
-		Settings.join_host = ip_field.text.strip_edges()
-		Settings.save()
 	connection_pending = true
 	connection_elapsed = 0.0
 	retry_elapsed = 0.0
+	retry_count = 0
 	notice.text = I18n.t("connecting")
 	_attempt_connect()
 
 func _attempt_connect() -> void:
 	retry_elapsed = 0.0
+	retry_count += 1
 	Net.join_server(target_address, Settings.server_port)
 
 func _connected() -> void:
@@ -139,7 +276,7 @@ func _connected() -> void:
 	if connecting_action == "create":
 		Net.create_room.rpc_id(1, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION, pending_mode)
 	else:
-		Net.join_room.rpc_id(1, code_field.text, Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION)
+		Net.join_room.rpc_id(1, invite_field.text.strip_edges().to_upper(), Profile.nick, Profile.character, Profile.cosmetics, GameConfig.NET_VERSION)
 
 func _mode_select(action: String) -> void:
 	_new_view()
@@ -180,12 +317,25 @@ func _mode_select(action: String) -> void:
 		button.pressed.connect(func() -> void:
 			pending_mode = mode_id
 			if action == "bots": _local_room(mode_id)
-			else: _connect_to("create")
+			else: _request_host()
 		)
 		view.add_child(button)
 		card_buttons.append(button)
 	_button("menu", Vector2(490, 638), Vector2(300, 54), _entry)
 	if not card_buttons.is_empty(): card_buttons[0].grab_focus()
+
+func _request_host() -> void:
+	if Settings.firewall_notice_shown:
+		_connect_to("create")
+		return
+	var dialog := ConfirmationDialog.new()
+	dialog.title = I18n.t("online_firewall_title")
+	dialog.dialog_text = I18n.t("online_firewall_text")
+	get_tree().root.add_child(dialog)
+	dialog.confirmed.connect(func(): Settings.firewall_notice_shown = true; Settings.save(); dialog.queue_free(); _connect_to("create"))
+	dialog.canceled.connect(func(): dialog.queue_free())
+	dialog.close_requested.connect(func(): dialog.queue_free())
+	dialog.popup_centered(Vector2i(620, 230))
 
 func _add_mode_illustration(mode_id: String, at: Vector2, include_detail: bool = true) -> void:
 	if mode_id == "voodoo":
@@ -271,10 +421,16 @@ func _build_room() -> void:
 		_label(I18n.t("room_code") + "  " + str(room.code), Vector2(20, 30), Vector2(360, 60), 26)
 		_button("copy", Vector2(35, 94), Vector2(150, 42), func(): DisplayServer.clipboard_set(str(room.code)))
 	if hosting_here:
-		var address_text := local_host_ip if not local_host_ip.is_empty() else I18n.t("host_ip_none")
-		_label(I18n.t("hosting_ip") % address_text, Vector2(20, 144), Vector2(375, 48), 18)
-		_button("copy_ip", Vector2(25, 197), Vector2(160, 42), func(): if not local_host_ip.is_empty(): DisplayServer.clipboard_set(local_host_ip))
-		_button("network_help", Vector2(195, 197), Vector2(200, 42), _open_network_help)
+		var invite_ip := external_address if not external_address.is_empty() else local_host_ip
+		var invite := InviteCode.encode(str(room.code), invite_ip, Settings.server_port)
+		_label(I18n.t("online_invite_label"), Vector2(20, 137), Vector2(390, 32), 18)
+		var invite_text := _label(invite if not invite.is_empty() else I18n.t("online_invite_pending"), Vector2(20, 169), Vector2(390, 42), 20)
+		invite_text.add_theme_color_override("font_color", GameConfig.EMBER)
+		_button("online_copy_invite", Vector2(25, 215), Vector2(190, 42), func(): if not invite.is_empty(): DisplayServer.clipboard_set(invite))
+		_button("network_help", Vector2(225, 215), Vector2(180, 42), _open_network_help)
+		var interface_text := I18n.t("online_network_label") % [str(network_interfaces[selected_interface].name), invite_ip] if not network_interfaces.is_empty() else I18n.t("host_ip_none")
+		_label(interface_text, Vector2(20, 259), Vector2(390, 44), 16)
+		_label(("✓ " if not external_address.is_empty() else "✕ ") + (I18n.t("online_check_upnp_ok") if not external_address.is_empty() else I18n.t("online_check_upnp_fail")), Vector2(20, 302), Vector2(390, 36), 16)
 	var mode_panel := Panel.new()
 	mode_panel.position = Vector2(430, 18)
 	mode_panel.size = Vector2(408, 158)
@@ -372,6 +528,8 @@ func _leave() -> void:
 		Net.leave_room.rpc_id(1)
 	Net.leave_server()
 	Net.stop_host_server()
+	mapper.close()
+	external_address = ""
 	hosting_here = false
 	exit_requested.emit()
 
@@ -414,13 +572,32 @@ func _find_private_ipv4() -> String:
 	return ""
 
 func _open_network_help() -> void:
-	var dialog := AcceptDialog.new()
-	dialog.title = I18n.t("network_help")
-	dialog.dialog_text = I18n.t("network_help_text")
-	get_tree().root.add_child(dialog)
-	dialog.confirmed.connect(func() -> void: dialog.queue_free())
-	dialog.close_requested.connect(func() -> void: dialog.queue_free())
-	dialog.popup_centered(Vector2i(700, 440))
+	var panel := Panel.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-350, -205)
+	panel.size = Vector2(700, 410)
+	panel.add_theme_stylebox_override("panel", _network_panel_style())
+	var title := Label.new()
+	title.text = I18n.t("network_help")
+	title.position = Vector2(30, 24)
+	title.size = Vector2(640, 42)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_override("font", ThemeBuilder.title_font(26))
+	panel.add_child(title)
+	var body := Label.new()
+	body.text = I18n.t("network_help_text")
+	body.position = Vector2(46, 84)
+	body.size = Vector2(608, 240)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	panel.add_child(body)
+	var back := Button.new()
+	back.text = I18n.t("back")
+	back.position = Vector2(230, 340)
+	back.size = Vector2(240, 48)
+	back.pressed.connect(panel.queue_free)
+	panel.add_child(back)
+	get_tree().root.add_child(panel)
 
 func _events(events: Array) -> void:
 	for event: Dictionary in events:
@@ -470,6 +647,19 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	mapper.poll()
+	if room.is_empty():
+		lan_refresh_elapsed += delta
+		if lan_refresh_elapsed >= GameConfig.LAN_DISCOVERY_INTERVAL_SECONDS:
+			lan_refresh_elapsed = 0.0
+			LanDiscovery.request_rooms()
+			_refresh_room_list()
+		if invite_lookup_elapsed > 0.0:
+			invite_lookup_elapsed += delta
+			if invite_lookup_elapsed >= 3.0:
+				invite_lookup_elapsed = 0.0
+				invite_lookup_code = ""
+				notice.text = I18n.t("online_room_not_found")
 	if connection_pending:
 		connection_elapsed += delta
 		retry_elapsed += delta
@@ -477,7 +667,7 @@ func _process(delta: float) -> void:
 			_connection_failed()
 		elif connection_elapsed >= GameConfig.NET_CONNECT_TIMEOUT_SECONDS:
 			_connection_failed()
-		elif retry_elapsed >= GameConfig.NET_CONNECT_RETRY_SECONDS:
+		elif retry_elapsed >= GameConfig.NET_CONNECT_RETRY_SECONDS and retry_count < GameConfig.NET_CONNECT_MAX_ATTEMPTS:
 			_attempt_connect()
 	if local and room.get("phase") == "voting":
 		if local_vote.step(delta):
@@ -488,6 +678,7 @@ func _process(delta: float) -> void:
 
 func _exit_tree() -> void:
 	if connection_pending and hosting_here: Net.stop_host_server()
+	mapper.close()
 
 func _draw() -> void:
 	draw_texture_rect(background, Rect2(Vector2.ZERO, size), false)

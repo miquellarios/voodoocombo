@@ -7,6 +7,7 @@ var server_host := "127.0.0.1"
 var join_host := ""
 var server_port := GameConfig.SETTINGS_PORT
 var server_choice := 2
+var firewall_notice_shown := false
 var ui_scale := 1.0
 var music_volume := 0.7
 var sfx_volume := 0.8
@@ -22,6 +23,7 @@ func _ready() -> void:
 		join_host = str(config.get_value("network", "join_host", join_host))
 		server_port = clampi(int(config.get_value("network", "port", server_port)), 1, 65535)
 		server_choice = int(config.get_value("network", "choice", server_choice))
+		firewall_notice_shown = bool(config.get_value("network", "firewall_notice_shown", false))
 		reduce_motion = config.get_value("accessibility", "reduce_motion", false)
 		ui_scale = config.get_value("accessibility", "ui_scale", 1.0)
 		music_volume = config.get_value("audio", "music", 0.7)
@@ -43,6 +45,7 @@ func save() -> void:
 	config.set_value("network", "join_host", join_host)
 	config.set_value("network", "port", server_port)
 	config.set_value("network", "choice", server_choice)
+	config.set_value("network", "firewall_notice_shown", firewall_notice_shown)
 	config.set_value("accessibility", "reduce_motion", reduce_motion)
 	config.set_value("accessibility", "reduce_flashes", reduce_flashes)
 	config.set_value("accessibility", "vibration", vibration)
