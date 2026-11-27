@@ -1,129 +1,123 @@
-# Montar el servidor online de VoodooCombo (gratis, paso a paso)
+# Montar el servidor online de VoodooCombo (gratis y sin tocar comandos)
 
-**Para Miquel y Joel.** Se hace **una sola vez** y se tarda unos 45 minutos.
+**Para Miquel.** Se hace **una sola vez**. Son unos **30 minutos de clics** más 20 minutos de esperar.
 
 **Qué consigues:** una dirección como `https://voodoocombo.duckdns.org`.
-- Cualquiera la abre en el navegador y juega, sin instalar nada.
-- El `.exe` se conecta al mismo servidor.
-- Para jugar con un amigo, el anfitrión pulsa **INVITAR** y le manda el enlace por WhatsApp. El amigo lo abre y ya está en la sala.
+- **Hasta que Codex termine la fase 15:** una página que dice que el servidor está en marcha, con un botón para **descargar el juego para Windows**.
+- **Con la fase 15:** el juego en el navegador, con CREAR SALA → INVITAR → el amigo abre el enlace y entra en tu sala.
+
+**No hace falta entrar en la máquina ni escribir comandos.**
+- La máquina se instala sola al crearla.
+- **Se actualiza sola:** cada 10 minutos mira GitHub y, si Codex ha subido algo y no hay nadie jugando, se pone al día.
 
 **Qué necesitas:**
-- un ordenador con Windows 10 u 11;
 - un móvil;
-- una tarjeta para verificar la cuenta de Oracle. **No cobra nada** mientras no pulses "Upgrade".
-
-> El juego necesita la **fase 15** hecha por Codex para que la web pueda conectarse.
-> Los pasos 1 a 5 se pueden hacer ya: el servidor queda preparado y, cuando Codex termine la fase 15, solo hay que ejecutar `sudo /opt/voodoocombo/actualizar.sh` (paso 8).
+- una tarjeta, solo para que Oracle verifique que eres una persona. **No cobra nada** mientras no pulses "Upgrade".
 
 ---
 
-## 1. Crear la cuenta de Oracle Cloud (10 min)
+## Paso 1 · Dominio gratis en DuckDNS (3 min)
 
-1. Entra en <https://www.oracle.com/cloud/free/> y pulsa **Start for free**.
+1. Entra en <https://www.duckdns.org> y pulsa **Sign in with GitHub** (o Google).
+2. En **sub domain** escribe `voodoocombo` y pulsa **add domain**. Si está cogido, prueba `voodoocombo-dam` o similar.
+3. **Copia el token** (la línea larga de arriba, `token: xxxxxxxx-xxxx-…`) y guárdalo en un bloc de notas.
+4. La IP déjala como esté: la máquina la pone sola.
+
+Tu dirección será `https://voodoocombo.duckdns.org`, o la que hayas elegido.
+
+## Paso 2 · Cuenta de Oracle Cloud (10 min y esperar el correo)
+
+1. Entra en <https://www.oracle.com/cloud/free/> → **Start for free**.
 2. Rellena tus datos y verifica el correo y el móvil.
-3. **MUY IMPORTANTE:** en **Home Region** elige **Spain Central (Madrid)**. Las máquinas gratis solo se pueden crear en esa región y **no se puede cambiar después**.
-4. Pon la tarjeta: hacen una comprobación de 1 € o menos que se devuelve.
-5. Espera al correo de "Your account is ready" (de 5 minutos a un par de horas).
+3. ⚠️ **Home Region: elige `Spain Central (Madrid)`.** Las máquinas gratis solo se pueden crear ahí y **no se puede cambiar después**.
+4. Pon la tarjeta (hacen una comprobación de céntimos que se devuelve) y espera el correo "Your account is ready".
 
-## 2. Crear la máquina (10 min)
+## Paso 3 · Crear la máquina que se instala sola (10 min)
 
 1. Entra en <https://cloud.oracle.com>. Menú ☰ → **Compute** → **Instances** → **Create instance**.
 2. **Name:** `voodoocombo`.
 3. **Image and shape** → **Edit**:
-   - **Image:** **Canonical Ubuntu 24.04** (pulsa *Change image* si sale otra).
-   - **Shape:** **Ampere** → **VM.Standard.A1.Flex**, con **1 OCPU** y **6 GB** de memoria. Tiene que poner la etiqueta *Always Free-eligible*.
-   - Si al crear sale **"Out of capacity"**, vuelve aquí y elige **Specialty and previous generation** → **VM.Standard.E2.1.Micro**. También es gratis y da de sobra para el juego.
-4. **Networking:** deja **Create new virtual cloud network** y **Create new public subnet**. Comprueba que está marcado **Assign a public IPv4 address**.
-5. **Add SSH keys:** **Generate a key pair for me** → pulsa **Download private key**.
-   - Guarda el archivo (`ssh-key-….key`) en `C:\voodoocombo\clave.key`. **No lo subas a GitHub ni lo compartas.**
-6. Pulsa **Create**. Cuando el cuadro se ponga verde (**Running**), apunta la **Public IP address** (por ejemplo `152.70.10.20`).
+   - **Image** → **Change image** → **Ubuntu** → **Canonical Ubuntu 24.04** → **Select image**.
+   - **Shape** → **Change shape** → **Ampere** → **VM.Standard.A1.Flex** → **1 OCPU** y **6 GB** → **Select shape**. Tiene que poner *Always Free-eligible*.
+4. **Networking:** déjalo como viene (*Create new virtual cloud network*, *public subnet*, *Assign a public IPv4 address* marcado).
+5. **Add SSH keys:** **Generate a key pair for me** → **Download private key**. Guárdala por si un día hace falta; **no la subas a GitHub**.
+6. Abajo del todo: **Show advanced options** → pestaña **Management** → **Initialization script** → **Paste cloud-init script**. Pega esto, **cambiando las dos cosas en MAYÚSCULAS** por tu dominio y tu token de DuckDNS:
 
-## 3. Abrir los puertos web en Oracle (3 min)
-
-1. En la página de la máquina: **Primary VNIC** → pulsa el nombre de la **Subnet** → **Security Lists** → **Default Security List…**
-2. **Add Ingress Rules**:
-   - Source CIDR: `0.0.0.0/0`
-   - IP Protocol: `TCP`
-   - Destination Port Range: `80,443`
-3. **Add Ingress Rules** para guardar.
-
-## 4. Crear el dominio gratis en DuckDNS (3 min)
-
-1. Entra en <https://www.duckdns.org> y accede con GitHub o Google.
-2. En **sub domain** escribe `voodoocombo` (o el que esté libre) → **add domain**.
-3. En **current ip** pon la **IP pública** de la máquina (paso 2.6) → **update ip**.
-4. Apunta el **token** que sale arriba: lo necesitas en el paso 6.
-
-Tu dirección será `https://voodoocombo.duckdns.org` (o la que hayas elegido).
-
-## 5. Entrar en la máquina desde Windows (5 min)
-
-1. Abre **PowerShell** (botón Inicio → escribe "PowerShell").
-2. La primera vez, dale permisos a la clave para que SSH no se queje:
-   ```powershell
-   icacls C:\voodoocombo\clave.key /inheritance:r /grant:r "$($env:USERNAME):(R)"
+   ```bash
+   #!/bin/bash
+   curl -fsSL https://raw.githubusercontent.com/miquellarios/voodoocombo/main/deploy/instalar_servidor.sh -o /root/instalar.sh
+   bash /root/instalar.sh TUSUBDOMINIO.duckdns.org TU_TOKEN_DE_DUCKDNS
    ```
-3. Conéctate, cambiando la IP por la tuya:
-   ```powershell
-   ssh -i C:\voodoocombo\clave.key ubuntu@152.70.10.20
-   ```
-   - Si pregunta "Are you sure you want to continue connecting?", escribe `yes`.
-   - Cuando veas algo como `ubuntu@voodoocombo:~$`, ya estás dentro.
 
-## 6. Instalar todo con un solo comando (10-15 min)
+   Ejemplo: `bash /root/instalar.sh voodoocombo.duckdns.org 1a2b3c4d-1111-2222-3333-abcdefabcdef`
 
-Dentro de la máquina, copia y pega esto, cambiando el dominio y el token por los tuyos:
+7. Pulsa **Create**.
+   - Si sale **"Out of host capacity"**, vuelve al punto 3 y en Shape elige **Specialty and previous generation** → **VM.Standard.E2.1.Micro**. También es gratis; la instalación tardará un poco más.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/miquellarios/voodoocombo/main/deploy/instalar_servidor.sh -o instalar.sh
-sudo bash instalar.sh voodoocombo.duckdns.org TU_TOKEN_DE_DUCKDNS
-```
+## Paso 4 · Abrir la puerta de la web (3 min)
 
-**El script lo hace todo solo:**
-- instala Godot, el servidor del juego y Caddy (la web con HTTPS);
-- abre el cortafuegos de la máquina;
-- configura DuckDNS;
-- genera la versión web y el `.zip` de Windows;
-- deja el servidor como servicio, que **se reinicia solo** si se cae o si se reinicia la máquina.
+Hazlo nada más crear la máquina:
 
-Al final tiene que salir:
+1. En la página de la máquina, baja a **Primary VNIC** → pulsa el enlace de la **Subnet**.
+2. **Security Lists** → **Default Security List for …** → **Add Ingress Rules**.
+3. Rellena y pulsa **Add Ingress Rules**:
+   - **Source CIDR:** `0.0.0.0/0`
+   - **IP Protocol:** `TCP`
+   - **Destination Port Range:** `80,443`
 
-```
-Servidor del juego: EN MARCHA
-Caddy (web y HTTPS): EN MARCHA
-Listo. Abre en el navegador:  https://voodoocombo.duckdns.org
-```
+## Paso 5 · Esperar y comprobar (20 min)
 
-## 7. Comprobar
+- La máquina se instala sola. Espera **20 minutos**; con la máquina pequeña E2.1.Micro, 30.
+- Abre `https://TUSUBDOMINIO.duckdns.org`:
+  - **Hasta la fase 15:** sale la página "El servidor está en marcha" con **Descargar para Windows**. ✅ Ya está todo montado.
+  - **Con la fase 15:** sale el juego.
+- `https://TUSUBDOMINIO.duckdns.org/estado` enseña las salas abiertas.
 
-- Abre `https://voodoocombo.duckdns.org` en el navegador: tiene que cargar el juego. Esto funciona cuando Codex ha hecho la fase 15.
-- Abre `https://voodoocombo.duckdns.org/estado`: tiene que salir un texto con `rooms`.
-- **Prueba real:** cada uno en su casa abre la web; uno pulsa **JUGAR ONLINE** → **INVITAR** y le manda el enlace al otro.
-
-## 8. Actualizar el juego cuando Codex suba cambios
-
-Conéctate como en el paso 5 y ejecuta:
-
-```bash
-sudo /opt/voodoocombo/actualizar.sh
-```
-
-Baja lo último de GitHub, regenera la web y el `.exe`, y reinicia el servidor. Las partidas que estén en marcha en ese momento se cortan, así que hazlo cuando no esté jugando nadie.
+**Y ya está.** Cuando Codex suba la fase 15 a GitHub, en 10 minutos el servidor se actualiza solo y la dirección pasa a ser el juego.
 
 ---
 
-## Si algo falla
+## Si algo no va
 
-| Qué pasa | Qué hacer |
+| Qué ves | Qué hacer |
 |---|---|
-| "Out of capacity" al crear la máquina | Usa **VM.Standard.E2.1.Micro** (paso 2.3) o prueba otra vez más tarde |
-| `ssh` dice "UNPROTECTED PRIVATE KEY FILE" o "Permission denied" | Repite el `icacls` del paso 5.2 y comprueba que el usuario es `ubuntu` |
-| La web no carga o el navegador dice "no es seguro" | El dominio no apunta a la máquina o los puertos 80/443 están cerrados. Revisa los pasos 3 y 4, espera 2 minutos y ejecuta `sudo systemctl restart caddy` |
-| El juego dice "Servidor en mantenimiento" | `sudo systemctl status voodoocombo` y `sudo journalctl -u voodoocombo -n 50`. Mándale a Claude lo que salga |
-| Quieres ver lo que pasa en directo | `sudo journalctl -u voodoocombo -f` (salir con Ctrl+C) |
-| Oracle ha borrado la máquina por estar "inactiva" | Puede pasar con las máquinas gratis que casi no se usan. Crea otra (pasos 2-6): en 20 minutos vuelve a estar |
+| A los 30 min la página no carga | Comprueba el paso 4 (puertos 80 y 443). En DuckDNS, mira que la IP del subdominio sea la *Public IP address* de la máquina. Si no, ponla a mano y pulsa *update ip*. Espera 5 minutos |
+| El navegador dice "no es seguro" | El certificado aún no está: pasa si el paso 4 se hizo tarde. Espera 5 minutos y recarga |
+| "Out of host capacity" | Usa **VM.Standard.E2.1.Micro** (paso 3.7) o prueba más tarde |
+| Quieres ver qué ha pasado en la instalación | Entra por SSH (abajo) y ejecuta `sudo cat /var/log/voodoocombo-instalacion.log`. Mándale a Claude lo que salga |
+| Quieres forzar una actualización ya | Por SSH: `sudo /opt/voodoocombo/actualizar.sh` |
+| Oracle ha borrado la máquina por "inactiva" | Puede pasar con las máquinas gratis que casi no se usan. Repite los pasos 3 y 4: en 20 minutos vuelve a estar. El dominio y el token de DuckDNS valen los mismos |
 
-**Coste: 0 €.**
+### Entrar por SSH (solo si hace falta)
+
+En PowerShell, con la clave del paso 3.5 en `C:\voodoocombo\clave.key` y la *Public IP address* de la máquina:
+
+```powershell
+icacls C:\voodoocombo\clave.key /inheritance:r /grant:r "$($env:USERNAME):(R)"
+ssh -i C:\voodoocombo\clave.key ubuntu@LA_IP_DE_LA_MAQUINA
+```
+
+**Comandos útiles dentro:**
+- `sudo journalctl -u voodoocombo -f`: qué pasa en el servidor del juego (salir con Ctrl+C);
+- `sudo systemctl status voodoocombo caddy`: si están en marcha;
+- `sudo /opt/voodoocombo/actualizar.sh`: actualizar ya.
+
+## Coste: 0 €
+
 - No pulses nunca **Upgrade to Pay As You Go**.
-- Usa solo cosas marcadas como *Always Free*.
-- La clave SSH y el token de DuckDNS **no se suben a GitHub**.
+- Usa solo cosas marcadas *Always Free*.
+- El token de DuckDNS y la clave SSH **no se suben a GitHub ni se comparten**.
+
+---
+
+### Qué instala el script (para la documentación del proyecto)
+
+| Pieza | Para qué |
+|---|---|
+| **Godot 4.7.2** sin pantalla | El servidor del juego, autoritativo: decide doblones, golpes y ganador. Corre como servicio `voodoocombo` y se reinicia solo |
+| **Caddy** | Web con HTTPS: pide y renueva el certificado de Let's Encrypt solo. Sirve la versión web y pasa la conexión del juego `wss://…/ws` al servidor |
+| **DuckDNS** | Dominio gratis que apunta a la máquina. Se actualiza cada 5 minutos |
+| **Temporizador `voodoocombo-actualizar`** | Cada 10 minutos mira GitHub. Si hay cambios y nadie jugando, regenera la web y el `.exe` y reinicia el servidor |
+| **Cortafuegos y swap** | Abre los puertos 80 y 443 dentro de la máquina, y añade 2 GB de swap si tiene poca memoria |
+
+Los archivos están en `deploy/` del repositorio.

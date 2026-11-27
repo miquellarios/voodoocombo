@@ -27,13 +27,13 @@ REMOTO="$(como git -C "$SRC" rev-parse FETCH_HEAD)"
 if [[ $AUTO -eq 1 ]]; then
   if [[ "$LOCAL" == "$REMOTO" && -f "$BASE/web/index.html" ]]; then exit 0; fi
   # no se actualiza con gente dentro: se reintenta en el siguiente aviso del temporizador
-  JUGANDO="$(curl -fsS --max-time 3 http://127.0.0.1:8080/status 2>/dev/null | python3 -c '
+  JUGANDO="$( { curl -fsS --max-time 3 http://127.0.0.1:8080/status 2>/dev/null || true; } | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
     print(sum(len(r.get("players", [])) for r in d.get("rooms", [])))
 except Exception:
-    print(0)' || echo 0)"
+    print(0)')"
   if [[ "${JUGANDO:-0}" != "0" ]]; then echo "Hay $JUGANDO jugadores dentro: se actualizará más tarde."; exit 0; fi
   verde "Cambios nuevos en GitHub ($LOCAL -> $REMOTO): actualizando"
 fi

@@ -7,6 +7,12 @@
 >    - `jugar_online_referencia.png`: pantalla JUGAR;
 >    - `invitar_referencia.png`: lobby con INVITAR y lo que vive el amigo.
 > 4. El despliegue ya está hecho por Claude en `deploy/`, con la guía para humanos en `docs/SERVIDOR-ONLINE.md`. **No lo cambies** salvo que algo de esta fase lo pida. Si lo cambias, apúntalo en la bitácora.
+> 5. **Si en la fase 14 hiciste la versión antigua de 14c** (código de invitación con la IP dentro, UPnP o detección de VPN), **no lo borres**: muévelo dentro de SIN INTERNET → "Alojar en mi PC". La forma principal de jugar desde casa pasa a ser la de esta fase.
+>
+> ⚠️ **El servidor se actualiza solo desde `main`.** Cada 10 minutos mira GitHub y, si hay commits nuevos y nadie jugando, regenera la web y el `.exe` y se reinicia (`deploy/actualizar.sh --auto`). Así que:
+> - **no hagas `push` a `main` de nada que no arranque**;
+> - ejecuta los tests antes de cada `push`;
+> - si un bloque se queda a medias, haz el `push` cuando funcione.
 
 ## El objetivo del equipo
 
@@ -33,8 +39,8 @@ Navegador         --https://DOMINIO/-->  Caddy  -->  /opt/voodoocombo/web (expor
   - Caddy, que pone el certificado HTTPS solo;
   - el servicio `voodoocombo.service`, que se reinicia solo;
   - DuckDNS.
-- **`deploy/actualizar.sh`:**
-  - hace `git pull` e importa el proyecto;
+- **`deploy/actualizar.sh`** (lo lanza solo un temporizador cada 10 minutos):
+  - baja `main` e importa el proyecto;
   - exporta el preset **"Web"** a la carpeta de la web y el preset **"Windows"** a `https://DOMINIO/descargar/VoodooCombo-Windows.zip`;
   - reinicia el servidor.
 - **Comprobado por Claude con Godot 4.7.2:**
@@ -232,4 +238,5 @@ Claude lo probó con estos valores y exporta bien.
 
 **Al acabar:**
 - sube los cambios a GitHub;
-- avisa en la bitácora de que hay que ejecutar en el servidor `sudo /opt/voodoocombo/actualizar.sh` (lo hacen los humanos, ver `docs/SERVIDOR-ONLINE.md`, paso 8).
+- en 10 minutos el servidor se actualiza solo. Comprueba que `https://<dominio>` ya enseña el juego y apúntalo en la bitácora.
+- Si tarda, un humano puede forzarlo con `sudo /opt/voodoocombo/actualizar.sh` (ver `docs/SERVIDOR-ONLINE.md`).

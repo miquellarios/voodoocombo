@@ -56,6 +56,7 @@
   - el proyecto exporta a web y arranca en Chrome;
   - el preset Windows exporta desde Linux con las plantillas 4.7.2.
 - La cuenta de Oracle y DuckDNS las tienen que crear los humanos.
+- La máquina se instala sola al crearla (script de inicio de cloud-init) y **se actualiza sola desde `main`** cada 10 minutos, si nadie está jugando. Por eso a `main` solo se sube lo que funciona.
 
 Capturas de la revisión de la fase 13: `docs/capturas/fase-13-revision/`.
 
