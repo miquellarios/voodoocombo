@@ -1,0 +1,7 @@
+[Unit]
+Description=VoodooCombo: actualizar desde GitHub si hay cambios y no hay nadie jugando
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/voodoocombo/actualizar.sh --auto

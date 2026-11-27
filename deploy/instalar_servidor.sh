@@ -5,9 +5,10 @@
 #   - Caddy, que sirve la versión web por HTTPS y pasa las conexiones del juego (WebSocket) al servidor;
 #   - DuckDNS actualizado (opcional).
 #
-# Uso (en la máquina, por SSH):
-#   sudo bash instalar_servidor.sh <dominio> [token_duckdns]
-#   sudo bash instalar_servidor.sh voodoocombo.duckdns.org 1234abcd-....
+# Uso:
+#   - Lo más fácil: pegarlo como "script de inicio" (cloud-init) al crear la máquina en Oracle.
+#     Ver docs/SERVIDOR-ONLINE.md: no hace falta entrar por SSH.
+#   - O a mano, por SSH:  sudo bash instalar_servidor.sh voodoocombo.duckdns.org TOKEN_DE_DUCKDNS
 #
 # Se puede ejecutar otra vez sin miedo: si algo ya está hecho, lo deja como está.
 set -euo pipefail
@@ -25,6 +26,7 @@ verde() { printf '\033[1;32m%s\033[0m\n' "$*"; }
 aviso() { printf '\033[1;33m[AVISO] %s\033[0m\n' "$*"; }
 fallo() { printf '\033[1;31m[ERROR] %s\033[0m\n' "$*"; exit 1; }
 
+exec > >(tee -a /var/log/voodoocombo-instalacion.log) 2>&1
 [[ $EUID -eq 0 ]] || fallo "Ejecútalo con sudo: sudo bash instalar_servidor.sh <dominio> [token]"
 [[ -n "$DOMINIO" ]] || fallo "Falta el dominio. Ejemplo: sudo bash instalar_servidor.sh voodoocombo.duckdns.org TU_TOKEN"
 
@@ -36,8 +38,16 @@ esac
 
 verde "1/8 · Paquetes del sistema"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y git unzip zip curl caddy ca-certificates
+# Al arrancar una máquina nueva, Ubuntu suele estar actualizándose: se espera a que suelte apt.
+APT=(apt-get -o DPkg::Lock::Timeout=900 -y)
+"${APT[@]}" update
+"${APT[@]}" install git unzip zip curl caddy ca-certificates python3
+
+# Las máquinas gratis pequeñas tienen 1 GB: con 2 GB de swap, exportar el juego no se queda sin memoria.
+if [[ ! -f /swapfile ]] && (( $(awk '/MemTotal/{print $2}' /proc/meminfo) < 3000000 )); then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
 
 verde "2/8 · Usuario $USUARIO y carpetas"
 id "$USUARIO" >/dev/null 2>&1 || useradd --system --home "$DATOS" --create-home --shell /usr/sbin/nologin "$USUARIO"
@@ -100,10 +110,13 @@ EOF
 fi
 
 cp "$BASE/src/deploy/voodoocombo.service" /etc/systemd/system/voodoocombo.service
+cp "$BASE/src/deploy/voodoocombo-actualizar.service" /etc/systemd/system/voodoocombo-actualizar.service
+cp "$BASE/src/deploy/voodoocombo-actualizar.timer" /etc/systemd/system/voodoocombo-actualizar.timer
 sed "s/__DOMINIO__/${DOMINIO}/g" "$BASE/src/deploy/Caddyfile.plantilla" > /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile || fallo "El Caddyfile no es válido"
 systemctl daemon-reload
 systemctl enable voodoocombo caddy
+systemctl enable --now voodoocombo-actualizar.timer
 
 verde "8/8 · Versión web, ejecutable y arranque"
 "$BASE/actualizar.sh"
@@ -123,5 +136,6 @@ if systemctl is-active --quiet caddy; then verde "Caddy (web y HTTPS): EN MARCHA
 echo
 verde "Listo. Abre en el navegador:  https://${DOMINIO}"
 echo   "Estado del servidor:           https://${DOMINIO}/estado"
-echo   "Para actualizar el juego:      sudo ${BASE}/actualizar.sh"
+echo   "Se actualiza solo: cada 10 min mira GitHub y, si hay cambios y nadie jugando, se pone al día."
+echo   "Para actualizar ya:            sudo ${BASE}/actualizar.sh"
 echo   "Ver lo que pasa en directo:    sudo journalctl -u voodoocombo -f"
