@@ -57,6 +57,19 @@ func save() -> void:
 	config.set_value("display", "window_size_index", window_size_index)
 	config.save("user://settings.cfg")
 
+func scale_canvas_layer(layer: CanvasLayer) -> void:
+	var scale_value := ui_scale
+	var center := Vector2(GameConfig.VIEWPORT_WIDTH, GameConfig.VIEWPORT_HEIGHT) * 0.5
+	layer.transform = Transform2D(Vector2(scale_value, 0.0), Vector2(0.0, scale_value), center * (1.0 - scale_value))
+
+func apply_ui_scale() -> void:
+	if not is_inside_tree(): return
+	var pending: Array[Node] = [get_tree().root]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		if node is CanvasLayer: scale_canvas_layer(node)
+		for child in node.get_children(): pending.append(child)
+
 func apply_display() -> void:
 	if window_fullscreen:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)

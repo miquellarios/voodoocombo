@@ -247,6 +247,7 @@ func _ready() -> void:
 func _show_crash_notice() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 100
+	Settings.scale_canvas_layer(layer)
 	add_child(layer)
 	var backdrop := ColorRect.new()
 	backdrop.color = Color("0b0710", 0.86)
@@ -2263,6 +2264,7 @@ func _new_overlay() -> Control:
 	Fx.curtain()
 	hud = CanvasLayer.new()
 	hud.layer = 10
+	Settings.scale_canvas_layer(hud)
 	add_child(hud)
 	hud_root = Control.new()
 	hud_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -2290,9 +2292,9 @@ func _label(root: Control, text: String, offset: Vector2, size: int, tint: Color
 	label.position = Vector2(240, 0) + offset
 	label.size = Vector2(800, 52)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", roundi(size * Settings.ui_scale))
+	label.add_theme_font_size_override("font_size", size)
 	var label_font_path := "res://assets/fonts/Oswald-Bold.woff2" if _bold else "res://assets/fonts/Oswald-Medium.woff2"
-	var label_font := ThemeBuilder.title_font(roundi(size * Settings.ui_scale)) if _bold else ThemeBuilder.font("Oswald-Medium.woff2")
+	var label_font := ThemeBuilder.title_font(size) if _bold else ThemeBuilder.font("Oswald-Medium.woff2")
 	if label_font != null: label.add_theme_font_override("font", label_font)
 	label.add_theme_color_override("font_color", tint)
 	label.add_theme_color_override("font_shadow_color", Color("160e22"))
@@ -2307,8 +2309,8 @@ func _button(root: Control, text: String, offset: Vector2, action: Callable) -> 
 	button.text = text
 	button.position = Vector2(470, 0) + offset
 	button.size = Vector2(340, 54)
-	button.add_theme_font_size_override("font_size", roundi(26 * Settings.ui_scale))
-	var menu_font := ThemeBuilder.title_font(roundi(26 * Settings.ui_scale), true)
+	button.add_theme_font_size_override("font_size", 26)
+	var menu_font := ThemeBuilder.title_font(26, true)
 	if menu_font != null: button.add_theme_font_override("font", menu_font)
 	button.focus_mode = Control.FOCUS_ALL
 	button.pressed.connect(func(): Sfx.play_tone(300.0, 0.07); action.call())

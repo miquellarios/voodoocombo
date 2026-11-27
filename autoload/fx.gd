@@ -26,6 +26,7 @@ func _canvas() -> Node2D:
 	if not is_instance_valid(canvas):
 		var layer := CanvasLayer.new()
 		layer.layer = 19
+		Settings.scale_canvas_layer(layer)
 		add_child(layer)
 		canvas = load("res://ui/juice_canvas.gd").new()
 		layer.add_child(canvas)
@@ -115,6 +116,7 @@ func _render_pop(text: String, position: Vector2, tint: Color, banner: bool) -> 
 	if not is_instance_valid(text_layer):
 		text_layer = CanvasLayer.new()
 		text_layer.layer = 20
+		Settings.scale_canvas_layer(text_layer)
 		add_child(text_layer)
 	var numeric := text.begins_with("+") or text.begins_with("-")
 	var loss := text.begins_with("-")

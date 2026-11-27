@@ -13,6 +13,7 @@ var tab_buttons: Array[Button] = []
 
 func _ready() -> void:
 	layer = 30
+	Settings.scale_canvas_layer(self)
 	_build()
 
 func _build() -> void:
@@ -21,6 +22,7 @@ func _build() -> void:
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(backdrop)
 	var outer := MarginContainer.new()
+	outer.theme = ThemeBuilder.build()
 	outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	outer.add_theme_constant_override("margin_left", 100)
 	outer.add_theme_constant_override("margin_right", 100)
@@ -33,8 +35,9 @@ func _build() -> void:
 	var title := Label.new()
 	title.text = I18n.t("settings")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.custom_minimum_size.y = 58.0 * Settings.ui_scale
-	title.add_theme_font_size_override("font_size", roundi(44.0 * Settings.ui_scale))
+	title.custom_minimum_size.y = 58.0
+	title.add_theme_font_size_override("font_size", 44)
+	title.add_theme_font_override("font", ThemeBuilder.title_font(44))
 	title.add_theme_color_override("font_color", EMBER)
 	layout.add_child(title)
 	var tabs := HBoxContainer.new()
@@ -43,9 +46,10 @@ func _build() -> void:
 	for i in TABS.size():
 		var tab := Button.new()
 		tab.text = I18n.t(TABS[i])
-		tab.custom_minimum_size = Vector2(minf(220.0 * Settings.ui_scale, 260.0), 46.0 * Settings.ui_scale)
+		tab.custom_minimum_size = Vector2(220.0, 46.0)
 		tab.focus_mode = Control.FOCUS_ALL
-		tab.add_theme_font_size_override("font_size", roundi(20.0 * Settings.ui_scale))
+		tab.add_theme_font_size_override("font_size", 20)
+		tab.add_theme_font_override("font", ThemeBuilder.title_font(20, true))
 		tab.add_theme_color_override("font_color", EMBER if i == selected_tab else BONE)
 		tab.pressed.connect(func() -> void: selected_tab = i; _refresh())
 		tabs.add_child(tab)
@@ -64,12 +68,12 @@ func _build() -> void:
 	hint.text = I18n.t("settings_help_controls")
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.add_theme_color_override("font_color", Color("b8a9d1"))
-	hint.add_theme_font_size_override("font_size", roundi(16.0 * Settings.ui_scale))
+	hint.add_theme_font_size_override("font_size", 16)
 	footer.add_child(hint)
 	var back := Button.new()
 	back.text = I18n.t("menu")
-	back.custom_minimum_size = GameConfig.SETTINGS_BACK_SIZE * Settings.ui_scale
-	back.add_theme_font_size_override("font_size", roundi(20.0 * Settings.ui_scale))
+	back.custom_minimum_size = GameConfig.SETTINGS_BACK_SIZE
+	back.add_theme_font_size_override("font_size", 20)
 	back.pressed.connect(_close)
 	footer.add_child(back)
 	_refresh()
@@ -80,8 +84,8 @@ func _refresh() -> void:
 	focusables.clear()
 	for index in tab_buttons.size():
 		tab_buttons[index].add_theme_color_override("font_color", EMBER if index == selected_tab else BONE)
-		tab_buttons[index].custom_minimum_size = Vector2(minf(220.0 * Settings.ui_scale, 260.0), 46.0 * Settings.ui_scale)
-		tab_buttons[index].add_theme_font_size_override("font_size", roundi(20.0 * Settings.ui_scale))
+		tab_buttons[index].custom_minimum_size = Vector2(220.0, 46.0)
+		tab_buttons[index].add_theme_font_size_override("font_size", 20)
 	for child in page.get_children(): child.queue_free()
 	match selected_tab:
 		0:
@@ -102,12 +106,12 @@ func _refresh() -> void:
 			_add_choice("settings_server", ["settings_local", "settings_lan", "settings_oracle"], func() -> int: return Settings.server_choice, _set_server_choice, true)
 			_add_text_field("settings_address", "server_host", GameConfig.SETTINGS_INPUT_MAX_LENGTH)
 			_add_text_field("settings_port", "server_port", 5, true)
-			_add_action("logs_open", _open_logs_folder)
+			_add_action("settings_logs", "logs_open", _open_logs_folder)
 	if focusables.size() > 0: focusables[0].grab_focus()
 
 func _new_row(key: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(0.0, GameConfig.SETTINGS_ROW_SIZE.y * Settings.ui_scale)
+	row.custom_minimum_size = Vector2(0.0, GameConfig.SETTINGS_ROW_SIZE.y)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 12)
 	var style := StyleBoxFlat.new()
@@ -120,12 +124,14 @@ func _new_row(key: String) -> HBoxContainer:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	page.add_child(panel)
 	panel.add_child(row)
+	row.set_meta("panel_style", style)
 	var label := Label.new()
 	label.text = I18n.t(key)
-	label.custom_minimum_size.x = minf(GameConfig.SETTINGS_ROW_LABEL_WIDTH * Settings.ui_scale, 440.0)
+	label.custom_minimum_size.x = minf(GameConfig.SETTINGS_ROW_LABEL_WIDTH, 440.0)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	label.add_theme_font_size_override("font_size", roundi(23.0 * Settings.ui_scale))
+	label.add_theme_font_size_override("font_size", 23)
+	label.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
 	label.add_theme_color_override("font_color", BONE)
 	row.add_child(label)
 	return row
@@ -137,15 +143,17 @@ func _add_choice(key: String, options: Array, getter: Callable, setter: Callable
 	var value := Button.new()
 	value.flat = true
 	value.focus_mode = Control.FOCUS_ALL
-	value.custom_minimum_size.x = GameConfig.SETTINGS_VALUE_WIDTH * Settings.ui_scale
-	value.add_theme_font_size_override("font_size", roundi(22.0 * Settings.ui_scale))
+	value.custom_minimum_size.x = GameConfig.SETTINGS_VALUE_WIDTH
+	value.add_theme_font_size_override("font_size", 22)
+	value.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
+	value.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	value.add_theme_color_override("font_color", BONE)
 	var value_stack := VBoxContainer.new()
 	value_stack.alignment = BoxContainer.ALIGNMENT_CENTER
 	value_stack.add_child(value)
 	var scale_dots := Label.new()
 	scale_dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	scale_dots.add_theme_font_size_override("font_size", roundi(12.0 * Settings.ui_scale))
+	scale_dots.add_theme_font_size_override("font_size", 12)
 	scale_dots.add_theme_color_override("font_color", EMBER)
 	scale_dots.visible = key == "settings_ui_scale"
 	value_stack.add_child(scale_dots)
@@ -163,14 +171,31 @@ func _add_choice(key: String, options: Array, getter: Callable, setter: Callable
 			var dots := PackedStringArray()
 			for dot_index in options.size(): dots.append("●" if dot_index == index else "·")
 			scale_dots.text = " ".join(dots)
+			prev.disabled = index <= 0
+			next.disabled = index >= options.size() - 1
+			prev.modulate = Color("817b88") if prev.disabled else Color.WHITE
+			next.modulate = Color("817b88") if next.disabled else Color.WHITE
 	var change := func(delta: int) -> void:
-		var index := posmod(int(getter.call()) + delta, options.size())
+		var current_index := int(getter.call())
+		var index := clampi(current_index + delta, 0, options.size() - 1) if key == "settings_ui_scale" else posmod(current_index + delta, options.size())
+		if index == current_index: return
 		setter.call(index)
 		Settings.save()
 		Sfx.play_tone(520.0, 0.04, 0.08)
 		update.call()
-		if key in ["settings_ui_scale", "settings_language", "settings_server", "settings_display_mode"]: _refresh(); return
+		if key == "settings_ui_scale": Settings.apply_ui_scale(); return
+		if key in ["settings_language", "settings_server", "settings_display_mode"]: _refresh(); return
 		if not Settings.reduce_motion: value.scale = Vector2(1.05, 1.05); create_tween().tween_property(value, "scale", Vector2.ONE, 0.12)
+	value.focus_entered.connect(func():
+		var style: StyleBoxFlat = row.get_meta("panel_style")
+		style.border_color = EMBER
+		style.set_border_width_all(2)
+	)
+	value.focus_exited.connect(func():
+		var style: StyleBoxFlat = row.get_meta("panel_style")
+		style.border_color = Color("5c496d")
+		style.set_border_width_all(1)
+	)
 	prev.pressed.connect(func() -> void: change.call(-1))
 	next.pressed.connect(func() -> void: change.call(1))
 	update.call()
@@ -184,9 +209,10 @@ func _add_choice(key: String, options: Array, getter: Callable, setter: Callable
 func _arrow(text: String) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = GameConfig.SETTINGS_ARROW_SIZE * Settings.ui_scale
+	button.custom_minimum_size = GameConfig.SETTINGS_ARROW_SIZE
 	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", roundi(32.0 * Settings.ui_scale))
+	button.add_theme_font_size_override("font_size", 32)
+	button.add_theme_font_override("font", ThemeBuilder.font("Oswald-Bold.woff2"))
 	return button
 
 func _add_slider(key: String, setting: String) -> void:
@@ -195,7 +221,7 @@ func _add_slider(key: String, setting: String) -> void:
 	var previous := _arrow("‹")
 	previous.pressed.connect(func() -> void: slider.value = maxf(0.0, slider.value - GameConfig.SETTINGS_SLIDER_STEP); Sfx.play_tone(520.0, 0.04, 0.08))
 	row.add_child(previous)
-	slider.custom_minimum_size.x = maxf(140.0, GameConfig.SETTINGS_SLIDER_WIDTH - (Settings.ui_scale - 1.0) * 180.0)
+	slider.custom_minimum_size.x = GameConfig.SETTINGS_SLIDER_WIDTH
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.min_value = 0
 	slider.max_value = 100
@@ -205,7 +231,8 @@ func _add_slider(key: String, setting: String) -> void:
 	var label := Label.new()
 	label.custom_minimum_size.x = 64
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.add_theme_font_size_override("font_size", roundi(16.0 * Settings.ui_scale))
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
 	row.add_child(slider)
 	var next := _arrow("›")
 	next.pressed.connect(func() -> void: slider.value = minf(100.0, slider.value + GameConfig.SETTINGS_SLIDER_STEP); Sfx.play_tone(520.0, 0.04, 0.08))
@@ -219,8 +246,9 @@ func _add_slider(key: String, setting: String) -> void:
 func _add_text_field(key: String, setting: String, max_chars: int, read_only := false) -> void:
 	var row := _new_row(key)
 	var input := LineEdit.new()
-	input.custom_minimum_size = Vector2(400.0 * Settings.ui_scale, 48.0 * Settings.ui_scale)
-	input.add_theme_font_size_override("font_size", roundi(18.0 * Settings.ui_scale))
+	input.custom_minimum_size = Vector2(400.0, 48.0)
+	input.add_theme_font_size_override("font_size", 18)
+	input.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
 	input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	input.max_length = max_chars
 	input.text = str(Settings.get(setting))
@@ -233,12 +261,13 @@ func _add_text_field(key: String, setting: String, max_chars: int, read_only := 
 	row.add_child(input)
 	if not read_only: focusables.append(input)
 
-func _add_action(key: String, action: Callable) -> void:
-	var row := _new_row(key)
+func _add_action(label_key: String, button_key: String, action: Callable) -> void:
+	var row := _new_row(label_key)
 	var button := Button.new()
-	button.text = I18n.t(key)
-	button.custom_minimum_size = Vector2(GameConfig.SETTINGS_VALUE_WIDTH * Settings.ui_scale, 48.0 * Settings.ui_scale)
-	button.add_theme_font_size_override("font_size", roundi(19.0 * Settings.ui_scale))
+	button.text = I18n.t(button_key)
+	button.custom_minimum_size = Vector2(GameConfig.SETTINGS_VALUE_WIDTH, 48.0)
+	button.add_theme_font_size_override("font_size", 19)
+	button.add_theme_font_override("font", ThemeBuilder.font("Oswald-Bold.woff2"))
 	button.pressed.connect(action)
 	row.add_child(button)
 	focusables.append(button)
