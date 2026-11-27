@@ -28,6 +28,7 @@ var network_interfaces: Array[Dictionary] = []
 var selected_interface := 0
 var upnp_status := ""
 var wheel: Control
+var network_help_overlay: Control
 var clock_label: Label
 var local_id := 2
 var wheel_index := 0
@@ -92,7 +93,8 @@ func _button(key: String, at: Vector2, dimensions: Vector2, action: Callable) ->
 func _entry() -> void:
 	_new_view()
 	_refresh_interfaces()
-	_label(I18n.t("online"), Vector2(0, 38), Vector2(1280, 60), 40)
+	_add_title_backplate(Vector2(380, 24), Vector2(520, 76))
+	_label(I18n.t("online"), Vector2(0, 32), Vector2(1280, 58), 40)
 	_entry_panel(Rect2(52, 112, 550, 510))
 	_entry_panel(Rect2(630, 112, 598, 510))
 	_label(I18n.t("online_create_title"), Vector2(80, 132), Vector2(490, 44), 28)
@@ -280,7 +282,8 @@ func _connected() -> void:
 
 func _mode_select(action: String) -> void:
 	_new_view()
-	_label(I18n.t("choose_mode"), Vector2(0, 52), Vector2(1280, 62), 42)
+	_add_title_backplate(Vector2(340, 18), Vector2(600, 78))
+	_label(I18n.t("choose_mode"), Vector2(0, 26), Vector2(1280, 62), 42)
 	var modes: Array = GameConfig.MODES
 	var card_buttons: Array[Button] = []
 	for index in modes.size():
@@ -472,7 +475,7 @@ func _build_room() -> void:
 		else:
 			var player: Dictionary = roster[index]
 			if room.mode == "greed":
-				var team := _button("team_" + str(player.team),center + Vector2(-110,-245),Vector2(220,45),func(): _action("team",{"index":index}))
+				var team := _button("team_change",center + Vector2(-78,-245),Vector2(156,40),func(): _action("team",{"index":index}))
 				team.disabled = local_id != int(room.host) or bool(player.is_bot)
 			_label(str(player.name), center + Vector2(-115, 14), Vector2(230, 36), 24)
 			_label(I18n.t("lobby_ready") if bool(player.ready) else "…", center + Vector2(-115, 48), Vector2(230, 36), 22).modulate = Color("63a83a") if player.ready else Color.WHITE
@@ -484,6 +487,12 @@ func _build_room() -> void:
 				crown.size = Vector2(48, 32)
 				crown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				view.add_child(crown)
+	if room.mode == "greed":
+		for team_index in range(2):
+			var team_x := 260.0 + team_index * 480.0
+			var team_label := _label(I18n.t("team_%d" % team_index), Vector2(team_x, 210.0), Vector2(280.0, 40.0), 20)
+			team_label.add_theme_font_override("font", ThemeBuilder.title_font(20))
+			team_label.add_theme_color_override("font_color", GameConfig.COLORS[team_index])
 	_button("characters", Vector2(40, 635), Vector2(240, 55), func(): locker_requested.emit())
 	_button("lobby_ready", Vector2(320, 625), Vector2(350, 70), func(): _action("ready")).grab_focus()
 	_button("dances", Vector2(700, 635), Vector2(240, 55), _open_wheel)
@@ -572,32 +581,65 @@ func _find_private_ipv4() -> String:
 	return ""
 
 func _open_network_help() -> void:
+	if is_instance_valid(network_help_overlay): return
+	var overlay := Control.new()
+	overlay.name = "NetworkHelpOverlay"
+	overlay.position = Vector2.ZERO
+	overlay.size = Vector2(1280, 720)
+	view.add_child(overlay)
+	network_help_overlay = overlay
+	var backdrop := ColorRect.new()
+	backdrop.size = overlay.size
+	backdrop.color = Color(0.02, 0.01, 0.04, 0.84)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(backdrop)
 	var panel := Panel.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.position = Vector2(-350, -205)
+	panel.name = "NetworkHelpPanel"
+	panel.position = Vector2(290, 155)
 	panel.size = Vector2(700, 410)
 	panel.add_theme_stylebox_override("panel", _network_panel_style())
 	var title := Label.new()
+	title.name = "NetworkHelpTitle"
 	title.text = I18n.t("network_help")
 	title.position = Vector2(30, 24)
 	title.size = Vector2(640, 42)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_override("font", ThemeBuilder.title_font(26))
+	title.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
 	panel.add_child(title)
 	var body := Label.new()
+	body.name = "NetworkHelpBody"
 	body.text = I18n.t("network_help_text")
 	body.position = Vector2(46, 84)
 	body.size = Vector2(608, 240)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body.add_theme_font_override("font", ThemeBuilder.font("Oswald-Medium.woff2"))
+	body.add_theme_font_size_override("font_size", 20)
+	body.add_theme_color_override("font_color", GameConfig.BONE_TEXT)
 	panel.add_child(body)
 	var back := Button.new()
+	back.name = "NetworkHelpBack"
 	back.text = I18n.t("back")
 	back.position = Vector2(230, 340)
 	back.size = Vector2(240, 48)
-	back.pressed.connect(panel.queue_free)
+	back.pressed.connect(func(): overlay.queue_free(); network_help_overlay = null)
 	panel.add_child(back)
-	get_tree().root.add_child(panel)
+	overlay.add_child(panel)
+	back.grab_focus()
+
+func _add_title_backplate(at: Vector2, dimensions: Vector2) -> void:
+	var plate := Panel.new()
+	plate.position = at
+	plate.size = dimensions
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.02, 0.07, 0.88)
+	style.border_color = Color("5c496d", 0.85)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	plate.add_theme_stylebox_override("panel", style)
+	view.add_child(plate)
+	view.move_child(plate, 0)
 
 func _events(events: Array) -> void:
 	for event: Dictionary in events:
@@ -620,11 +662,36 @@ func _open_wheel() -> void:
 	for index in 8:
 		var button := Button.new()
 		var item: String = str(equipped[index])
-		button.text = I18n.t(item if item.begins_with("dance") or item.begins_with("shout") else "cosmetic_" + item)
-		button.position = Vector2.from_angle(index * TAU / 8.0 - PI / 2.0) * 210.0 - Vector2(105, 26)
-		button.size = Vector2(210, 52)
+		button.text = ""
+		button.tooltip_text = I18n.t(item if item.begins_with("dance") or item.begins_with("shout") else ("emote_calavera" if item == "calavera" else "cosmetic_" + item))
+		button.position = Vector2.from_angle(index * TAU / 8.0 - PI / 2.0) * 134.0 - Vector2(36, 36)
+		button.size = Vector2(72, 72)
 		button.pressed.connect(func(): _social(item); _close_wheel())
 		wheel.add_child(button)
+		if item.begins_with("shout"):
+			var symbol := Label.new()
+			symbol.text = "✦"
+			symbol.position = button.position + Vector2(8, 2)
+			symbol.size = Vector2(56, 56)
+			symbol.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			symbol.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			symbol.add_theme_font_size_override("font_size", 34)
+			symbol.add_theme_color_override("font_color", GameConfig.EMBER)
+			wheel.add_child(symbol)
+		else:
+			var social_id := "jaja" if item.begins_with("dance") else item
+			var frame := GameConfig.SOCIAL_EMOTES.find(social_id)
+			if frame >= 0:
+				var icon := TextureRect.new()
+				icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				icon.position = button.position + Vector2(8, 8)
+				icon.size = Vector2(56, 56)
+				var atlas := AtlasTexture.new()
+				atlas.atlas = load("res://assets/ui/emotes%s.png" % ("2" if frame >= 8 else ""))
+				atlas.region = Rect2((frame % 8) * 128.0, 0.0, 128.0, 128.0)
+				icon.texture = atlas
+				icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				wheel.add_child(icon)
 	(wheel.get_child(0) as Button).grab_focus()
 
 func _close_wheel() -> void:

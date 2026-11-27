@@ -1091,20 +1091,21 @@ func _build_social_locker(root: Control) -> void:
 			shout_icon.text = "✦"
 		else:
 			var social_icon := _result_emote_icon(social_key if not social_key.begins_with("dance") else "jaja")
-			social_icon.position = button.position + Vector2(12, 10)
+			social_icon.position = button.position + Vector2(8, 8)
 			social_icon.size = GameConfig.LOCKER_SOCIAL_ICON_SIZE
 			wheel_panel.add_child(social_icon)
 		var slot_number := _hud_label(wheel_panel, button.position + Vector2(34, 2), Vector2(16, 16), 11, HORIZONTAL_ALIGNMENT_CENTER)
 		slot_number.text = str(slot + 1)
-	var selected_social := _hud_label(wheel_panel, Vector2(300, 130), Vector2(135, 22), 14, HORIZONTAL_ALIGNMENT_CENTER)
+	var selected_social := _hud_label(wheel_panel, Vector2(105, 168), Vector2(150, 24), 14, HORIZONTAL_ALIGNMENT_CENTER)
 	selected_social.text = _social_name(str(equipped[locker_social_slot]))
 	var ids: Array = GameConfig.SOCIAL_LEVELS.keys()
 	var scroll := ScrollContainer.new()
 	scroll.position = GameConfig.LOCKER_SOCIAL_GRID_RECT.position
 	scroll.size = GameConfig.LOCKER_SOCIAL_GRID_RECT.size
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
 	root.add_child(scroll)
 	var grid := GridContainer.new()
-	grid.columns = GameConfig.LOCKER_GRID_COLUMNS
+	grid.columns = GameConfig.LOCKER_SOCIAL_GRID_COLUMNS
 	grid.add_theme_constant_override("h_separation", GameConfig.LOCKER_GRID_GAP)
 	grid.add_theme_constant_override("v_separation", GameConfig.LOCKER_GRID_GAP)
 	scroll.add_child(grid)
@@ -1128,7 +1129,7 @@ func _build_social_locker(root: Control) -> void:
 			shout.custom_minimum_size = Vector2(154, 76)
 		else:
 			var icon := _result_emote_icon(item if not item.begins_with("dance") else "jaja")
-			icon.custom_minimum_size = Vector2(72, 72)
+			icon.custom_minimum_size = GameConfig.LOCKER_SOCIAL_ICON_SIZE
 			content.add_child(icon)
 		var pick := Button.new()
 		pick.text = _social_name(item)
@@ -1141,7 +1142,7 @@ func _build_social_locker(root: Control) -> void:
 		content.add_child(pick)
 
 func _social_name(item: String) -> String:
-	var key := item if item.begins_with("dance") or item.begins_with("shout") else "cosmetic_" + item
+	var key := item if item.begins_with("dance") or item.begins_with("shout") else ("emote_calavera" if item == "calavera" else "cosmetic_" + item)
 	return I18n.t(key)
 
 func _select_social_item(slot: int, item: String) -> void:
@@ -1976,12 +1977,12 @@ func _draw() -> void:
 		var pos: Vector2 = player.pos
 		if SpellRules.is_active(player, "magnet"):
 			var angle := elapsed * GameConfig.SPELL_MAGNET_ORBIT_SPEED + float(i) * 1.7
-			_draw_spell_sprite("iman", pos + Vector2.from_angle(angle) * GameConfig.SPELL_ORBIT_RADIUS, 0.85, GameConfig.SPELL_EFFECT_SCALE, angle)
+			_draw_spell_sprite("iman", pos + Vector2.from_angle(angle) * GameConfig.SPELL_ORBIT_RADIUS, GameConfig.SPELL_EFFECT_SOFT_VISIBILITY_ALPHA, GameConfig.SPELL_EFFECT_SCALE * GameConfig.SPELL_EFFECT_SOFT_VISIBILITY_SCALE, angle)
 		if SpellRules.is_active(player, "boots") and player.vel.length() > 10.0:
 			var boot_angle: float = player.vel.angle() + PI
 			_draw_spell_sprite("botas", pos + Vector2.from_angle(boot_angle) * 25.0, 0.75, GameConfig.SPELL_EFFECT_SCALE, boot_angle)
 		if SpellRules.is_active(player, "ring"):
-			_draw_spell_sprite("anillo", pos + Vector2(0, 3), 0.9, GameConfig.SPELL_EFFECT_SCALE, elapsed * 1.6)
+			_draw_spell_sprite("anillo", pos + Vector2(0, 3), GameConfig.SPELL_EFFECT_SOFT_VISIBILITY_ALPHA, GameConfig.SPELL_EFFECT_SCALE * GameConfig.SPELL_EFFECT_SOFT_VISIBILITY_SCALE, elapsed * 1.6)
 		if mode == "survival":
 			for stitch in GameConfig.SURVIVAL_LIVES:
 				var texture: Texture2D = STITCHES_TEXTURE
@@ -2017,8 +2018,7 @@ func _draw() -> void:
 			draw_texture_rect_region(sheet, Rect2(-112.0, -168.0, frame_width, frame_height), Rect2(frame * frame_width, int(animation.get("row", 0)) * frame_height, frame_width, frame_height), Color(1,1,1,0.35) if bool(player.get("ghost",false)) else Color.WHITE)
 			draw_set_transform(OFFSET)
 		if SpellRules.is_active(player, "cloak"):
-			var cloak_alpha := 0.72 if Settings.reduce_motion else 0.58 + 0.18 * sin(elapsed * 5.0)
-			_draw_spell_sprite("capa", pos, cloak_alpha, GameConfig.SPELL_EFFECT_SCALE, 0.0)
+			_draw_spell_sprite("capa", pos, GameConfig.SPELL_EFFECT_SOFT_VISIBILITY_ALPHA, GameConfig.SPELL_EFFECT_SCALE * GameConfig.SPELL_EFFECT_SOFT_VISIBILITY_SCALE, 0.0)
 		if float(player.get("frozen_left", 0.0)) > 0.0:
 			_draw_spell_sprite("hielo", pos, 0.9, GameConfig.SPELL_EFFECT_SCALE, 0.0)
 		var name_color: Color = player.color if i == local_player else Color.WHITE

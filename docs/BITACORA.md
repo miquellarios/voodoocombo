@@ -427,3 +427,9 @@ Formato de cada entrada:
 - Subido y reducido el bloque del podio para despejar el pie de pantalla. Las placas se separan de los puestos dibujados dentro de cada bloque; la cuarta posición tiene espacio propio a la derecha. Ambos botones comparten una fila de 40 px a 80 px del borde inferior.
 - Prueba headless Godot 4.7.2 verifica que puestos, placas y botones no se cruzan con 2, 3 y 4 jugadores. No se pudo guardar captura gráfica en este entorno headless.
 - Humanos: revisar visualmente las placas debajo de cada puesto, el cuarto personaje a la derecha y la fila inferior en ventanas 1280×720 y 1920×1080.
+
+### Fase 14h — Detalles de interfaz y alojamiento
+- La ayuda de conexión ahora es un modal propio con fondo oscuro, fuentes y colores del juego, texto ajustable y botón VOLVER. ELIGE MODO y JUGAR ONLINE tienen una placa de contraste. Codicia muestra un rótulo por pareja y deja el cambio de equipo en un botón separado.
+- La rueda del lobby usa iconos; la rueda de taquilla ocupa 360×360 px con iconos de 56 px. La colección se muestra en dos columnas con barra de desplazamiento siempre visible. El emote calavera tiene nombre propio. Imán, capa y anillo tienen escala +25 % y opacidad 85 %. Alojar desde el editor añade `--path` con la ruta del proyecto.
+- Godot 4.7.2: suite core, pruebas de sala online, ayuda/modal, argumentos de proceso del servidor, escala, marcador y podio pasan. La inspección visual mediante captura no está disponible en este entorno headless.
+- Humanos: revisar ayuda, títulos, equipos, taquilla y los tres efectos de hechizo; desde el editor comprobar que CREAR SALA aloja el servidor en el proyecto abierto.
